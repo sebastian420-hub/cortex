@@ -49,7 +49,7 @@ LocalAgent is a **terminal-based autonomous coding agent** that replicates Claud
 ┌─────────────────────────────────────────────────────────────────┐
 │                         USER TERMINAL                           │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │               Interactive REPL Interface                  │  │
+│  │               Interactive REPL Interface (cli.py)         │  │
 │  │  (prompt_toolkit + rich for display)                     │  │
 │  └────────────────────┬─────────────────────────────────────┘  │
 └───────────────────────┼─────────────────────────────────────────┘
@@ -58,12 +58,12 @@ LocalAgent is a **terminal-based autonomous coding agent** that replicates Claud
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      LOCAL AGENT CORE                           │
+│                      LOCAL AGENT CORE (agent.py)                │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Conversation Manager                         │  │
+│  │              Conversation Manager (core/conversation.py) │  │
 │  │  • Maintains message history                             │  │
 │  │  • Manages system prompts                                │  │
-│  │  • Handles context window                                │  │
+│  │  • Handles context window (core/context.py)              │  │
 │  └────────────────────┬─────────────────────────────────────┘  │
 │                       │                                         │
 │                       │ Orchestrates                            │
@@ -71,8 +71,9 @@ LocalAgent is a **terminal-based autonomous coding agent** that replicates Claud
 │  ┌────────────────────▼─────────────────────────────────────┐  │
 │  │              Agent Loop Controller                        │  │
 │  │  • Iterative reasoning cycle                             │  │
-│  │  • Tool call routing                                     │  │
+│  │  • Tool call routing (via tool classes)                   │  │
 │  │  • Termination detection                                 │  │
+│  │  • Streaming support (core/streaming.py)                 │  │
 │  └────────────────────┬─────────────────────────────────────┘  │
 └───────────────────────┼─────────────────────────────────────────┘
                         │
@@ -93,17 +94,27 @@ LocalAgent is a **terminal-based autonomous coding agent** that replicates Claud
                         │
                         ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                      TOOL EXECUTION LAYER                       │
+│                      TOOL EXECUTION LAYER (tools/)              │
 │  ┌──────────────┬──────────────┬──────────────┬─────────────┐  │
-│  │  File I/O    │   Command    │   Search     │   Project   │  │
-│  │   Tools      │   Executor   │   Engine     │   Context   │  │
+│  │  File I/O    │   Command    │   Search     │   Git       │  │
+│  │   Tools      │   Executor   │   Engine     │   Tools     │  │
 │  │              │              │              │             │  │
-│  │ • read_file  │ • execute_   │ • list_      │ • Load      │  │
-│  │ • write_file │   command    │   files      │   AGENT.md  │  │
-│  │              │ • Safety     │ • search_    │ • Index     │  │
-│  │              │   checks     │   files      │   project   │  │
+│  │ • read_file  │ • execute_   │ • list_      │ • git_      │  │
+│  │ • write_file │   command    │   files      │   status    │  │
+│  │              │ • Safety     │ • search_    │ • git_diff  │  │
+│  │              │   checks     │   files      │ • git_      │  │
+│  │              │   (security) │              │   commit    │  │
 │  └──────┬───────┴──────┬───────┴──────┬───────┴──────┬──────┘  │
-└─────────┼──────────────┼──────────────┼──────────────┼──────────┘
+│         │              │              │              │         │
+│         │              │              │              │         │
+│  ┌──────▼──────┬───────▼──────┬───────▼──────┬───────▼──────┐ │
+│  │   Test      │   Config     │   Storage    │   UI         │ │
+│  │   Tools     │   System    │   (sessions)  │   (display)  │ │
+│  │             │              │              │              │ │
+│  │ • run_tests │ • YAML      │ • save/load  │ • diffs      │ │
+│  │             │   config     │   sessions   │ • progress   │ │
+│  └─────────────┴──────────────┴──────────────┴──────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
           │              │              │              │
           │              │              │              │
           ▼              ▼              ▼              ▼
@@ -112,6 +123,7 @@ LocalAgent is a **terminal-based autonomous coding agent** that replicates Claud
 │  • Read/Write files in project directory                       │
 │  • Execute shell commands                                       │
 │  • Search through codebase                                      │
+│  • Git operations                                               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -155,9 +167,11 @@ class LocalAgent:
     model: str                    # Ollama model name
     project_dir: Path             # Working directory
     permission_mode: str          # normal/auto/plan
-    conversation_history: List    # Full message history
+    config: AgentConfig           # Configuration settings
+    conversation: ConversationManager  # Conversation history manager
     session_start: datetime       # Session tracking
     project_context: str          # Content from AGENT.md
+    history_dir: Path             # Session storage directory
 ```
 
 **Key Methods:**
@@ -165,59 +179,78 @@ class LocalAgent:
 __init__()                        # Initialize agent
 _load_project_context()           # Load AGENT.md
 _get_system_prompt()              # Generate system prompt
-execute_tool()                    # Route tool execution
-run_interactive()                 # Start REPL loop
-run_oneshot()                     # Execute single prompt
+execute_tool()                    # Route tool execution (uses tool classes)
 _process_message()                # Main agent loop
-_handle_command()                 # Handle /commands
+get_conversation_history()        # Get current conversation
+clear_conversation()               # Clear conversation history
 ```
+
+**Note**: `run_interactive()` and `run_oneshot()` are now in `cli.py`, and `_handle_command()` is also in the CLI module.
 
 ### 3.2 Tool Execution Layer
 
-Each tool is implemented as a private method with consistent interface:
+Tools are now implemented as separate classes inheriting from a base `Tool` class, located in `localagent/tools/`:
 
-**Tool Interface Pattern:**
+**Tool Base Class:**
 ```python
-def _tool_name(self, arg1: str, arg2: str = None) -> Dict[str, Any]:
-    """
-    Returns:
-        {
-            "success": bool,
-            "data": Any,
-            "error": str (if failed)
-        }
-    """
+class Tool(ABC):
+    def __init__(self, project_dir: Path, permission_mode: str, console):
+        self.project_dir = project_dir
+        self.permission_mode = permission_mode
+        self.console = console
+    
+    @abstractmethod
+    def execute(self, **kwargs: Any) -> Dict[str, Any]:
+        """Execute the tool with given arguments"""
+        pass
 ```
 
-**Available Tools:**
+**Available Tools (in `localagent/tools/`):**
 
-1. **File I/O Tools**
+1. **File I/O Tools** (`file_tools.py`)
    ```python
-   _read_file(path: str) -> Dict
-   _write_file(path: str, content: str) -> Dict
+   ReadFileTool.execute(path: str) -> Dict
+   WriteFileTool.execute(path: str, content: str) -> Dict
    ```
-   - Handles file reading/writing
+   - Handles file reading/writing with path validation
    - Shows syntax-highlighted previews
    - Requests permission for writes
    - Creates directories if needed
 
-2. **Command Execution**
+2. **Command Execution** (`command_tools.py`)
    ```python
-   _execute_command(command: str, reason: str) -> Dict
+   ExecuteCommandTool.execute(command: str, reason: str) -> Dict
    ```
    - Runs shell commands
    - Safety checks for dangerous operations
    - Captures stdout/stderr
    - Timeout protection (30s)
 
-3. **File Discovery**
+3. **File Discovery** (`search_tools.py`)
    ```python
-   _list_files(path: str, pattern: str) -> Dict
-   _search_files(query: str, file_pattern: str) -> Dict
+   ListFilesTool.execute(path: str, pattern: str) -> Dict
+   SearchFilesTool.execute(query: str, file_pattern: str) -> Dict
    ```
    - Directory listing with glob patterns
    - Full-text search via ripgrep/grep
    - Result limiting and formatting
+
+4. **Git Integration** (`git_tools.py`) - NEW
+   ```python
+   GitStatusTool.execute() -> Dict
+   GitDiffTool.execute(path: str) -> Dict
+   GitCommitTool.execute(message: str) -> Dict
+   GitLogTool.execute(limit: int) -> Dict
+   ```
+   - Git status, diff, commit, and log operations
+   - Permission checking for commits
+
+5. **Test Execution** (`test_tools.py`) - NEW
+   ```python
+   RunTestsTool.execute(pattern: str, verbose: bool) -> Dict
+   ```
+   - Auto-detects pytest or unittest
+   - Runs test suite with results parsing
 
 ### 3.3 Permission System
 
@@ -490,6 +523,37 @@ Operation   Operation   Operation
 ollama >= 0.1.0          # Local LLM server interface
 rich >= 13.0.0           # Terminal formatting
 prompt_toolkit >= 3.0.0  # Advanced input handling
+pyyaml >= 6.0            # Configuration file support
+```
+
+**Project Structure:**
+```
+localagent/
+├── agent.py             # Main agent class
+├── cli.py               # Command-line interface
+├── config.py            # Configuration management
+├── models.py            # Data models (PermissionMode)
+├── tools/               # Tool implementations
+│   ├── base.py         # Base tool class
+│   ├── file_tools.py
+│   ├── command_tools.py
+│   ├── search_tools.py
+│   ├── git_tools.py    # NEW
+│   └── test_tools.py   # NEW
+├── core/                # Core functionality
+│   ├── security.py     # Path validation, safety
+│   ├── context.py      # Context window management
+│   ├── conversation.py # Conversation manager
+│   └── streaming.py    # Streaming responses
+├── ui/                  # User interface
+│   ├── console.py      # Console utilities
+│   ├── display.py      # Display helpers
+│   └── repl.py         # REPL interface
+├── storage/             # Data persistence
+│   ├── history.py      # Command history
+│   └── sessions.py     # Session management
+└── utils/               # Utilities
+    └── errors.py       # Error handling & retry
 ```
 
 **System Dependencies:**
@@ -824,13 +888,18 @@ subprocess.run(
 - Conversation history stored locally
 - No telemetry or tracking
 
-**Data Storage:**
+**Data Storage:** ✅ IMPLEMENTED in `storage/` module
 ```
 ~/.localagent/
-  ├── sessions/          # Conversation history
-  │   └── 2024-01-07.json
-  └── history.txt        # Command history
+  ├── sessions/          # Conversation history (storage/sessions.py)
+  │   └── session_name.json
+  └── history.txt        # Command history (storage/history.py)
 ```
+
+**Session Management:**
+- Save/load conversations via `SessionManager`
+- CLI commands: `--save-session`, `--load-session`, `--list-sessions`
+- In-session commands: `/save`, `/load`, `/sessions`
 
 ---
 
@@ -879,10 +948,15 @@ ollama pull llama3.3:70b-q8_0
 
 **3. Context Management:**
 ```python
-# Trim old messages when context gets large
-if len(history) > 50:
-    # Keep system prompt + recent 40 messages
-    history = [history[0]] + history[-40:]
+# Now handled by ConversationManager in core/conversation.py
+# Automatically truncates when max_tokens exceeded
+# Keeps system prompt + recent N messages
+manager = ConversationManager(
+    system_prompt="...",
+    max_tokens=100000,
+    keep_recent=20
+)
+manager._optimize()  # Called automatically after each message
 ```
 
 **4. Caching:**
@@ -970,25 +1044,19 @@ def _start_server(self, command: str) -> Dict:
     """Start development server"""
 ```
 
-**Git Tools:**
+**Git Tools:** ✅ IMPLEMENTED in `tools/git_tools.py`
 ```python
-def _git_status(self) -> Dict:
-    """Show git status"""
-    
-def _git_commit(self, message: str) -> Dict:
-    """Commit changes with message"""
-    
-def _git_diff(self, file: str = None) -> Dict:
-    """Show git diff"""
+GitStatusTool.execute() -> Dict
+GitDiffTool.execute(path: str) -> Dict
+GitCommitTool.execute(message: str) -> Dict
+GitLogTool.execute(limit: int) -> Dict
 ```
 
-**Testing Tools:**
+**Testing Tools:** ✅ IMPLEMENTED in `tools/test_tools.py`
 ```python
-def _run_tests(self, pattern: str = None) -> Dict:
-    """Run test suite"""
-    
-def _generate_tests(self, file: str) -> Dict:
-    """Generate test file for given module"""
+RunTestsTool.execute(pattern: str, verbose: bool) -> Dict
+# Auto-detects pytest or unittest
+# Parses and displays test results
 ```
 
 ### 10.3 Plugin Architecture (Future)
@@ -1059,11 +1127,15 @@ MainAgent:
 ## 12. Future Enhancements
 
 ### Short-term (1-2 months)
+- [x] Better context window management ✅
+- [x] Improved error recovery ✅
+- [x] Session management (save/load conversations) ✅
+- [x] Git integration tools ✅
+- [x] Test execution tools ✅
+- [x] Configuration system ✅
+- [x] Streaming responses (experimental) ✅
 - [ ] Parallel tool execution
-- [ ] Better context window management
 - [ ] File caching system
-- [ ] Improved error recovery
-- [ ] Session management (save/load conversations)
 
 ### Medium-term (3-6 months)
 - [ ] Plugin architecture
