@@ -1,0 +1,9 @@
+# Default configuration for LocalAgent
+
+model: llama3.2
+permission_mode: normal
+max_iterations: 15
+max_tokens: 100000
+keep_recent_messages: 20
+auto_save: false
+
