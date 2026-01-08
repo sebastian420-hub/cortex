@@ -90,10 +90,12 @@ class SearchFilesTool(Tool):
             
             if output:
                 # Limit output
-                lines = output.split('\n')[:50]
+                output_lines = output.split('\n')
+                lines = output_lines[:50]
                 preview = '\n'.join(lines)
-                if len(output.split('\n')) > 50:
-                    preview += f"\n... ({len(output.split('\n')) - 50} more matches)"
+                if len(output_lines) > 50:
+                    more_matches = len(output_lines) - 50
+                    preview += f"\n... ({more_matches} more matches)"
                 
                 if self.console:
                     self.console.print(Panel(preview, title="Search Results", border_style="cyan"))

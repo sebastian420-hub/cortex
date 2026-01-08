@@ -43,6 +43,13 @@ class LocalAgent:
         self.config = config or AgentConfig()
         self.session_start = datetime.now()
         
+        # Initialize history directory
+        self.history_dir = Path.home() / ".localagent" / "sessions"
+        self.history_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Load project context (must be before _get_system_prompt)
+        self.project_context = self._load_project_context()
+        
         # Initialize conversation manager
         system_prompt = self._get_system_prompt()
         self.conversation = ConversationManager(
@@ -50,16 +57,6 @@ class LocalAgent:
             max_tokens=self.config.max_tokens,
             keep_recent=self.config.keep_recent_messages
         )
-        
-        # Initialize history directory
-        self.history_dir = Path.home() / ".localagent" / "sessions"
-        self.history_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Load project context
-        self.project_context = self._load_project_context()
-        
-        # Update system prompt with context
-        self.conversation.history[0]["content"] = self._get_system_prompt()
     
     def _load_project_context(self) -> str:
         """Load AGENT.md or README.md for project context"""

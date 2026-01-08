@@ -34,10 +34,12 @@ class ReadFileTool(Tool):
             # Show preview
             if self.console:
                 ext = full_path.suffix.lstrip('.') or "txt"
-                preview_lines = content.split('\n')[:15]
+                content_lines = content.split('\n')
+                preview_lines = content_lines[:15]
                 preview = '\n'.join(preview_lines)
-                if len(content.split('\n')) > 15:
-                    preview += f"\n... ({len(content.split('\n')) - 15} more lines)"
+                if len(content_lines) > 15:
+                    more_lines = len(content_lines) - 15
+                    preview += f"\n... ({more_lines} more lines)"
                 
                 syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
                 self.console.print(Panel(syntax, title=f"📄 {path}", border_style="cyan"))
@@ -85,10 +87,12 @@ class WriteFileTool(Tool):
             # Show preview of new content
             if self.console:
                 ext = full_path.suffix.lstrip('.') or "txt"
-                preview_lines = content.split('\n')[:20]
+                content_lines = content.split('\n')
+                preview_lines = content_lines[:20]
                 preview = '\n'.join(preview_lines)
-                if len(content.split('\n')) > 20:
-                    preview += f"\n... ({len(content.split('\n')) - 20} more lines)"
+                if len(content_lines) > 20:
+                    more_lines = len(content_lines) - 20
+                    preview += f"\n... ({more_lines} more lines)"
                 
                 syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
                 self.console.print(Panel(syntax, title=f"New content: {path}", border_style="yellow"))
