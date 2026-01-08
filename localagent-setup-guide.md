@@ -31,27 +31,31 @@ ollama pull llama3.3:70b      # 70B - Much smarter, needs good GPU
 ollama pull qwen2.5:32b       # 32B - Good balance
 ```
 
-### Step 3: Install Python Dependencies
+### Step 3: Install LocalAgent
 
 ```bash
-pip install ollama rich prompt_toolkit
+# Clone the repository
+git clone https://github.com/sebastian420-hub/local_terminal_agent.git
+cd local_terminal_agent
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install in development mode (creates 'localagent' command)
+pip install -e .
 ```
 
-### Step 4: Save the Agent Code
-
-Save the agent code from the artifact as `localagent.py`
-
-### Step 5: Run It!
+### Step 4: Run It!
 
 ```bash
-# Make it executable (optional)
-chmod +x localagent.py
-
 # Navigate to any project
 cd ~/my-project
 
-# Start the agent
-python localagent.py
+# Start the agent (now available as 'localagent' command)
+localagent
+
+# Or use Python module syntax
+python -m localagent.cli
 ```
 
 ---
@@ -62,7 +66,7 @@ python localagent.py
 
 ```bash
 cd my-project
-python localagent.py
+localagent
 
 > add logging to api.py
 > create a README file
@@ -74,31 +78,51 @@ python localagent.py
 ### One-Shot Mode
 
 ```bash
-python localagent.py -p "list all Python files"
-python localagent.py -p "add type hints to utils.py"
+localagent -p "list all Python files"
+localagent -p "add type hints to utils.py"
 ```
 
 ### Different Models
 
 ```bash
 # Use Llama 3.3 70B (much smarter)
-python localagent.py --model llama3.3:70b
+localagent --model llama3.3:70b
 
 # Use Qwen 2.5 (good at coding)
-python localagent.py --model qwen2.5:32b
+localagent --model qwen2.5:32b
 ```
 
 ### Permission Modes
 
 ```bash
 # Normal mode (asks for everything) - DEFAULT
-python localagent.py
+localagent
 
 # Auto-approve mode (dangerous! use in containers)
-python localagent.py --auto-approve
+localagent --auto-approve
 
 # Plan mode (read-only, no changes)
-python localagent.py --plan-mode
+localagent --plan-mode
+```
+
+### Session Management
+
+```bash
+# Save current session
+localagent --save-session mywork
+
+# Load a saved session
+localagent --load-session mywork
+
+# List all sessions
+localagent --list-sessions
+```
+
+### Configuration File
+
+```bash
+# Use a config file
+localagent --config config.yaml
 ```
 
 ---
@@ -109,7 +133,7 @@ python localagent.py --plan-mode
 
 ```bash
 cd flask-app
-python localagent.py
+localagent
 
 > add a /health endpoint that returns server status
 
@@ -193,6 +217,9 @@ While in interactive mode, you can use these commands:
 /mode auto         Change to auto-approve mode
 /mode plan         Change to plan mode (read-only)
 /project           Show project information
+/save [name]       Save current session
+/load [name]       Load a saved session
+/sessions          List saved sessions
 /exit              Exit LocalAgent
 ```
 
@@ -200,55 +227,18 @@ While in interactive mode, you can use these commands:
 
 ## 🔧 Making It a Global Command (Like Claude Code)
 
-Want to run `localagent` from anywhere? Here's how:
-
-### Option 1: Symlink (Quick & Easy)
+The `localagent` command is automatically available system-wide after installation:
 
 ```bash
-# Make executable
-chmod +x localagent.py
-
-# Create symlink in your PATH
-sudo ln -s $(pwd)/localagent.py /usr/local/bin/localagent
-
-# Now use it anywhere!
-cd ~/any-project
-localagent
-```
-
-### Option 2: Install with pip (Professional)
-
-Create `setup.py`:
-
-```python
-from setuptools import setup
-
-setup(
-    name="localagent",
-    version="1.0.0",
-    py_modules=["localagent"],
-    install_requires=[
-        "ollama>=0.1.0",
-        "rich>=13.0.0",
-        "prompt_toolkit>=3.0.0"
-    ],
-    entry_points={
-        "console_scripts": [
-            "localagent=localagent:main",
-        ],
-    },
-)
-```
-
-Then install:
-
-```bash
+# Install the package
 pip install -e .
 
-# Now works system-wide!
+# Now use it from anywhere!
 cd ~/any-project
 localagent
 ```
+
+The package includes a proper `setup.py` and `pyproject.toml` with entry points configured, so the `localagent` command is automatically added to your PATH during installation.
 
 ---
 
@@ -394,18 +384,28 @@ ollama list
 
 ```bash
 # Use a smaller model
-python localagent.py --model llama3.2
+localagent --model llama3.2
 
 # Or if you have a good GPU, use quantized version
 ollama pull llama3.3:70b-q4_K_M
-python localagent.py --model llama3.3:70b-q4_K_M
+localagent --model llama3.3:70b-q4_K_M
 ```
 
 ### "Permission denied" on commands
 
 ```bash
 # Don't run with sudo - the agent asks for permission
-python localagent.py  # Not: sudo python localagent.py
+localagent  # Not: sudo localagent
+```
+
+### "Command not found: localagent"
+
+```bash
+# Make sure you installed the package
+pip install -e .
+
+# Or use Python module syntax
+python -m localagent.cli
 ```
 
 ---
@@ -456,7 +456,7 @@ Try it now:
 
 ```bash
 cd your-project
-python localagent.py
+localagent
 
 > create a simple hello world API endpoint
 ```
