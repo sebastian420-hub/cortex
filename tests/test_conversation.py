@@ -31,7 +31,7 @@ def test_conversation_clear():
     )
     
     manager.add_user_message("Hello")
-    manager.clear()
+    manager.clear(keep_system=False)
     
     history = manager.get_history()
     assert len(history) == 0

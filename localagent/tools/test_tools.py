@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from .base import Tool
+from ..utils.errors import create_error_response, create_success_response, ErrorType
 
 
 class RunTestsTool(Tool):
@@ -66,7 +67,11 @@ class RunTestsTool(Tool):
         framework = self._detect_test_framework()
         
         if not framework:
-            return {"error": "Could not detect test framework. Install pytest or use unittest."}
+            return create_error_response(
+                "Could not detect test framework. Install pytest or use unittest.",
+                ErrorType.VALIDATION,
+                {"pattern": pattern}
+            )
         
         if self.console:
             self.console.print(f"[blue]🧪 Running tests with {framework}...[/blue]")
@@ -105,14 +110,28 @@ class RunTestsTool(Tool):
                     border_style=border_style
                 ))
             
-            return {
-                "success": result.returncode == 0,
-                "output": output,
-                "exit_code": result.returncode,
-                "framework": framework
-            }
+            if result.returncode == 0:
+                return create_success_response({
+                    "output": output,
+                    "exit_code": result.returncode,
+                    "framework": framework
+                })
+            else:
+                return create_error_response(
+                    f"Tests failed with exit code {result.returncode}",
+                    ErrorType.EXECUTION,
+                    {"pattern": pattern, "framework": framework, "exit_code": result.returncode, "output": output}
+                )
         except subprocess.TimeoutExpired:
-            return {"error": "Tests timed out after 120 seconds"}
+            return create_error_response(
+                "Tests timed out after 120 seconds",
+                ErrorType.TIMEOUT,
+                {"pattern": pattern, "framework": framework}
+            )
         except Exception as e:
-            return {"error": str(e)}
+            return create_error_response(
+                str(e),
+                ErrorType.EXECUTION,
+                {"pattern": pattern, "framework": framework}
+            )
 

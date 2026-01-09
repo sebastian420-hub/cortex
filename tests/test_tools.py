@@ -39,7 +39,77 @@ def test_write_file_plan_mode(tmp_path):
     result = tool.execute(path="test.txt", content="Test content")
     
     assert result["success"] is False
-    assert "Plan mode" in result["message"]
+    assert result["permission_denied"] is True
+    assert "Plan mode" in result["reason"]
+    assert result["action"] == "write_file"
+
+
+def test_read_file_not_found(tmp_path):
+    """Test read_file returns proper error format for missing file"""
+    from localagent.ui.console import console
+    from localagent.utils.errors import ErrorType
+    
+    tool = create_tool_instance("read_file", tmp_path, PermissionMode.NORMAL, console)
+    result = tool.execute(path="nonexistent.txt")
+    
+    assert result["success"] is False
+    assert result["error_type"] == ErrorType.NOT_FOUND
+    assert "error" in result
+    assert "retryable" in result
+    assert result["retryable"] is False
+
+
+def test_write_file_permission_denied(tmp_path):
+    """Test write_file returns permission denial format"""
+    from localagent.ui.console import console
+    from localagent.utils.errors import ErrorType
+    
+    tool = create_tool_instance("write_file", tmp_path, PermissionMode.PLAN, console)
+    result = tool.execute(path="test.txt", content="Test")
+    
+    assert result["success"] is False
+    assert result["permission_denied"] is True
+    assert result["error_type"] == ErrorType.PERMISSION
+    assert result["action"] == "write_file"
+    assert "reason" in result
+
+
+def test_tool_result_validation(tmp_path):
+    """Test that tool results have proper structure"""
+    from localagent.ui.console import console
+    
+    tool = create_tool_instance("read_file", tmp_path, PermissionMode.NORMAL, console)
+    
+    # Create test file
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("Hello")
+    
+    result = tool.execute(path="test.txt")
+    
+    # Success response should have success=True
+    assert result["success"] is True
+    assert "content" in result
+    
+    # Test error response structure
+    result = tool.execute(path="nonexistent.txt")
+    assert result["success"] is False
+    assert "error" in result
+    assert "error_type" in result
+    assert "retryable" in result
+
+
+def test_execute_command_retryable_error(tmp_path):
+    """Test that execution errors are marked as retryable"""
+    from localagent.ui.console import console
+    from localagent.utils.errors import ErrorType
+    
+    tool = create_tool_instance("execute_command", tmp_path, PermissionMode.AUTO_APPROVE, console)
+    # Use a command that will fail
+    result = tool.execute(command="nonexistent_command_xyz", reason="test")
+    
+    assert result["success"] is False
+    assert result["error_type"] in [ErrorType.EXECUTION, ErrorType.NOT_FOUND]
+    assert result.get("retryable", False) is True
 
 
 def test_list_files_tool(tmp_path):

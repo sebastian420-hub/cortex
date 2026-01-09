@@ -12,11 +12,13 @@ class ConversationManager:
         self,
         system_prompt: str,
         max_tokens: int = 100000,
-        keep_recent: int = 20
+        keep_recent: int = 20,
+        model: str = "gpt-4"
     ):
         self.system_prompt = system_prompt
         self.max_tokens = max_tokens
         self.keep_recent = keep_recent
+        self.model = model
         self.history: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt}
         ]
@@ -47,10 +49,15 @@ class ConversationManager:
     def add_tool_result(self, tool_call_id: str, result: Dict[str, Any]) -> None:
         """Add a tool result to the conversation"""
         import json
+        # Ensure result has standard format before stringifying
+        # This ensures consistent structure even if tools don't use helper functions
+        if "success" not in result:
+            result["success"] = "error" not in result
+        
         self.history.append({
             "role": "tool",
             "tool_call_id": tool_call_id,
-            "content": json.dumps(result)
+            "content": json.dumps(result, ensure_ascii=False)  # Keep JSON but ensure format
         })
         self._optimize()
     
@@ -67,16 +74,17 @@ class ConversationManager:
     
     def _optimize(self) -> None:
         """Optimize conversation history if it exceeds token limit"""
-        current_tokens = get_conversation_tokens(self.history)
+        current_tokens = get_conversation_tokens(self.history, self.model)
         if current_tokens > self.max_tokens:
             self.history = truncate_history(
                 self.history,
                 max_tokens=self.max_tokens,
                 keep_system=True,
-                keep_recent=self.keep_recent
+                keep_recent=self.keep_recent,
+                model=self.model
             )
     
     def get_token_count(self) -> int:
         """Get current token count"""
-        return get_conversation_tokens(self.history)
+        return get_conversation_tokens(self.history, self.model)
 

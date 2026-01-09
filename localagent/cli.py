@@ -16,6 +16,8 @@ from .ui.console import console
 from .ui.repl import REPL
 from .storage.history import get_history_file
 from .storage.sessions import SessionManager
+from .output import OutputFormat
+from .hooks import HookManager
 
 __version__ = "1.0.0"
 
@@ -43,6 +45,9 @@ Examples:
   localagent --config config.yaml      # Use config file
   localagent --save-session mywork     # Save session
   localagent --load-session mywork    # Load session
+  localagent -o json -p "list files"   # JSON output for scripting
+  localagent --hooks-config hooks.yaml # Custom hooks config
+  localagent --no-hooks                # Disable hook system
         """
     )
     
@@ -111,7 +116,27 @@ Examples:
         default=None,
         help="Project directory (default: current directory)"
     )
-    
+
+    parser.add_argument(
+        "--output-format", "-o",
+        choices=["text", "json", "stream-json"],
+        default=None,
+        help="Output format: text (default), json, or stream-json"
+    )
+
+    parser.add_argument(
+        "--no-hooks",
+        action="store_true",
+        help="Disable hook system"
+    )
+
+    parser.add_argument(
+        "--hooks-config",
+        type=str,
+        default=None,
+        help="Path to hooks configuration file (YAML)"
+    )
+
     args = parser.parse_args()
     
     # Check Ollama connection
@@ -153,17 +178,48 @@ Examples:
     
     # Handle session management commands
     session_manager = SessionManager(Path.home() / ".localagent" / "sessions")
-    
+
     if args.list_sessions:
         session_manager.show_sessions()
         sys.exit(0)
-    
+
+    # Determine output format
+    output_format = OutputFormat.TEXT
+    if args.output_format:
+        output_format = OutputFormat(args.output_format)
+    elif config.output_format:
+        output_format = OutputFormat(config.output_format)
+
+    # Set up hook manager
+    hook_manager = HookManager()
+    if not args.no_hooks and config.hooks_enabled:
+        # Load hooks from config
+        if config.hooks:
+            hook_manager = HookManager.from_config({"hooks": config.hooks})
+
+        # Load hooks from separate config file if specified
+        if args.hooks_config:
+            hooks_config_path = Path(args.hooks_config)
+            if hooks_config_path.exists():
+                try:
+                    import yaml
+                    with open(hooks_config_path) as f:
+                        hooks_data = yaml.safe_load(f) or {}
+                    hook_manager = HookManager.from_config(hooks_data)
+                    console.print(f"[dim]Loaded hooks from {args.hooks_config}[/dim]")
+                except Exception as e:
+                    console.print(f"[yellow]Warning:[/yellow] Failed to load hooks config: {e}")
+    elif args.no_hooks:
+        hook_manager.disable()
+
     # Create agent
     agent = LocalAgent(
         model=config.model,
         project_dir=project_dir,
         permission_mode=permission_mode,
-        config=config
+        config=config,
+        hook_manager=hook_manager,
+        output_format=output_format,
     )
     
     # Load session if requested

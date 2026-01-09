@@ -9,6 +9,7 @@ from rich.prompt import Confirm
 from .base import Tool
 from ..core.security import is_dangerous_command
 from ..models import PermissionMode
+from ..utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType
 
 
 class ExecuteCommandTool(Tool):
@@ -20,7 +21,11 @@ class ExecuteCommandTool(Tool):
         if self.permission_mode == PermissionMode.PLAN:
             if self.console:
                 self.console.print(f"[yellow]⏸  PLAN MODE:[/yellow] Would execute: {command}")
-            return {"success": False, "message": "Plan mode - no commands allowed"}
+            return create_permission_denial(
+                "Plan mode - no commands allowed",
+                "execute_command",
+                {"command": command, "permission_mode": "plan"}
+            )
         
         if self.console:
             self.console.print(f"[blue]🔧 Command:[/blue] {command}")
@@ -31,14 +36,22 @@ class ExecuteCommandTool(Tool):
         if is_dangerous_command(command):
             if self.console:
                 self.console.print("[red]🛑 BLOCKED:[/red] Dangerous command detected")
-            return {"error": "Dangerous command blocked for safety"}
+            return create_error_response(
+                "Dangerous command blocked for safety",
+                ErrorType.SECURITY,
+                {"command": command}
+            )
         
         # Ask for approval
         if self.permission_mode == PermissionMode.NORMAL and self.console:
             if not Confirm.ask(f"[bold]Execute: {command}?[/bold]"):
                 if self.console:
                     self.console.print("[red]✗[/red] Cancelled by user")
-                return {"success": False, "message": "Cancelled by user"}
+                return create_permission_denial(
+                    "Cancelled by user",
+                    "execute_command",
+                    {"command": command}
+                )
         
         try:
             result = subprocess.run(
@@ -66,14 +79,31 @@ class ExecuteCommandTool(Tool):
                         border_style="red"
                     ))
             
-            return {
-                "success": result.returncode == 0,
-                "output": output,
-                "exit_code": result.returncode
-            }
+            if result.returncode == 0:
+                return create_success_response({
+                    "output": output,
+                    "exit_code": result.returncode
+                })
+            else:
+                return create_error_response(
+                    f"Command failed with exit code {result.returncode}",
+                    ErrorType.EXECUTION,
+                    {"command": command, "exit_code": result.returncode, "output": output},
+                    retryable=True
+                )
             
         except subprocess.TimeoutExpired:
-            return {"error": "Command timed out after 30 seconds"}
+            return create_error_response(
+                "Command timed out after 30 seconds",
+                ErrorType.TIMEOUT,
+                {"command": command},
+                retryable=True
+            )
         except Exception as e:
-            return {"error": str(e)}
+            return create_error_response(
+                str(e),
+                ErrorType.EXECUTION,
+                {"command": command},
+                retryable=True
+            )
 
