@@ -2,7 +2,7 @@
 
 import pytest
 
-from localagent.hooks import (
+from cortex.hooks import (
     HookAction,
     HookEvent,
     HookResult,

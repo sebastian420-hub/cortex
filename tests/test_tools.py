@@ -2,8 +2,8 @@
 
 import pytest
 from pathlib import Path
-from localagent.tools import create_tool_instance
-from localagent.models import PermissionMode
+from cortex.tools import create_tool_instance
+from cortex.models import PermissionMode
 
 
 def test_read_file_tool(tmp_path, monkeypatch):
@@ -11,7 +11,7 @@ def test_read_file_tool(tmp_path, monkeypatch):
     test_file = tmp_path / "test.txt"
     test_file.write_text("Hello, World!")
     
-    from localagent.ui.console import console
+    from cortex.ui.console import console
     tool = create_tool_instance("read_file", tmp_path, PermissionMode.NORMAL, console)
     result = tool.execute(path="test.txt")
     
@@ -22,7 +22,7 @@ def test_read_file_tool(tmp_path, monkeypatch):
 
 def test_write_file_tool(tmp_path, monkeypatch):
     """Test write_file tool"""
-    from localagent.ui.console import console
+    from cortex.ui.console import console
     
     tool = create_tool_instance("write_file", tmp_path, PermissionMode.AUTO_APPROVE, console)
     result = tool.execute(path="test.txt", content="Test content")
@@ -33,7 +33,7 @@ def test_write_file_tool(tmp_path, monkeypatch):
 
 def test_write_file_plan_mode(tmp_path):
     """Test that write_file is blocked in plan mode"""
-    from localagent.ui.console import console
+    from cortex.ui.console import console
     
     tool = create_tool_instance("write_file", tmp_path, PermissionMode.PLAN, console)
     result = tool.execute(path="test.txt", content="Test content")
@@ -46,8 +46,8 @@ def test_write_file_plan_mode(tmp_path):
 
 def test_read_file_not_found(tmp_path):
     """Test read_file returns proper error format for missing file"""
-    from localagent.ui.console import console
-    from localagent.utils.errors import ErrorType
+    from cortex.ui.console import console
+    from cortex.utils.errors import ErrorType
     
     tool = create_tool_instance("read_file", tmp_path, PermissionMode.NORMAL, console)
     result = tool.execute(path="nonexistent.txt")
@@ -61,8 +61,8 @@ def test_read_file_not_found(tmp_path):
 
 def test_write_file_permission_denied(tmp_path):
     """Test write_file returns permission denial format"""
-    from localagent.ui.console import console
-    from localagent.utils.errors import ErrorType
+    from cortex.ui.console import console
+    from cortex.utils.errors import ErrorType
     
     tool = create_tool_instance("write_file", tmp_path, PermissionMode.PLAN, console)
     result = tool.execute(path="test.txt", content="Test")
@@ -76,7 +76,7 @@ def test_write_file_permission_denied(tmp_path):
 
 def test_tool_result_validation(tmp_path):
     """Test that tool results have proper structure"""
-    from localagent.ui.console import console
+    from cortex.ui.console import console
     
     tool = create_tool_instance("read_file", tmp_path, PermissionMode.NORMAL, console)
     
@@ -100,8 +100,8 @@ def test_tool_result_validation(tmp_path):
 
 def test_execute_command_retryable_error(tmp_path):
     """Test that execution errors are marked as retryable"""
-    from localagent.ui.console import console
-    from localagent.utils.errors import ErrorType
+    from cortex.ui.console import console
+    from cortex.utils.errors import ErrorType
     
     tool = create_tool_instance("execute_command", tmp_path, PermissionMode.AUTO_APPROVE, console)
     # Use a command that will fail
@@ -119,7 +119,7 @@ def test_list_files_tool(tmp_path):
     (tmp_path / "file2.py").write_text("test")
     (tmp_path / ".hidden").write_text("test")
     
-    from localagent.ui.console import console
+    from cortex.ui.console import console
     tool = create_tool_instance("list_files", tmp_path, PermissionMode.NORMAL, console)
     result = tool.execute(path=".")
     
@@ -138,7 +138,7 @@ def test_git_status_tool(tmp_path, monkeypatch):
     (tmp_path / "test.txt").write_text("test")
     subprocess.run(["git", "add", "test.txt"], cwd=tmp_path, capture_output=True)
     
-    from localagent.ui.console import console
+    from cortex.ui.console import console
     tool = create_tool_instance("git_status", tmp_path, PermissionMode.NORMAL, console)
     result = tool.execute()
     

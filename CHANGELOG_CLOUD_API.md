@@ -39,7 +39,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 
 ### Phase 1: Provider Abstraction Layer
 
-**File**: `localagent/core/providers.py` (NEW)
+**File**: `cortex/core/providers.py` (NEW)
 
 - Created `ModelProvider` abstract base class
 - Implemented `OllamaProvider` for local models
@@ -49,7 +49,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 
 ### Phase 2: Agent Integration
 
-**File**: `localagent/agent.py`
+**File**: `cortex/agent.py`
 
 - Replaced direct Ollama calls with provider abstraction
 - Added provider initialization in `__init__`
@@ -59,7 +59,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 
 ### Phase 3: Streaming Support
 
-**File**: `localagent/core/streaming.py`
+**File**: `cortex/core/streaming.py`
 
 - Renamed `stream_ollama_response()` to `stream_model_response()`
 - Updated to accept provider parameter
@@ -67,7 +67,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 
 ### Phase 4: Configuration
 
-**File**: `localagent/config.py`
+**File**: `cortex/config.py`
 
 - Added `provider` field to `AgentConfig`
 - Added environment variable support for `LOCALAGENT_PROVIDER`
@@ -79,7 +79,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 
 ### Phase 5: CLI Updates
 
-**File**: `localagent/cli.py`
+**File**: `cortex/cli.py`
 
 - Removed hardcoded Ollama connection checks
 - Added `--provider` argument to override auto-detection
@@ -96,7 +96,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 
 ### Phase 7: Error Handling
 
-**File**: `localagent/utils/errors.py`
+**File**: `cortex/utils/errors.py`
 
 - Added `PROVIDER` error type
 - Provider errors handled gracefully
@@ -130,8 +130,8 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 ### Local Models (Ollama)
 
 ```bash
-localagent --model llama3.2
-localagent --model deepseek-r1:8b
+cortex --model llama3.2
+cortex --model deepseek-r1:8b
 ```
 
 ### Cloud APIs
@@ -139,21 +139,21 @@ localagent --model deepseek-r1:8b
 ```bash
 # DeepSeek (requires DEEPSEEK_API_KEY)
 export DEEPSEEK_API_KEY=your_key_here
-localagent --model deepseek-chat
+cortex --model deepseek-chat
 
 # Anthropic Claude (requires ANTHROPIC_API_KEY)
 export ANTHROPIC_API_KEY=your_key_here
-localagent --model claude-3-haiku-20240307
+cortex --model claude-3-haiku-20240307
 ```
 
 ### Provider Management
 
 ```bash
 # List available providers
-localagent --list-providers
+cortex --list-providers
 
 # Override auto-detection
-localagent --provider deepseek --model deepseek-chat
+cortex --provider deepseek --model deepseek-chat
 ```
 
 ---
@@ -191,12 +191,12 @@ localagent --provider deepseek --model deepseek-chat
 ## Files Modified
 
 ### Core Files
-1. `localagent/core/providers.py` - NEW - Provider abstraction layer
-2. `localagent/agent.py` - Updated to use provider abstraction
-3. `localagent/core/streaming.py` - Updated for multiple providers
-4. `localagent/config.py` - Added provider configuration
-5. `localagent/cli.py` - Updated CLI for cloud support
-6. `localagent/utils/errors.py` - Added provider error type
+1. `cortex/core/providers.py` - NEW - Provider abstraction layer
+2. `cortex/agent.py` - Updated to use provider abstraction
+3. `cortex/core/streaming.py` - Updated for multiple providers
+4. `cortex/config.py` - Added provider configuration
+5. `cortex/cli.py` - Updated CLI for cloud support
+6. `cortex/utils/errors.py` - Added provider error type
 
 ### Test Files
 7. `tests/test_providers.py` - NEW - Provider tests

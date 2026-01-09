@@ -3,8 +3,8 @@
 import pytest
 from pathlib import Path
 
-from localagent.tools.registry import ToolRegistry, get_registry, reset_registry
-from localagent.tools.base import Tool
+from cortex.tools.registry import ToolRegistry, get_registry, reset_registry
+from cortex.tools.base import Tool
 
 
 class MockTool(Tool):

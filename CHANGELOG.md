@@ -1,14 +1,31 @@
 # Changelog
 
-All notable changes to LocalAgent will be documented in this file.
+All notable changes to Cortex will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2025-01-XX
+
+### Changed
+- **BREAKING**: Renamed project from LocalAgent to Cortex
+- Renamed package directory: `localagent/` → `cortex/`
+- Renamed main class: `LocalAgent` → `Cortex`
+- Renamed CLI command: `localagent` → `cortex`
+- Updated storage directory: `.localagent/` → `.cortex/`
+- Updated all documentation and references
+- Updated project description to reflect unified agent capabilities (coding, cybersecurity, personal assistance)
+
+### Migration Notes
+- Users will need to reinstall: `pip install -e .`
+- Old CLI command `localagent` no longer works - use `cortex` instead
+- Storage directory migration: `.localagent/` → `.cortex/` (may need manual migration for existing users)
+- All imports in external code will need updating: `from localagent` → `from cortex`
+
 ## [1.0.0] - 2024-01-07
 
 ### Added
-- Initial release of LocalAgent
+- Initial release of Cortex
 - Core agent functionality with Ollama integration
 - File I/O tools (read_file, write_file)
 - Command execution tool

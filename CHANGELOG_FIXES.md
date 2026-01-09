@@ -15,7 +15,7 @@ This changelog documents all fixes and improvements implemented based on the com
 ## Phase 1: Error Handling Enhancements ✅
 
 ### 1.1 Added Permission Denial Helper
-**File**: `localagent/utils/errors.py`
+**File**: `cortex/utils/errors.py`
 
 - **Added**: `create_permission_denial()` function to distinguish permission issues from errors
 - **Purpose**: Clear separation between user/system blocked actions vs actual errors
@@ -31,7 +31,7 @@ create_permission_denial(
 ```
 
 ### 1.2 Added Retryable Flag to Error Responses
-**File**: `localagent/utils/errors.py`
+**File**: `cortex/utils/errors.py`
 
 - **Enhanced**: `create_error_response()` now accepts `retryable` parameter (default: `False`)
 - **Purpose**: Allows model to understand which errors can be safely retried
@@ -47,9 +47,9 @@ create_permission_denial(
 
 ### 1.3 Updated Tools to Use Permission Denial Helper
 **Files**: 
-- `localagent/tools/file_tools.py`
-- `localagent/tools/command_tools.py`
-- `localagent/tools/git_tools.py`
+- `cortex/tools/file_tools.py`
+- `cortex/tools/command_tools.py`
+- `cortex/tools/git_tools.py`
 
 **Changes**:
 - Replaced `create_error_response()` with `create_permission_denial()` for all permission-related responses
@@ -95,7 +95,7 @@ return create_permission_denial(
 ## Phase 2: Loop Guard Enhancements ✅
 
 ### 2.1 Added Progress Tracking
-**File**: `localagent/core/loop_guards.py`
+**File**: `cortex/core/loop_guards.py`
 
 **New Attributes**:
 - `unique_operations: Set[str]` - Tracks unique tool operations
@@ -115,7 +115,7 @@ return create_permission_denial(
 - File tracking: Automatically tracks `read_file` and `write_file` operations
 
 ### 2.2 Integrated Enhanced Loop Guards
-**File**: `localagent/agent.py`
+**File**: `cortex/agent.py`
 
 **Changes**:
 - Added `loop_guard.increment_iteration()` at start of each loop iteration (line 402)
@@ -145,7 +145,7 @@ for iteration in range(max_iterations):
 - **Purpose**: Accurate token counting instead of rough character-based estimation
 
 ### 3.2 Updated Token Estimation
-**File**: `localagent/core/context.py`
+**File**: `cortex/core/context.py`
 
 **Changes**:
 - Replaced `estimate_tokens(text)` with `estimate_tokens(text, model="gpt-4")`
@@ -167,7 +167,7 @@ return len(text) // 4  # Fallback
 ```
 
 ### 3.3 Updated Context Manager
-**File**: `localagent/core/conversation.py`
+**File**: `cortex/core/conversation.py`
 
 **Changes**:
 - Added `model` parameter to `ConversationManager.__init__()` (default: `"gpt-4"`)
@@ -175,7 +175,7 @@ return len(text) // 4  # Fallback
 - Updated `get_token_count()` to pass model to `get_conversation_tokens()`
 
 ### 3.4 Updated Agent Integration
-**File**: `localagent/agent.py`
+**File**: `cortex/agent.py`
 
 **Changes**:
 - Updated `ConversationManager` initialization to pass `model=self.model` (line 279)
@@ -191,7 +191,7 @@ return len(text) // 4  # Fallback
 ## Phase 4: System Prompt Improvements ✅
 
 ### 4.1 Added Completion Signals
-**File**: `localagent/agent.py`
+**File**: `cortex/agent.py`
 
 **Added Section**: "Task Completion" guidance
 
@@ -203,7 +203,7 @@ return len(text) // 4  # Fallback
 - Guidance for ambiguous requests (ask for clarification, propose plan)
 
 ### 4.2 Enhanced Error Handling Guidance
-**File**: `localagent/agent.py`
+**File**: `cortex/agent.py`
 
 **Updated Section**: "Error Handling" (line 203-212)
 
@@ -307,16 +307,16 @@ return len(text) // 4  # Fallback
 ## Files Modified
 
 ### Core Files
-1. `localagent/utils/errors.py` - Added permission denial helper, retryable flag
-2. `localagent/core/loop_guards.py` - Added progress tracking, stuck state detection
-3. `localagent/core/context.py` - Fixed token estimation with tiktoken
-4. `localagent/core/conversation.py` - Added model parameter support
-5. `localagent/agent.py` - Integrated enhancements, updated system prompt
+1. `cortex/utils/errors.py` - Added permission denial helper, retryable flag
+2. `cortex/core/loop_guards.py` - Added progress tracking, stuck state detection
+3. `cortex/core/context.py` - Fixed token estimation with tiktoken
+4. `cortex/core/conversation.py` - Added model parameter support
+5. `cortex/agent.py` - Integrated enhancements, updated system prompt
 
 ### Tool Files
-6. `localagent/tools/file_tools.py` - Updated to use permission denial helper
-7. `localagent/tools/command_tools.py` - Updated to use permission denial helper
-8. `localagent/tools/git_tools.py` - Updated to use permission denial helper
+6. `cortex/tools/file_tools.py` - Updated to use permission denial helper
+7. `cortex/tools/command_tools.py` - Updated to use permission denial helper
+8. `cortex/tools/git_tools.py` - Updated to use permission denial helper
 
 ### Test Files
 9. `tests/test_tools.py` - Enhanced with comprehensive tests

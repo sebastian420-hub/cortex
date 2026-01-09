@@ -1,4 +1,4 @@
-"""Setup script for LocalAgent (backup for compatibility)"""
+"""Setup script for Cortex (backup for compatibility)"""
 
 from setuptools import setup, find_packages
 
@@ -6,13 +6,13 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="localagent",
+    name="cortex",
     version="1.0.0",
-    author="LocalAgent Contributors",
-    description="A Claude Code-like terminal agent using local LLM models",
+    author="Cortex Contributors",
+    description="A unified agent for coding, cybersecurity, and personal assistance",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/yourusername/localagent",
+    url="https://github.com/yourusername/cortex",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -33,7 +33,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "localagent=localagent.cli:main",
+            "cortex=cortex.cli:main",
         ],
     },
 )

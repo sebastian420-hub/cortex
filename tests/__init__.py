@@ -1,2 +1,2 @@
-"""Tests for LocalAgent"""
+"""Tests for Cortex"""
 

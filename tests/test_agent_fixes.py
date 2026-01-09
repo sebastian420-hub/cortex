@@ -2,10 +2,10 @@
 
 import pytest
 from pathlib import Path
-from localagent.agent import LocalAgent
-from localagent.core.loop_guards import LoopGuard
-from localagent.utils.errors import create_error_response, create_success_response, ErrorType
-from localagent.models import PermissionMode
+from cortex.agent import Cortex
+from cortex.core.loop_guards import LoopGuard
+from cortex.utils.errors import create_error_response, create_success_response, ErrorType
+from cortex.models import PermissionMode
 
 
 def test_loop_guard_repeated_tool_call():
@@ -68,7 +68,7 @@ def test_success_response_format():
 
 def test_error_type_constants():
     """Test error type constants are defined"""
-    from localagent.utils.errors import ErrorType
+    from cortex.utils.errors import ErrorType
     
     assert ErrorType.PERMISSION == "permission"
     assert ErrorType.NOT_FOUND == "not_found"

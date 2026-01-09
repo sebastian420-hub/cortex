@@ -3,16 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "localagent"
+name = "cortex"
 version = "1.0.0"
-description = "A Claude Code-like terminal agent using local LLM models"
+description = "A unified agent for coding, cybersecurity, and personal assistance"
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "LocalAgent Contributors"}
+    {name = "Cortex Contributors"}
 ]
-keywords = ["ai", "coding-assistant", "llm", "ollama", "terminal"]
+keywords = ["ai", "coding-assistant", "cybersecurity", "llm", "ollama", "terminal", "mcp"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -44,7 +44,7 @@ dev = [
 ]
 
 [project.scripts]
-localagent = "localagent.cli:main"
+cortex = "cortex.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/yourusername/localagent"
@@ -53,7 +53,7 @@ Repository = "https://github.com/yourusername/localagent"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["localagent*"]
+include = ["cortex*"]
 
 [tool.black]
 line-length = 100

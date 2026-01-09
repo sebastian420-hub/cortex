@@ -1,7 +1,7 @@
 """Tests for loop guard system"""
 
 import pytest
-from localagent.core.loop_guards import LoopGuard
+from cortex.core.loop_guards import LoopGuard
 
 
 def test_loop_guard_initialization():

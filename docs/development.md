@@ -4,7 +4,7 @@
 
 ```
 LocalTerminalAgent/
-├── localagent/          # Main package
+├── cortex/          # Main package
 │   ├── agent.py        # Core agent class
 │   ├── cli.py          # CLI entry point
 │   ├── config.py       # Configuration
@@ -21,7 +21,7 @@ LocalTerminalAgent/
 
 ## Adding a New Tool
 
-1. Create a tool class in `localagent/tools/`:
+1. Create a tool class in `cortex/tools/`:
 
 ```python
 from .base import Tool
@@ -32,7 +32,7 @@ class MyNewTool(Tool):
         return {"success": True, "result": ...}
 ```
 
-2. Add tool definition to `localagent/tools/__init__.py`:
+2. Add tool definition to `cortex/tools/__init__.py`:
 
 ```python
 TOOLS.append({
@@ -73,7 +73,7 @@ pytest tests/ -v
 pytest tests/test_tools.py -v
 
 # With coverage
-pytest tests/ --cov=localagent --cov-report=html
+pytest tests/ --cov=cortex --cov-report=html
 ```
 
 ## Code Style
@@ -104,6 +104,6 @@ logging.basicConfig(level=logging.DEBUG)
 ## Performance Profiling
 
 ```bash
-python -m cProfile -o profile.stats localagent/cli.py
+python -m cProfile -o profile.stats cortex/cli.py
 ```
 

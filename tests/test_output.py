@@ -4,7 +4,7 @@ import pytest
 import json
 from io import StringIO
 
-from localagent.output import (
+from cortex.output import (
     OutputFormat,
     OutputFormatter,
     TextFormatter,

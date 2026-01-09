@@ -1,4 +1,4 @@
-# Default configuration for LocalAgent
+# Default configuration for Cortex
 
 model: llama3.2
 permission_mode: normal

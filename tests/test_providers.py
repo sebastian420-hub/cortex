@@ -4,7 +4,7 @@ import pytest
 import os
 import sys
 from unittest.mock import Mock, patch, MagicMock
-from localagent.core.providers import (
+from cortex.core.providers import (
     ModelProvider,
     OllamaProvider,
     DeepSeekProvider,

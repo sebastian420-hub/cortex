@@ -1,6 +1,6 @@
-# LocalAgent Commands Reference
+# Cortex Commands Reference
 
-Complete guide to using LocalAgent commands and options.
+Complete guide to using Cortex commands and options.
 
 ## Table of Contents
 
@@ -340,7 +340,7 @@ List all saved sessions.
 
 ### `/exit`
 
-Exit the LocalAgent session.
+Exit the Cortex session.
 
 ```bash
 > /exit
@@ -381,7 +381,7 @@ hooks_enabled: true
 
 ### Project Context Files
 
-LocalAgent automatically reads project context from these files (in order of priority):
+Cortex automatically reads project context from these files (in order of priority):
 
 1. `AGENT.md` - Project-specific instructions for the agent
 2. `CLAUDE.md` - Alternative project context file

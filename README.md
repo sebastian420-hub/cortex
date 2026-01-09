@@ -1,6 +1,6 @@
-# LocalAgent
+# Cortex
 
-A Claude Code-like terminal agent supporting both local LLM models (via Ollama) and cloud APIs (DeepSeek, Anthropic). Work with your codebase through natural language with flexible model options.
+A unified agent for coding, cybersecurity, and personal assistance. Cortex supports both local LLM models (via Ollama) and cloud APIs (DeepSeek, Anthropic), and can integrate with MCP servers for third-party services. Work with your codebase, security tools, and more through natural language with flexible model options.
 
 ## Features
 
@@ -20,12 +20,12 @@ A Claude Code-like terminal agent supporting both local LLM models (via Ollama) 
 - For local models: [Ollama](https://ollama.ai/) installed and running
 - For cloud APIs: API keys (see [Cloud API Setup](#cloud-api-setup))
 
-### Install LocalAgent
+### Install Cortex
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/localagent.git
-cd localagent
+git clone https://github.com/yourusername/cortex.git
+cd cortex
 
 # Install dependencies
 pip install -r requirements.txt
@@ -54,11 +54,11 @@ ollama pull qwen2.5:32b       # 32B - Good balance
 # Navigate to your project
 cd ~/my-project
 
-# Start LocalAgent
-localagent
+# Start Cortex
+cortex
 
 # Or use one-shot mode
-localagent -p "add logging to api.py"
+cortex -p "add logging to api.py"
 ```
 
 ## Usage
@@ -66,7 +66,7 @@ localagent -p "add logging to api.py"
 ### Interactive Mode
 
 ```bash
-localagent
+cortex
 
 > add logging to api.py
 > create a README file
@@ -78,8 +78,8 @@ localagent
 ### One-Shot Mode
 
 ```bash
-localagent -p "list all Python files"
-localagent -p "add type hints to utils.py"
+cortex -p "list all Python files"
+cortex -p "add type hints to utils.py"
 ```
 
 ### Different Models
@@ -88,29 +88,29 @@ localagent -p "add type hints to utils.py"
 
 ```bash
 # Use Llama 3.3 70B (much smarter)
-localagent --model llama3.3:70b
+cortex --model llama3.3:70b
 
 # Use Qwen 2.5 (good at coding)
-localagent --model qwen2.5:32b
+cortex --model qwen2.5:32b
 
 # Use DeepSeek R1 (local via Ollama)
-localagent --model deepseek-r1:8b
+cortex --model deepseek-r1:8b
 ```
 
 #### Cloud APIs
 
 ```bash
 # Use DeepSeek Chat (cheapest cloud option, excellent for coding)
-localagent --model deepseek-chat
+cortex --model deepseek-chat
 
 # Use DeepSeek Coder (specialized for coding)
-localagent --model deepseek-coder
+cortex --model deepseek-coder
 
 # Use Claude 3 Haiku (fast and affordable)
-localagent --model claude-3-haiku-20240307
+cortex --model claude-3-haiku-20240307
 
 # Use Claude 3.5 Sonnet (best quality, similar to Claude Code)
-localagent --model claude-3-5-sonnet-20241022
+cortex --model claude-3-5-sonnet-20241022
 ```
 
 ### Cloud API Setup
@@ -124,7 +124,7 @@ localagent --model claude-3-5-sonnet-20241022
    ```
 3. Use DeepSeek models:
    ```bash
-   localagent --model deepseek-chat
+   cortex --model deepseek-chat
    ```
 
 #### Anthropic Claude API
@@ -136,20 +136,20 @@ localagent --model claude-3-5-sonnet-20241022
    ```
 3. Use Claude models:
    ```bash
-   localagent --model claude-3-haiku-20240307
+   cortex --model claude-3-haiku-20240307
    ```
 
 #### List Available Providers
 
 ```bash
-localagent --list-providers
+cortex --list-providers
 ```
 
 Shows all available providers, models, and API key status.
 
 ### Provider Auto-Detection
 
-LocalAgent automatically detects the provider from the model name:
+Cortex automatically detects the provider from the model name:
 
 - Models starting with `deepseek-` → DeepSeek API
 - Models starting with `claude-` → Anthropic API
@@ -158,7 +158,7 @@ LocalAgent automatically detects the provider from the model name:
 You can also explicitly specify the provider:
 
 ```bash
-localagent --provider deepseek --model deepseek-chat
+cortex --provider deepseek --model deepseek-chat
 ```
 
 ### Cost Comparison
@@ -176,26 +176,26 @@ localagent --provider deepseek --model deepseek-chat
 
 ```bash
 # Normal mode (asks for everything) - DEFAULT
-localagent
+cortex
 
 # Auto-approve mode (dangerous! use in containers)
-localagent --auto-approve
+cortex --auto-approve
 
 # Plan mode (read-only, no changes)
-localagent --plan-mode
+cortex --plan-mode
 ```
 
 ### Session Management
 
 ```bash
 # Save current session
-localagent --save-session mywork
+cortex --save-session mywork
 
 # Load a saved session
-localagent --load-session mywork
+cortex --load-session mywork
 
 # List all sessions
-localagent --list-sessions
+cortex --list-sessions
 ```
 
 ### Configuration File
@@ -213,7 +213,7 @@ keep_recent_messages: 20
 Then use it:
 
 ```bash
-localagent --config config.yaml
+cortex --config config.yaml
 ```
 
 ## In-Session Commands
@@ -227,11 +227,11 @@ While in interactive mode, you can use these commands:
 - `/save [name]` - Save current session
 - `/load [name]` - Load a saved session
 - `/sessions` - List saved sessions
-- `/exit` - Exit LocalAgent
+- `/exit` - Exit Cortex
 
 ## Available Tools
 
-LocalAgent comes with a comprehensive set of tools:
+Cortex comes with a comprehensive set of tools:
 
 ### File Operations
 - `read_file` - Read file contents
@@ -285,10 +285,10 @@ The agent will automatically read this and follow your conventions!
 
 ## Architecture
 
-LocalAgent is organized into clean, modular components:
+Cortex is organized into clean, modular components:
 
 ```
-localagent/
+cortex/
 ├── agent.py          # Main agent class
 ├── cli.py            # Command-line interface
 ├── config.py         # Configuration management
@@ -315,20 +315,20 @@ pre-commit install
 ### Run Tests
 
 ```bash
-pytest tests/ -v --cov=localagent
+pytest tests/ -v --cov=cortex
 ```
 
 ### Code Quality
 
 ```bash
 # Format code
-black localagent tests
+black cortex tests
 
 # Lint
-flake8 localagent tests
+flake8 cortex tests
 
 # Type check
-mypy localagent
+mypy cortex
 ```
 
 ## Contributing

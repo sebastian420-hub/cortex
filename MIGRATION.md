@@ -12,14 +12,14 @@ The codebase has been reorganized from a single `local-code.py` file into a prop
 ```
 LocalTerminalAgent/
 ├── local-code.py
-├── localagent-architecture.md
-└── localagent-setup-guide.md
+├── cortex-architecture.md
+└── cortex-setup-guide.md
 ```
 
 **After:**
 ```
 LocalTerminalAgent/
-├── localagent/          # Main package
+├── cortex/          # Main package
 │   ├── __init__.py
 │   ├── agent.py
 │   ├── cli.py
@@ -48,10 +48,10 @@ python local-code.py
 **After:**
 ```bash
 # After installation
-localagent
+cortex
 
 # Or directly
-python -m localagent.cli
+python -m cortex.cli
 ```
 
 ### Installation
@@ -64,7 +64,7 @@ python -m localagent.cli
 pip install -e .
 # or
 pip install -r requirements.txt
-python -m localagent.cli
+python -m cortex.cli
 ```
 
 ## Backward Compatibility
@@ -91,20 +91,20 @@ The old `local-code.py` file is still present but deprecated. For new installati
 2. Update any scripts that import from `local-code.py`:
    ```python
    # Old
-   from local_code import LocalAgent
+   from local_code import Cortex
    
    # New
-   from localagent import LocalAgent
+   from cortex import Cortex
    ```
 
 3. Use the new CLI:
    ```bash
-   localagent --help
+   cortex --help
    ```
 
 ## Breaking Changes
 
 - Import paths have changed
-- CLI interface is now `localagent` instead of `python local-code.py`
+- CLI interface is now `cortex` instead of `python local-code.py`
 - Some internal APIs have changed (but public API remains similar)
 

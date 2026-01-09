@@ -3,9 +3,9 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from localagent.agent import LocalAgent
-from localagent.models import PermissionMode
-from localagent.config import AgentConfig
+from cortex.agent import Cortex
+from cortex.models import PermissionMode
+from cortex.config import AgentConfig
 from tests.fixtures.mock_ollama import create_mock_response, create_tool_call
 
 
@@ -32,8 +32,8 @@ def test_agent_completes_simple_task(tmp_path, mock_provider):
     mock_provider.validate_api_key.return_value = True
     
     # Create agent with mocked provider
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_provider):
-        agent = LocalAgent(
+    with patch('cortex.agent.ProviderFactory.get_provider', return_value=mock_provider):
+        agent = Cortex(
             model="test-model",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.AUTO_APPROVE
@@ -57,8 +57,8 @@ def test_agent_handles_tool_errors(tmp_path, mock_provider):
     mock_provider.normalize_model_name.return_value = "test-model"
     mock_provider.validate_api_key.return_value = True
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_provider):
-        agent = LocalAgent(
+    with patch('cortex.agent.ProviderFactory.get_provider', return_value=mock_provider):
+        agent = Cortex(
             model="test-model",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.AUTO_APPROVE
@@ -87,8 +87,8 @@ def test_agent_loop_guard_prevents_infinite_loop(tmp_path, mock_provider):
     mock_provider.normalize_model_name.return_value = "test-model"
     mock_provider.validate_api_key.return_value = True
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_provider):
-        agent = LocalAgent(
+    with patch('cortex.agent.ProviderFactory.get_provider', return_value=mock_provider):
+        agent = Cortex(
             model="test-model",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.AUTO_APPROVE,
@@ -114,8 +114,8 @@ def test_agent_handles_permission_denial(tmp_path, mock_provider):
     mock_provider.validate_api_key.return_value = True
     
     # Create agent in PLAN mode (should deny writes)
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_provider):
-        agent = LocalAgent(
+    with patch('cortex.agent.ProviderFactory.get_provider', return_value=mock_provider):
+        agent = Cortex(
             model="test-model",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.PLAN

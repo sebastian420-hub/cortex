@@ -1,15 +1,15 @@
-"""Tests for LocalAgent class"""
+"""Tests for Cortex class"""
 
 import pytest
 from pathlib import Path
-from localagent.agent import LocalAgent
-from localagent.models import PermissionMode
-from localagent.config import AgentConfig
+from cortex.agent import Cortex
+from cortex.models import PermissionMode
+from cortex.config import AgentConfig
 
 
 def test_agent_initialization(tmp_path):
     """Test agent initialization"""
-    agent = LocalAgent(
+    agent = Cortex(
         model="llama3.2",
         project_dir=str(tmp_path),
         permission_mode=PermissionMode.NORMAL
@@ -25,7 +25,7 @@ def test_agent_load_project_context(tmp_path):
     agent_file = tmp_path / "AGENT.md"
     agent_file.write_text("# Project\n\nThis is a test project.")
     
-    agent = LocalAgent(
+    agent = Cortex(
         model="llama3.2",
         project_dir=str(tmp_path),
         permission_mode=PermissionMode.NORMAL
@@ -37,7 +37,7 @@ def test_agent_load_project_context(tmp_path):
 
 def test_agent_execute_tool_string_args(tmp_path):
     """Test that tool execution handles string JSON arguments"""
-    agent = LocalAgent(
+    agent = Cortex(
         model="llama3.2",
         project_dir=str(tmp_path),
         permission_mode=PermissionMode.AUTO_APPROVE
@@ -58,7 +58,7 @@ def test_agent_execute_tool_string_args(tmp_path):
 
 def test_agent_clear_conversation(tmp_path):
     """Test clearing conversation"""
-    agent = LocalAgent(
+    agent = Cortex(
         model="llama3.2",
         project_dir=str(tmp_path),
         permission_mode=PermissionMode.NORMAL

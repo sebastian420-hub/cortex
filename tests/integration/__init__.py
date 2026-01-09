@@ -1,1 +1,1 @@
-"""Integration tests for LocalAgent"""
+"""Integration tests for Cortex"""

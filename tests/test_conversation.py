@@ -1,8 +1,8 @@
 """Tests for conversation management"""
 
 import pytest
-from localagent.core.conversation import ConversationManager
-from localagent.core.context import estimate_tokens, truncate_history
+from cortex.core.conversation import ConversationManager
+from cortex.core.context import estimate_tokens, truncate_history
 
 
 def test_conversation_manager():

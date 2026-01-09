@@ -4,10 +4,10 @@ import pytest
 import os
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
-from localagent.agent import LocalAgent
-from localagent.config import AgentConfig
-from localagent.models import PermissionMode
-from localagent.core.providers import ProviderError
+from cortex.agent import Cortex
+from cortex.config import AgentConfig
+from cortex.models import PermissionMode
+from cortex.core.providers import ProviderError
 
 
 @pytest.fixture
@@ -54,8 +54,8 @@ def test_agent_with_deepseek_provider(tmp_path, mock_deepseek_provider):
     """Test agent initialization with DeepSeek provider"""
     config = AgentConfig(model="deepseek-chat", provider="deepseek")
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
-        agent = LocalAgent(
+    with patch('Cortex.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
+        agent = Cortex(
             model="deepseek-chat",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.NORMAL,
@@ -70,8 +70,8 @@ def test_agent_with_anthropic_provider(tmp_path, mock_anthropic_provider):
     """Test agent initialization with Anthropic provider"""
     config = AgentConfig(model="claude-3-haiku-20240307", provider="anthropic")
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_anthropic_provider):
-        agent = LocalAgent(
+    with patch('Cortex.agent.ProviderFactory.get_provider', return_value=mock_anthropic_provider):
+        agent = Cortex(
             model="claude-3-haiku-20240307",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.NORMAL,
@@ -86,13 +86,13 @@ def test_agent_provider_validation_failure(tmp_path):
     """Test agent raises error when provider validation fails"""
     config = AgentConfig(model="deepseek-chat")
     
-    with patch('localagent.agent.ProviderFactory.get_provider') as mock_get:
+    with patch('Cortex.agent.ProviderFactory.get_provider') as mock_get:
         mock_provider = Mock()
         mock_provider.validate_api_key.return_value = False
         mock_get.return_value = mock_provider
         
         with pytest.raises(ProviderError, match="API key not set"):
-            LocalAgent(
+            Cortex(
                 model="deepseek-chat",
                 project_dir=str(tmp_path),
                 permission_mode=PermissionMode.NORMAL,
@@ -104,8 +104,8 @@ def test_agent_calls_provider_chat(tmp_path, mock_deepseek_provider):
     """Test agent calls provider chat method"""
     config = AgentConfig(model="deepseek-chat")
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
-        agent = LocalAgent(
+    with patch('Cortex.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
+        agent = Cortex(
             model="deepseek-chat",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.AUTO_APPROVE,
@@ -144,12 +144,12 @@ def test_agent_tool_calling_with_cloud_provider(tmp_path, mock_deepseek_provider
         }
     }
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
+    with patch('Cortex.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
         # Create test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("Test content")
         
-        agent = LocalAgent(
+        agent = Cortex(
             model="deepseek-chat",
             project_dir=str(tmp_path),
             permission_mode=PermissionMode.AUTO_APPROVE,
@@ -167,14 +167,14 @@ def test_agent_streaming_with_cloud_provider(tmp_path, mock_deepseek_provider):
     """Test agent streaming works with cloud providers"""
     config = AgentConfig(model="deepseek-chat")
     
-    with patch('localagent.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
-        with patch('localagent.agent.stream_model_response') as mock_stream:
+    with patch('Cortex.agent.ProviderFactory.get_provider', return_value=mock_deepseek_provider):
+        with patch('cortex.agent.stream_model_response') as mock_stream:
             mock_stream.return_value = iter([
                 {"message": {"content": "Hello"}},
                 {"message": {"content": " World"}}
             ])
             
-            agent = LocalAgent(
+            agent = Cortex(
                 model="deepseek-chat",
                 project_dir=str(tmp_path),
                 permission_mode=PermissionMode.AUTO_APPROVE,

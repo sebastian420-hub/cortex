@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from localagent.core.security import validate_path, SecurityError, is_dangerous_command
+from cortex.core.security import validate_path, SecurityError, is_dangerous_command
 
 
 def test_validate_path_within_project(tmp_path):
