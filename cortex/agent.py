@@ -373,14 +373,8 @@ Remember: Use tools only when necessary. For conversational interactions, respon
             return
 
         if self._is_text_output():
-            if is_final:
-                console.print(Panel(
-                    Markdown(content),
-                    title="[bold green]Cortex[/bold green]",
-                    border_style="green"
-                ))
-            else:
-                console.print(Markdown(content))
+            # Always use simple markdown output (no Panel boxes)
+            console.print(Markdown(content))
         else:
             formatted = self.formatter.format_response(response)
             self.formatter.write(formatted)
@@ -627,15 +621,13 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 # Add assistant response
                 self.conversation.add_assistant_message(
                     content=response_message.get("content", ""),
-                    tool_calls=response_message.get("tool_calls")
+                    tool_calls=response_message.get("tool_calls"),
+                    reasoning_content=response_message.get("reasoning_content")
                 )
-                
-                # Display content if present (even if tools are also present)
-                if response_message.get("content"):
-                    self._output_response({"content": response_message["content"]})
                 
                 # Check if using tools
                 if response_message.get("tool_calls"):
+                    # Don't display content here if tools are present - wait for final response
                     # Execute tools
                     for tool_call in response_message["tool_calls"]:
                         # Check for shutdown request before each tool
@@ -647,7 +639,15 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                         tool_name = tool_call["function"]["name"]
                         arguments = tool_call["function"]["arguments"]
                         
-                        # Execute
+                        # Parse arguments to dict if it's a JSON string (for loop guards)
+                        parsed_arguments = arguments
+                        if isinstance(arguments, str):
+                            try:
+                                parsed_arguments = json.loads(arguments)
+                            except json.JSONDecodeError:
+                                parsed_arguments = {}  # Fallback to empty dict if parsing fails
+                        
+                        # Execute (execute_tool handles string parsing internally)
                         result = self.execute_tool(tool_name, arguments)
                         
                         # Output tool result (for JSON modes)
@@ -672,7 +672,7 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                             if self.loop_guard.check_repeated_error(result):
                                 # Try recovery if enabled
                                 recovery_action = self.loop_guard.get_recovery_action(
-                                    result, tool_name, arguments
+                                    result, tool_name, parsed_arguments
                                 )
                                 if recovery_action:
                                     from .core.recovery import RecoveryStrategy
@@ -692,15 +692,16 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                                 self._output_error("Repeated error detected. Stopping to prevent infinite loop.", "loop_guard")
                                 return
 
-                        self.loop_guard.record_tool_call(tool_name, arguments)
-                        self.loop_guard.record_operation(tool_name, arguments)
+                        # Use parsed_arguments for loop guards (must be dict)
+                        self.loop_guard.record_tool_call(tool_name, parsed_arguments)
+                        self.loop_guard.record_operation(tool_name, parsed_arguments)
 
                         # Check stuck state
                         if self.loop_guard.check_stuck_state():
                             self._output_error("Agent appears stuck. Stopping to prevent infinite loop.", "loop_guard")
                             return
 
-                        if self.loop_guard.check_repeated_tool_call(tool_name, arguments):
+                        if self.loop_guard.check_repeated_tool_call(tool_name, parsed_arguments):
                             self._output_error("Same tool called repeatedly. Stopping to prevent infinite loop.", "loop_guard")
                             return
                         

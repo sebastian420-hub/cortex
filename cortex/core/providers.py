@@ -187,6 +187,10 @@ class DeepSeekProvider(ModelProvider):
                 }
             }
             
+            # Handle reasoning_content (required for DeepSeek thinking mode)
+            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+                result["message"]["reasoning_content"] = message.reasoning_content
+            
             # Handle tool calls
             if hasattr(message, 'tool_calls') and message.tool_calls:
                 result["message"]["tool_calls"] = [
@@ -234,6 +238,10 @@ class DeepSeekProvider(ModelProvider):
                                 "content": delta.content or ""
                             }
                         }
+                        
+                        # Handle reasoning_content in streaming (required for DeepSeek thinking mode)
+                        if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                            result["message"]["reasoning_content"] = delta.reasoning_content
                         
                         # Handle tool calls in streaming
                         if hasattr(delta, 'tool_calls') and delta.tool_calls:

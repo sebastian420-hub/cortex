@@ -61,6 +61,7 @@ def display_streaming_response(
         Complete response message
     """
     content_parts: list[str] = []
+    reasoning_parts: list[str] = []
     tool_calls: list[Dict[str, Any]] = []
     full_message: Dict[str, Any] = {"role": "assistant"}
     
@@ -71,6 +72,10 @@ def display_streaming_response(
         # Accumulate content
         if msg.get("content"):
             content_parts.append(msg["content"])
+        
+        # Accumulate reasoning_content (for DeepSeek thinking mode)
+        if msg.get("reasoning_content"):
+            reasoning_parts.append(msg["reasoning_content"])
         
         # Collect tool calls
         if msg.get("tool_calls"):
@@ -93,16 +98,15 @@ def display_streaming_response(
     if content_parts:
         full_message["content"] = "".join(content_parts)
     
+    if reasoning_parts:
+        full_message["reasoning_content"] = "".join(reasoning_parts)
+    
     if tool_calls:
         full_message["tool_calls"] = tool_calls
     
-    # Display final content if any
+    # Display final content if any (simple markdown, no Panel)
     if full_message.get("content"):
-        console.print(Panel(
-            Markdown(full_message["content"]),
-            title=title,
-            border_style="green"
-        ))
+        console.print(Markdown(full_message["content"]))
     
     return full_message
 
