@@ -4,14 +4,16 @@ import sys
 import os
 import argparse
 from pathlib import Path
+from typing import Optional
 
-import ollama
 from rich.console import Console
 from rich.panel import Panel
+from rich.table import Table
 
 from .agent import LocalAgent
 from .models import PermissionMode
 from .config import AgentConfig
+from .core.providers import ProviderFactory, ProviderError
 from .ui.console import console
 from .ui.repl import REPL
 from .storage.history import get_history_file
@@ -25,9 +27,100 @@ __version__ = "1.0.0"
 def check_ollama() -> bool:
     """Check if Ollama is available"""
     try:
+        import ollama
         ollama.list()
         return True
     except:
+        return False
+
+
+def list_providers():
+    """List available providers and models"""
+    table = Table(title="Available Providers and Models", show_header=True, header_style="bold cyan")
+    table.add_column("Provider", style="cyan")
+    table.add_column("Model Name", style="green")
+    table.add_column("Description", style="dim")
+    table.add_column("API Key Required", style="yellow")
+    
+    # Ollama
+    table.add_row(
+        "Ollama",
+        "llama3.2, deepseek-r1:8b, qwen2.5:32b, etc.",
+        "Local models via Ollama",
+        "No"
+    )
+    
+    # DeepSeek
+    deepseek_key = "Yes" if os.getenv("DEEPSEEK_API_KEY") else "[red]Yes (not set)[/red]"
+    table.add_row(
+        "DeepSeek",
+        "deepseek-chat, deepseek-coder, deepseek-reasoner",
+        "Cloud API - Best for coding, cheapest",
+        deepseek_key
+    )
+    
+    # Anthropic
+    anthropic_key = "Yes" if os.getenv("ANTHROPIC_API_KEY") else "[red]Yes (not set)[/red]"
+    table.add_row(
+        "Anthropic",
+        "claude-3-5-sonnet-20241022, claude-3-haiku-20240307, claude-3-opus-20240229",
+        "Cloud API - Claude models",
+        anthropic_key
+    )
+    
+    console.print(table)
+    console.print("\n[dim]Note: Provider is auto-detected from model name. Use --provider to override.[/dim]")
+
+
+def validate_provider_setup(model: str, provider_override: Optional[str] = None) -> bool:
+    """Validate that provider is properly set up"""
+    try:
+        provider = ProviderFactory.get_provider(model, provider_override)
+        
+        # Check API key for cloud providers
+        if not provider.validate_api_key():
+            provider_name = ProviderFactory.get_provider_name(model)
+            if provider_name == "deepseek":
+                console.print(Panel(
+                    "[red]Error:[/red] DEEPSEEK_API_KEY not set\n\n"
+                    "Get your API key from: [cyan]https://platform.deepseek.com/[/cyan]\n\n"
+                    "Set it with:\n"
+                    "  [cyan]export DEEPSEEK_API_KEY=your_key_here[/cyan]",
+                    title="API Key Required",
+                    border_style="red"
+                ))
+            elif provider_name == "anthropic":
+                console.print(Panel(
+                    "[red]Error:[/red] ANTHROPIC_API_KEY not set\n\n"
+                    "Get your API key from: [cyan]https://console.anthropic.com/[/cyan]\n\n"
+                    "Set it with:\n"
+                    "  [cyan]export ANTHROPIC_API_KEY=your_key_here[/cyan]",
+                    title="API Key Required",
+                    border_style="red"
+                ))
+            return False
+        
+        # Check Ollama connection if using Ollama provider
+        provider_name = ProviderFactory.get_provider_name(model)
+        if provider_name == "ollama" and not check_ollama():
+            console.print(Panel(
+                "[red]Error:[/red] Cannot connect to Ollama\n\n"
+                "Make sure Ollama is running:\n"
+                "  [cyan]ollama serve[/cyan]\n\n"
+                "And you have a model pulled:\n"
+                "  [cyan]ollama pull llama3.2[/cyan]",
+                title="Ollama Not Found",
+                border_style="red"
+            ))
+            return False
+        
+        return True
+    except ProviderError as e:
+        console.print(Panel(
+            f"[red]Error:[/red] {str(e)}",
+            title="Provider Error",
+            border_style="red"
+        ))
         return False
 
 
@@ -60,7 +153,20 @@ Examples:
     parser.add_argument(
         "--model", "-m",
         default=None,
-        help="Ollama model to use (default: llama3.2)"
+        help="Model to use (default: llama3.2). Auto-detects provider from model name."
+    )
+    
+    parser.add_argument(
+        "--provider",
+        choices=["ollama", "deepseek", "anthropic"],
+        default=None,
+        help="Override provider auto-detection (normally auto-detected from model name)"
+    )
+    
+    parser.add_argument(
+        "--list-providers",
+        action="store_true",
+        help="List available providers and models"
     )
     
     parser.add_argument(
@@ -139,18 +245,10 @@ Examples:
 
     args = parser.parse_args()
     
-    # Check Ollama connection
-    if not check_ollama():
-        console.print(Panel(
-            "[red]Error:[/red] Cannot connect to Ollama\n\n"
-            "Make sure Ollama is running:\n"
-            "  [cyan]ollama serve[/cyan]\n\n"
-            "And you have a model pulled:\n"
-            "  [cyan]ollama pull llama3.2[/cyan]",
-            title="Ollama Not Found",
-            border_style="red"
-        ))
-        sys.exit(1)
+    # Handle list-providers command
+    if args.list_providers:
+        list_providers()
+        sys.exit(0)
     
     # Load configuration
     config = AgentConfig()
@@ -164,6 +262,13 @@ Examples:
     # Override with CLI arguments
     if args.model:
         config.model = args.model
+    
+    if args.provider:
+        config.provider = args.provider
+    
+    # Validate provider setup
+    if not validate_provider_setup(config.model, config.provider):
+        sys.exit(1)
     
     # Determine permission mode
     if args.auto_approve:

@@ -19,6 +19,7 @@ class ErrorType:
     TIMEOUT = "timeout"
     NETWORK = "network"
     SECURITY = "security"
+    PROVIDER = "provider"
 
 
 def retry_with_backoff(

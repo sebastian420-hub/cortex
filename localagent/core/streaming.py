@@ -1,37 +1,42 @@
 """Streaming response handling"""
 
 from typing import Iterator, Dict, Any, Optional
-import ollama
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
 from rich.panel import Panel
 
+from .providers import ModelProvider
+
 console = Console()
 
 
-def stream_ollama_response(
+def stream_model_response(
+    provider: ModelProvider,
     model: str,
     messages: list,
     tools: list
 ) -> Iterator[Dict[str, Any]]:
     """
-    Stream responses from Ollama.
+    Stream responses from model provider.
     
     Args:
+        provider: Model provider instance
         model: Model name
         messages: Conversation history
         tools: Tool definitions
         
     Yields:
-        Response chunks from Ollama
+        Response chunks from the model
     """
     try:
-        stream = ollama.chat(
+        if not provider.supports_streaming():
+            raise ValueError(f"Provider {type(provider).__name__} does not support streaming")
+        
+        stream = provider.stream_chat(
             model=model,
             messages=messages,
-            tools=tools,
-            stream=True
+            tools=tools
         )
         
         for chunk in stream:

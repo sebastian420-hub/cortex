@@ -1,12 +1,13 @@
 # LocalAgent
 
-A Claude Code-like terminal agent using local LLM models via Ollama. Work with your codebase through natural language, all running locally on your machine.
+A Claude Code-like terminal agent supporting both local LLM models (via Ollama) and cloud APIs (DeepSeek, Anthropic). Work with your codebase through natural language with flexible model options.
 
 ## Features
 
-- **Privacy-First**: All processing happens locally - no data sent to external APIs
-- **Cost-Effective**: Free to use (only requires local compute)
-- **Offline-Capable**: Works without internet connection
+- **Flexible Models**: Use local models (Ollama) or cloud APIs (DeepSeek, Anthropic Claude)
+- **Cost-Effective**: Choose between free local models or affordable cloud APIs
+- **Privacy Options**: Use local models for complete privacy, or cloud APIs for better performance
+- **Offline-Capable**: Works without internet when using local models
 - **Extensible**: Easy to add new tools and capabilities
 - **Safe**: Built-in permission system and dangerous operation blocking
 - **Rich Terminal UI**: Beautiful syntax highlighting, markdown rendering, and progress indicators
@@ -16,8 +17,8 @@ A Claude Code-like terminal agent using local LLM models via Ollama. Work with y
 ### Prerequisites
 
 - Python 3.8+
-- [Ollama](https://ollama.ai/) installed and running
-- A local LLM model (e.g., `llama3.2`, `llama3.3:70b`)
+- For local models: [Ollama](https://ollama.ai/) installed and running
+- For cloud APIs: API keys (see [Cloud API Setup](#cloud-api-setup))
 
 ### Install LocalAgent
 
@@ -83,13 +84,93 @@ localagent -p "add type hints to utils.py"
 
 ### Different Models
 
+#### Local Models (Ollama)
+
 ```bash
 # Use Llama 3.3 70B (much smarter)
 localagent --model llama3.3:70b
 
 # Use Qwen 2.5 (good at coding)
 localagent --model qwen2.5:32b
+
+# Use DeepSeek R1 (local via Ollama)
+localagent --model deepseek-r1:8b
 ```
+
+#### Cloud APIs
+
+```bash
+# Use DeepSeek Chat (cheapest cloud option, excellent for coding)
+localagent --model deepseek-chat
+
+# Use DeepSeek Coder (specialized for coding)
+localagent --model deepseek-coder
+
+# Use Claude 3 Haiku (fast and affordable)
+localagent --model claude-3-haiku-20240307
+
+# Use Claude 3.5 Sonnet (best quality, similar to Claude Code)
+localagent --model claude-3-5-sonnet-20241022
+```
+
+### Cloud API Setup
+
+#### DeepSeek API
+
+1. Get your API key from [DeepSeek Platform](https://platform.deepseek.com/)
+2. Set environment variable:
+   ```bash
+   export DEEPSEEK_API_KEY=your_key_here
+   ```
+3. Use DeepSeek models:
+   ```bash
+   localagent --model deepseek-chat
+   ```
+
+#### Anthropic Claude API
+
+1. Get your API key from [Anthropic Console](https://console.anthropic.com/)
+2. Set environment variable:
+   ```bash
+   export ANTHROPIC_API_KEY=your_key_here
+   ```
+3. Use Claude models:
+   ```bash
+   localagent --model claude-3-haiku-20240307
+   ```
+
+#### List Available Providers
+
+```bash
+localagent --list-providers
+```
+
+Shows all available providers, models, and API key status.
+
+### Provider Auto-Detection
+
+LocalAgent automatically detects the provider from the model name:
+
+- Models starting with `deepseek-` → DeepSeek API
+- Models starting with `claude-` → Anthropic API
+- All others → Ollama (local)
+
+You can also explicitly specify the provider:
+
+```bash
+localagent --provider deepseek --model deepseek-chat
+```
+
+### Cost Comparison
+
+| Model | Provider | Input/1M | Output/1M | Best For |
+|-------|----------|----------|-----------|----------|
+| **DeepSeek-V3.2** | DeepSeek | $0.28 | $0.42 | Coding (cheapest) |
+| **Claude 3 Haiku** | Anthropic | $0.25 | $1.25 | General coding |
+| **Claude 3.5 Sonnet** | Anthropic | $3.00 | $15.00 | Best quality (Claude Code) |
+| **Local Models** | Ollama | Free | Free | Privacy, offline use |
+
+*Note: Pricing as of 2024. Check provider websites for current rates.*
 
 ### Permission Modes
 

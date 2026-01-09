@@ -49,12 +49,51 @@ localagent -p "list all Python files in the project"
 -m <model_name>
 ```
 
-Specify which Ollama model to use. Default is `llama3.2`.
+Specify which model to use. Provider is auto-detected from model name. Default is `llama3.2` (Ollama).
 
-**Examples:**
+**Local Models (Ollama):**
 ```bash
 localagent --model llama3.3:70b
 localagent -m qwen2.5:32b
+localagent --model deepseek-r1:8b
+```
+
+**Cloud Models:**
+```bash
+# DeepSeek (requires DEEPSEEK_API_KEY)
+localagent --model deepseek-chat
+localagent --model deepseek-coder
+
+# Anthropic Claude (requires ANTHROPIC_API_KEY)
+localagent --model claude-3-haiku-20240307
+localagent --model claude-3-5-sonnet-20241022
+```
+
+### Provider Selection
+
+```bash
+--provider <provider_name>
+```
+
+Override provider auto-detection. Options: `ollama`, `deepseek`, `anthropic`.
+
+**Examples:**
+```bash
+localagent --provider deepseek --model deepseek-chat
+localagent --provider anthropic --model claude-3-haiku-20240307
+```
+
+### List Providers
+
+```bash
+--list-providers
+```
+
+Display all available providers, models, and API key status.
+
+**Example:**
+```bash
+localagent --list-providers
 ```
 
 ### Permission Modes
@@ -99,7 +138,12 @@ max_iterations: 20
 max_tokens: 100000
 keep_recent_messages: 20
 auto_save: false
+# provider: null  # Auto-detected, or specify: "ollama", "deepseek", "anthropic"
 ```
+
+**Note:** API keys are read from environment variables, not config files:
+- `DEEPSEEK_API_KEY` for DeepSeek models
+- `ANTHROPIC_API_KEY` for Anthropic/Claude models
 
 ### Session Management
 
@@ -396,6 +440,24 @@ localagent --load-session feature-work
 
 # List all sessions
 localagent --list-sessions
+```
+
+### Cloud API Examples
+
+```bash
+# Use DeepSeek Chat (cheapest cloud option)
+export DEEPSEEK_API_KEY=your_key_here
+localagent --model deepseek-chat -p "refactor authentication module"
+
+# Use Claude 3 Haiku (fast and affordable)
+export ANTHROPIC_API_KEY=your_key_here
+localagent --model claude-3-haiku-20240307 -p "write tests for user service"
+
+# Use Claude 3.5 Sonnet (best quality, similar to Claude Code)
+localagent --model claude-3-5-sonnet-20241022 -p "optimize database queries"
+
+# List available providers and check API key status
+localagent --list-providers
 ```
 
 ### Automation Examples

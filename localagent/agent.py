@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
-import ollama
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
@@ -14,7 +13,8 @@ from rich.markdown import Markdown
 from .models import PermissionMode
 from .config import AgentConfig
 from .core.conversation import ConversationManager
-from .core.streaming import stream_ollama_response, display_streaming_response
+from .core.streaming import stream_model_response, display_streaming_response
+from .core.providers import ProviderFactory, ProviderError
 from .core.security import SecurityError
 from .core.loop_guards import LoopGuard
 from .tools import TOOLS, create_tool_instance
@@ -35,10 +35,10 @@ from .hooks import (
 from .output import OutputFormat, create_formatter
 
 try:
-    from .core.streaming import stream_ollama_response, display_streaming_response
+    from .core.streaming import stream_model_response, display_streaming_response
 except ImportError:
     # Fallback if streaming not available
-    stream_ollama_response = None
+    stream_model_response = None
     display_streaming_response = None
 
 
@@ -85,6 +85,19 @@ class LocalAgent:
 
         # Initialize loop guard
         self.loop_guard = LoopGuard(max_repeats=3)
+
+        # Initialize model provider
+        provider_override = getattr(self.config, 'provider', None)
+        try:
+            self.provider = ProviderFactory.get_provider(self.model, provider_override)
+            # Validate API key for cloud providers
+            if not self.provider.validate_api_key():
+                raise ProviderError(
+                    f"API key not set for {ProviderFactory.get_provider_name(self.model)} provider. "
+                    f"Please set the required environment variable."
+                )
+        except ProviderError as e:
+            raise ProviderError(f"Failed to initialize provider: {e}") from e
 
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
@@ -311,13 +324,17 @@ Remember: Use tools only when necessary. For conversational interactions, respon
 
     @retry_with_backoff(max_retries=3, exceptions=(Exception,))
     def _call_model(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Call Ollama model with retry logic"""
+        """Call model via provider with retry logic"""
         try:
-            return ollama.chat(
-                model=self.model,
+            # Normalize model name for provider
+            normalized_model = self.provider.normalize_model_name(self.model)
+            return self.provider.chat(
+                model=normalized_model,
                 messages=messages,
                 tools=tools
             )
+        except ProviderError as e:
+            raise ModelError(f"Provider error: {e}") from e
         except Exception as e:
             raise ModelError(f"Failed to call model: {e}") from e
     
@@ -473,10 +490,12 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 
                 # Show thinking indicator
                 with console.status("[cyan]🤔 Thinking...[/cyan]", spinner="dots"):
-                    if use_streaming and stream_ollama_response:
+                    if use_streaming and stream_model_response and self.provider.supports_streaming():
                         # Streaming mode
-                        stream = stream_ollama_response(
-                            self.model,
+                        normalized_model = self.provider.normalize_model_name(self.model)
+                        stream = stream_model_response(
+                            self.provider,
+                            normalized_model,
                             messages,
                             TOOLS
                         )
@@ -552,7 +571,7 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                         self._output_warning("Model returned empty response. Exiting.")
                         return
                     
-            except ModelError as e:
+            except (ModelError, ProviderError) as e:
                 import traceback
                 self._output_error(str(e), "model_error", {"traceback": traceback.format_exc()})
                 return

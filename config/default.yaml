@@ -7,3 +7,11 @@ max_tokens: 100000
 keep_recent_messages: 20
 auto_save: false
 
+# Provider settings (auto-detected from model name if not specified)
+# provider: null  # "ollama" | "deepseek" | "anthropic" | null (auto-detect)
+
+# API keys are read from environment variables:
+# - DEEPSEEK_API_KEY (for DeepSeek models)
+# - ANTHROPIC_API_KEY (for Anthropic/Claude models)
+# Ollama doesn't require API keys
+

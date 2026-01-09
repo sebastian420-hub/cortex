@@ -40,6 +40,8 @@ class AgentConfig:
         # Subagent settings
         subagent_max_iterations: int = 10,
         subagent_allowed_tools: Optional[List[str]] = None,
+        # Provider settings
+        provider: Optional[str] = None,
         **kwargs
     ):
         # Core settings
@@ -66,6 +68,9 @@ class AgentConfig:
         self.subagent_allowed_tools = subagent_allowed_tools or [
             "read_file", "list_files", "search_files"
         ]
+
+        # Provider settings
+        self.provider = provider  # Auto-detected if None
 
         # Extra settings for extensibility
         self.extra = kwargs
@@ -109,6 +114,7 @@ class AgentConfig:
             permission_mode=os.getenv("LOCALAGENT_MODE", "normal"),
             max_iterations=int(os.getenv("LOCALAGENT_MAX_ITERATIONS", "15")),
             max_tokens=int(os.getenv("LOCALAGENT_MAX_TOKENS", "100000")),
+            provider=os.getenv("LOCALAGENT_PROVIDER", None),
         )
     
     @classmethod
@@ -138,6 +144,7 @@ class AgentConfig:
             config.tools_plugins = file_config.tools_plugins
             config.subagent_max_iterations = file_config.subagent_max_iterations
             config.subagent_allowed_tools = file_config.subagent_allowed_tools
+            config.provider = file_config.provider
 
         # Override with environment variables
         env_config = cls.from_env()
@@ -149,6 +156,8 @@ class AgentConfig:
             config.output_format = os.getenv("LOCALAGENT_OUTPUT_FORMAT")
         if os.getenv("LOCALAGENT_HOOKS_ENABLED"):
             config.hooks_enabled = os.getenv("LOCALAGENT_HOOKS_ENABLED").lower() == "true"
+        if os.getenv("LOCALAGENT_PROVIDER"):
+            config.provider = os.getenv("LOCALAGENT_PROVIDER")
 
         return config
 
@@ -168,5 +177,6 @@ class AgentConfig:
             "tools_plugins": self.tools_plugins,
             "subagent_max_iterations": self.subagent_max_iterations,
             "subagent_allowed_tools": self.subagent_allowed_tools,
+            "provider": self.provider,
         }
 
