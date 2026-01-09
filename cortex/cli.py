@@ -3,6 +3,7 @@
 import sys
 import os
 import argparse
+import signal
 from pathlib import Path
 from typing import Optional
 
@@ -291,6 +292,22 @@ Examples:
         session_manager.show_sessions()
         sys.exit(0)
 
+    # Run session cleanup on startup if enabled
+    if config.session_retention.get("cleanup_on_startup", False):
+        from .storage.cleanup import SessionCleanupManager
+        cleanup_manager = SessionCleanupManager(
+            sessions_dir=session_manager.sessions_dir,
+            max_age_days=config.session_retention.get("max_age_days", 30),
+            max_count=config.session_retention.get("max_count", 100),
+            max_total_size_mb=config.session_retention.get("max_total_size_mb", 500),
+        )
+        stats = cleanup_manager.run_full_cleanup()
+        if stats.sessions_removed > 0:
+            console.print(
+                f"[dim]Session cleanup: removed {stats.sessions_removed} old sessions, "
+                f"freed {stats.bytes_freed // 1024} KB[/dim]"
+            )
+
     # Determine output format
     output_format = OutputFormat.TEXT
     if args.output_format:
@@ -405,9 +422,45 @@ def run_interactive(
         permission_mode=agent.permission_mode
     )
     
+    # Register signal handlers for graceful shutdown
+    def signal_handler(signum, frame):
+        """Handle SIGINT and SIGTERM signals"""
+        console.print("\n[yellow]Shutdown signal received. Cleaning up...[/yellow]")
+        agent.request_shutdown()
+        agent._cleanup()
+        
+        # Optionally save session if dirty
+        if agent._session_dirty:
+            try:
+                from datetime import datetime
+                auto_save_name = f"autosave_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                session_manager.save_session(
+                    auto_save_name,
+                    agent.get_conversation_history(),
+                    str(agent.project_dir),
+                    agent.model,
+                    agent.permission_mode
+                )
+                console.print(f"[dim]Session auto-saved as: {auto_save_name}[/dim]")
+            except Exception as e:
+                console.print(f"[yellow]Warning:[/yellow] Could not auto-save session: {e}")
+        
+        console.print("[cyan]👋 Goodbye![/cyan]")
+        sys.exit(0)
+    
+    # Register handlers (Unix/Linux)
+    if hasattr(signal, 'SIGINT'):
+        signal.signal(signal.SIGINT, signal_handler)
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, signal_handler)
+    
     # Main loop
     while True:
         try:
+            # Check for shutdown request
+            if agent._shutdown_requested:
+                break
+            
             # Get user input
             user_input = repl.prompt("\n> ")
             
@@ -423,11 +476,34 @@ def run_interactive(
             agent._process_message(user_input, use_streaming=use_streaming)
             
         except KeyboardInterrupt:
+            # Handle Ctrl+C gracefully
             from rich.prompt import Confirm
             if Confirm.ask("\n[yellow]Exit Cortex?[/yellow]"):
+                agent.request_shutdown()
+                agent._cleanup()
+                
+                # Optionally save session if dirty
+                if agent._session_dirty:
+                    try:
+                        from datetime import datetime
+                        auto_save_name = f"autosave_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                        session_manager.save_session(
+                            auto_save_name,
+                            agent.get_conversation_history(),
+                            str(agent.project_dir),
+                            agent.model,
+                            agent.permission_mode
+                        )
+                        console.print(f"[dim]Session auto-saved as: {auto_save_name}[/dim]")
+                    except Exception as e:
+                        console.print(f"[yellow]Warning:[/yellow] Could not auto-save session: {e}")
+                
                 console.print("[cyan]👋 Goodbye![/cyan]")
                 break
         except EOFError:
+            # Handle EOF (Ctrl+D)
+            agent.request_shutdown()
+            agent._cleanup()
             break
 
 
@@ -500,10 +576,52 @@ Tokens: {agent.conversation.get_token_count()}
     
     elif cmd == '/sessions':
         session_manager.show_sessions()
-    
+
+    elif cmd == '/storage':
+        # Show storage statistics
+        from .storage.cleanup import SessionCleanupManager
+        cleanup_manager = SessionCleanupManager(
+            sessions_dir=session_manager.sessions_dir,
+            max_age_days=agent.config.session_retention.get("max_age_days", 30),
+            max_count=agent.config.session_retention.get("max_count", 100),
+            max_total_size_mb=agent.config.session_retention.get("max_total_size_mb", 500),
+        )
+        stats = cleanup_manager.get_storage_stats()
+        info = f"""
+[bold]Storage Statistics[/bold]
+Sessions: {stats['session_count']} / {stats['limit_count']} ({stats['usage_percent_count']}%)
+Size: {stats['total_size_mb']} MB / {stats['limit_size_mb']} MB ({stats['usage_percent_size']}%)
+Max Age: {stats['limit_age_days']} days
+
+Oldest: {stats['oldest_session'] or 'N/A'}
+Newest: {stats['newest_session'] or 'N/A'}
+"""
+        console.print(Panel(info, title="Storage"))
+
+    elif cmd == '/cleanup':
+        # Manual cleanup
+        from .storage.cleanup import SessionCleanupManager
+        cleanup_manager = SessionCleanupManager(
+            sessions_dir=session_manager.sessions_dir,
+            max_age_days=agent.config.session_retention.get("max_age_days", 30),
+            max_count=agent.config.session_retention.get("max_count", 100),
+            max_total_size_mb=agent.config.session_retention.get("max_total_size_mb", 500),
+        )
+        stats = cleanup_manager.run_full_cleanup()
+        if stats.sessions_removed > 0:
+            console.print(
+                f"[green]✓[/green] Removed {stats.sessions_removed} sessions, "
+                f"freed {stats.bytes_freed // 1024} KB"
+            )
+        else:
+            console.print("[green]✓[/green] No sessions needed cleanup")
+        if stats.errors:
+            for error in stats.errors:
+                console.print(f"[red]Error:[/red] {error}")
+
     elif cmd == '/exit':
         raise KeyboardInterrupt
-    
+
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         console.print("[dim]Type /help for available commands[/dim]")

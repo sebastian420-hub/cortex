@@ -1,6 +1,7 @@
 """Main Cortex class"""
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
@@ -76,15 +77,31 @@ class Cortex:
 
         # Initialize conversation manager
         system_prompt = self._get_system_prompt()
+        warn_on_truncation = self.config.session_retention.get("warn_on_truncation", True)
         self.conversation = ConversationManager(
             system_prompt=system_prompt,
             max_tokens=self.config.max_tokens,
             keep_recent=self.config.keep_recent_messages,
-            model=self.model
+            model=self.model,
+            warn_on_truncation=warn_on_truncation,
+            on_truncation=self._on_context_truncation
         )
 
-        # Initialize loop guard
-        self.loop_guard = LoopGuard(max_repeats=3)
+        # Initialize loop guard with recovery manager if enabled
+        recovery_manager = None
+        if self.config.error_recovery.get("enable_smart_recovery", False):
+            from .core.recovery import create_recovery_manager_from_config
+            recovery_manager = create_recovery_manager_from_config(self.config.error_recovery)
+
+        self.loop_guard = LoopGuard(
+            max_repeats=self.config.error_recovery.get("max_repeats", 3),
+            stuck_threshold=self.config.error_recovery.get("stuck_threshold", 5),
+            buffer_size=self.config.error_recovery.get("buffer_size", 10),
+            recovery_manager=recovery_manager
+        )
+
+        # Initialize timeout configuration
+        self._timeout_config = self.config.get_timeout_config()
 
         # Initialize model provider
         provider_override = getattr(self.config, 'provider', None)
@@ -101,10 +118,22 @@ class Cortex:
 
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
+        
+        # Shutdown flag for graceful termination
+        self._shutdown_requested = False
+        self._session_dirty = False  # Track if session needs saving
 
         # Dispatch session start event
         self._dispatch_session_start()
-    
+
+    def _on_context_truncation(self, messages_removed: int, remaining: int) -> None:
+        """Callback when context is truncated."""
+        if self._is_text_output():
+            console.print(
+                f"[yellow]Context truncated:[/yellow] Removed {messages_removed} old messages "
+                f"({remaining} remaining)"
+            )
+
     def switch_model(self, new_model: str, provider_override: Optional[str] = None) -> None:
         """
         Switch to a different model while maintaining conversation history.
@@ -450,7 +479,8 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 self.project_dir,
                 self.permission_mode,
                 console,
-                parent_agent=self
+                parent_agent=self,
+                timeout_config=self._timeout_config
             )
 
             # Execute tool
@@ -513,8 +543,33 @@ Remember: Use tools only when necessary. For conversational interactions, respon
         
         return True
     
+    def request_shutdown(self) -> None:
+        """Request graceful shutdown."""
+        self._shutdown_requested = True
+    
+    def _cleanup(self) -> None:
+        """
+        Cleanup resources on shutdown.
+        Saves session state if dirty and dispatches session end event.
+        """
+        try:
+            # Dispatch session end event
+            self._dispatch_session_end()
+            
+            # Note: Session saving is handled by CLI layer if needed
+            # This cleanup focuses on internal state
+            
+        except Exception as e:
+            # Don't raise exceptions during cleanup
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error during cleanup: {e}")
+    
     def _process_message(self, user_message: str, use_streaming: bool = False):
         """Process a user message through the agent loop with hook support."""
+
+        # Check for shutdown request
+        if self._shutdown_requested:
+            return
 
         # Dispatch UserPromptSubmit hook
         prompt_event = UserPromptSubmitEvent(
@@ -533,11 +588,18 @@ Remember: Use tools only when necessary. For conversational interactions, respon
 
         # Add user message
         self.conversation.add_user_message(user_message)
+        self._session_dirty = True
 
         # Agent loop
         max_iterations = self.config.max_iterations
 
         for iteration in range(max_iterations):
+            # Check for shutdown request
+            if self._shutdown_requested:
+                self._output_warning("Shutdown requested. Cleaning up...")
+                self._cleanup()
+                return
+            
             self.loop_guard.increment_iteration()
             console.print(f"[dim]{'─' * 60}[/dim]")
             
@@ -576,6 +638,12 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 if response_message.get("tool_calls"):
                     # Execute tools
                     for tool_call in response_message["tool_calls"]:
+                        # Check for shutdown request before each tool
+                        if self._shutdown_requested:
+                            self._output_warning("Shutdown requested. Stopping tool execution...")
+                            self._cleanup()
+                            return
+                        
                         tool_name = tool_call["function"]["name"]
                         arguments = tool_call["function"]["arguments"]
                         
@@ -594,16 +662,39 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                                 {"tool_name": tool_name}
                             )
                         
+                        # Add result to conversation first (before recovery handling)
+                        tool_call_id = tool_call.get("id", f"call_{iteration}")
+                        self.conversation.add_tool_result(tool_call_id, result)
+                        
                         # Check loop guards
                         if not self._is_tool_result_success(result):
                             self.loop_guard.record_error(result)
                             if self.loop_guard.check_repeated_error(result):
+                                # Try recovery if enabled
+                                recovery_action = self.loop_guard.get_recovery_action(
+                                    result, tool_name, arguments
+                                )
+                                if recovery_action:
+                                    from .core.recovery import RecoveryStrategy
+                                    if recovery_action.strategy != RecoveryStrategy.ESCALATE:
+                                        # Inject recovery suggestion and continue
+                                        self._output_warning(
+                                            f"Recovery triggered: {recovery_action.message}"
+                                        )
+                                        if recovery_action.suggested_prompt:
+                                            # Add recovery guidance as additional context
+                                            # The original tool result was already added above
+                                            self.conversation.add_user_message(
+                                                f"[Recovery Guidance] {recovery_action.suggested_prompt}"
+                                            )
+                                        continue  # Continue loop to let model try recovery
+                                # No recovery or escalate - stop
                                 self._output_error("Repeated error detected. Stopping to prevent infinite loop.", "loop_guard")
                                 return
-                        
+
                         self.loop_guard.record_tool_call(tool_name, arguments)
                         self.loop_guard.record_operation(tool_name, arguments)
-                        
+
                         # Check stuck state
                         if self.loop_guard.check_stuck_state():
                             self._output_error("Agent appears stuck. Stopping to prevent infinite loop.", "loop_guard")
@@ -613,9 +704,7 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                             self._output_error("Same tool called repeatedly. Stopping to prevent infinite loop.", "loop_guard")
                             return
                         
-                        # Add result to conversation
-                        tool_call_id = tool_call.get("id", f"call_{iteration}")
-                        self.conversation.add_tool_result(tool_call_id, result)
+                        # Note: Tool result is already added to conversation above (before recovery handling)
                 else:
                     # No more tools - final response
                     final_text = response_message.get("content", "")

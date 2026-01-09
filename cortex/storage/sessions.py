@@ -1,11 +1,26 @@
 """Session persistence for Cortex"""
 
 import json
+import os
+import sys
+import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from rich.console import Console
 from rich.table import Table
+
+# Platform-specific file locking
+if sys.platform == 'win32':
+    import msvcrt
+    LOCK_EX = 0x1  # Exclusive lock
+    LOCK_SH = 0x0  # Shared lock (read)
+    LOCK_NB = 0x2  # Non-blocking
+else:
+    import fcntl
+    LOCK_EX = fcntl.LOCK_EX
+    LOCK_SH = fcntl.LOCK_SH
+    LOCK_NB = fcntl.LOCK_NB
 
 console = Console()
 
@@ -16,6 +31,112 @@ class SessionManager:
     def __init__(self, sessions_dir: Path):
         self.sessions_dir = sessions_dir
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        self._lock_timeout = 5.0  # Timeout for acquiring locks (seconds)
+    
+    def _acquire_lock(self, file_handle, exclusive: bool = True, blocking: bool = True) -> bool:
+        """
+        Acquire a file lock.
+        
+        Args:
+            file_handle: Open file handle
+            exclusive: True for write lock, False for read lock
+            blocking: True to wait for lock, False to fail immediately
+            
+        Returns:
+            True if lock acquired, False otherwise
+        """
+        try:
+            if sys.platform == 'win32':
+                # Windows locking
+                mode = LOCK_EX if exclusive else LOCK_SH
+                if not blocking:
+                    mode |= LOCK_NB
+                msvcrt.locking(file_handle.fileno(), mode, 1)
+            else:
+                # Unix locking
+                mode = LOCK_EX if exclusive else LOCK_SH
+                if not blocking:
+                    mode |= LOCK_NB
+                fcntl.flock(file_handle.fileno(), mode)
+            return True
+        except (IOError, OSError):
+            return False
+    
+    def _release_lock(self, file_handle) -> None:
+        """Release a file lock."""
+        try:
+            if sys.platform == 'win32':
+                msvcrt.locking(file_handle.fileno(), 0, 1)  # Unlock
+            else:
+                fcntl.flock(file_handle.fileno(), fcntl.LOCK_UN)
+        except (IOError, OSError):
+            pass  # Ignore errors on release
+    
+    def _atomic_write(self, file_path: Path, data: Dict[str, Any]) -> bool:
+        """
+        Atomically write session data to file with locking.
+        
+        Args:
+            file_path: Target file path
+            data: Data to write
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        temp_file = file_path.with_suffix('.tmp')
+        lock_file = file_path.with_suffix('.lock')
+        
+        try:
+            # Write to temporary file first
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())  # Force write to disk
+            
+            # Acquire exclusive lock on lock file
+            lock_acquired = False
+            start_time = time.time()
+            
+            while not lock_acquired and (time.time() - start_time) < self._lock_timeout:
+                try:
+                    with open(lock_file, 'w') as lock_f:
+                        if self._acquire_lock(lock_f, exclusive=True, blocking=False):
+                            lock_acquired = True
+                            # Atomic rename (works on both Unix and Windows)
+                            temp_file.replace(file_path)
+                            return True
+                except (IOError, OSError):
+                    time.sleep(0.1)  # Brief wait before retry
+            
+            # If we couldn't acquire lock, still try atomic rename
+            # (on some systems, rename is atomic even without explicit locking)
+            if not lock_acquired:
+                temp_file.replace(file_path)
+                return True
+                
+        except Exception as e:
+            console.print(f"[yellow]Warning:[/yellow] Could not acquire lock for {file_path.name}: {e}")
+            # Fallback: try direct write without locking
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                return True
+            except Exception:
+                return False
+        finally:
+            # Clean up temp file if it still exists
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except:
+                    pass
+            if lock_file.exists():
+                try:
+                    lock_file.unlink()
+                except:
+                    pass
+        
+        return False
     
     def save_session(
         self,
@@ -56,11 +177,13 @@ class SessionManager:
                 "version": "1.0"
             }
             
-            with open(session_file, 'w', encoding='utf-8') as f:
-                json.dump(session_data, f, indent=2, ensure_ascii=False)
-            
-            console.print(f"[green]✓[/green] Session saved: {safe_name}")
-            return True
+            # Use atomic write with locking
+            if self._atomic_write(session_file, session_data):
+                console.print(f"[green]✓[/green] Session saved: {safe_name}")
+                return True
+            else:
+                console.print(f"[red]Error saving session:[/red] Failed to write {safe_name}")
+                return False
             
         except Exception as e:
             console.print(f"[red]Error saving session:[/red] {e}")
@@ -86,11 +209,26 @@ class SessionManager:
                 console.print(f"[red]Session not found:[/red] {session_name}")
                 return None
             
-            with open(session_file, 'r', encoding='utf-8') as f:
-                session_data = json.load(f)
-            
-            console.print(f"[green]✓[/green] Session loaded: {session_name}")
-            return session_data
+            # Try to acquire read lock (non-blocking)
+            try:
+                with open(session_file, 'r', encoding='utf-8') as f:
+                    # Try to acquire shared lock (non-blocking)
+                    if self._acquire_lock(f, exclusive=False, blocking=False):
+                        try:
+                            session_data = json.load(f)
+                            console.print(f"[green]✓[/green] Session loaded: {session_name}")
+                            return session_data
+                        finally:
+                            self._release_lock(f)
+                    else:
+                        # If lock unavailable, read without lock (may get partial read)
+                        # This is acceptable for read operations
+                        session_data = json.load(f)
+                        console.print(f"[green]✓[/green] Session loaded: {session_name}")
+                        return session_data
+            except json.JSONDecodeError as e:
+                console.print(f"[red]Error loading session:[/red] Invalid JSON in {session_name}: {e}")
+                return None
             
         except Exception as e:
             console.print(f"[red]Error loading session:[/red] {e}")

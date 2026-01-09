@@ -1,6 +1,7 @@
 """Model provider abstraction layer for supporting multiple LLM APIs"""
 
 import os
+import json
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Iterator, Optional
 import logging
@@ -378,7 +379,7 @@ class AnthropicProvider(ModelProvider):
                     tool_calls.append({
                         "function": {
                             "name": content_block.name,
-                            "arguments": str(content_block.input)  # Anthropic uses dict, convert to JSON string
+                            "arguments": json.dumps(content_block.input)  # Anthropic uses dict, convert to JSON string
                         },
                         "id": content_block.id,
                         "type": "function"
