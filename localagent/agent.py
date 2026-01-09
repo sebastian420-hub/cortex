@@ -262,6 +262,53 @@ Remember: Use tools only when necessary. For conversational interactions, respon
         )
         self.hook_manager.dispatch(event)
 
+    # Output helper methods for format-aware display
+    def _is_text_output(self) -> bool:
+        """Check if we're in text output mode (vs JSON modes)."""
+        return self.output_format == OutputFormat.TEXT
+
+    def _output_response(self, response: Dict[str, Any], is_final: bool = False) -> None:
+        """Output a response using the appropriate formatter."""
+        content = response.get("content", "")
+        if not content:
+            return
+
+        if self._is_text_output():
+            if is_final:
+                console.print(Panel(
+                    Markdown(content),
+                    title="[bold green]LocalAgent[/bold green]",
+                    border_style="green"
+                ))
+            else:
+                console.print(Markdown(content))
+        else:
+            formatted = self.formatter.format_response(response)
+            self.formatter.write(formatted)
+
+    def _output_tool_result(self, tool_name: str, result: Dict[str, Any]) -> None:
+        """Output a tool result using the appropriate formatter."""
+        if not self._is_text_output():
+            formatted = self.formatter.format_tool_result(tool_name, result)
+            self.formatter.write(formatted)
+        # In text mode, tool results are shown by the tools themselves
+
+    def _output_error(self, error: str, error_type: str = "error", context: Optional[Dict[str, Any]] = None) -> None:
+        """Output an error using the appropriate formatter."""
+        if self._is_text_output():
+            console.print(f"[red]{error_type.upper()}:[/red] {error}")
+        else:
+            formatted = self.formatter.format_error(error, error_type, context)
+            self.formatter.write(formatted)
+
+    def _output_warning(self, message: str) -> None:
+        """Output a warning message."""
+        if self._is_text_output():
+            console.print(f"[yellow]{message}[/yellow]")
+        else:
+            formatted = self.formatter.format_error(message, "warning")
+            self.formatter.write(formatted)
+
     @retry_with_backoff(max_retries=3, exceptions=(Exception,))
     def _call_model(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Call Ollama model with retry logic"""
@@ -323,12 +370,13 @@ Remember: Use tools only when necessary. For conversational interactions, respon
         success = False
 
         try:
-            # Create tool instance
+            # Create tool instance (pass self for task tool which needs parent_agent)
             tool = create_tool_instance(
                 tool_name,
                 self.project_dir,
                 self.permission_mode,
-                console
+                console,
+                parent_agent=self
             )
 
             # Execute tool
@@ -403,7 +451,7 @@ Remember: Use tools only when necessary. For conversational interactions, respon
 
         # Handle hook actions
         if prompt_result.action == HookAction.ABORT:
-            console.print(f"[red]Prompt blocked:[/red] {prompt_result.message}")
+            self._output_error(prompt_result.message or "Blocked by hook", "prompt_blocked")
             return
         elif prompt_result.action == HookAction.MODIFY and prompt_result.modified_data:
             # Use modified prompt from hook
@@ -446,7 +494,7 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 
                 # Display content if present (even if tools are also present)
                 if response_message.get("content"):
-                    console.print(Markdown(response_message["content"]))
+                    self._output_response({"content": response_message["content"]})
                 
                 # Check if using tools
                 if response_message.get("tool_calls"):
@@ -458,9 +506,12 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                         # Execute
                         result = self.execute_tool(tool_name, arguments)
                         
+                        # Output tool result (for JSON modes)
+                        self._output_tool_result(tool_name, result)
+
                         # Validate result
                         if not self._validate_tool_result(tool_name, result):
-                            console.print(f"[yellow]⚠️  Invalid tool result format from {tool_name}[/yellow]")
+                            self._output_warning(f"Invalid tool result format from {tool_name}")
                             result = create_error_response(
                                 "Tool returned invalid result format",
                                 ErrorType.EXECUTION,
@@ -471,7 +522,7 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                         if not self._is_tool_result_success(result):
                             self.loop_guard.record_error(result)
                             if self.loop_guard.check_repeated_error(result):
-                                console.print("[red]⚠️  Repeated error detected. Stopping to prevent infinite loop.[/red]")
+                                self._output_error("Repeated error detected. Stopping to prevent infinite loop.", "loop_guard")
                                 return
                         
                         self.loop_guard.record_tool_call(tool_name, arguments)
@@ -479,11 +530,11 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                         
                         # Check stuck state
                         if self.loop_guard.check_stuck_state():
-                            console.print("[red]⚠️  Agent appears stuck. Stopping to prevent infinite loop.[/red]")
+                            self._output_error("Agent appears stuck. Stopping to prevent infinite loop.", "loop_guard")
                             return
-                        
+
                         if self.loop_guard.check_repeated_tool_call(tool_name, arguments):
-                            console.print("[red]⚠️  Same tool called repeatedly. Stopping to prevent infinite loop.[/red]")
+                            self._output_error("Same tool called repeatedly. Stopping to prevent infinite loop.", "loop_guard")
                             return
                         
                         # Add result to conversation
@@ -492,31 +543,25 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 else:
                     # No more tools - final response
                     final_text = response_message.get("content", "")
-                    
+
                     if final_text:
-                        console.print(Panel(
-                            Markdown(final_text),
-                            title="[bold green]🤖 LocalAgent[/bold green]",
-                            border_style="green"
-                        ))
+                        self._output_response({"content": final_text}, is_final=True)
                         return
                     else:
                         # Empty response - this shouldn't happen, but handle gracefully
-                        console.print("[yellow]⚠️  Model returned empty response. Exiting.[/yellow]")
+                        self._output_warning("Model returned empty response. Exiting.")
                         return
                     
             except ModelError as e:
-                console.print(f"[red]Model Error:[/red] {e}")
                 import traceback
-                console.print("[dim]" + traceback.format_exc() + "[/dim]")
+                self._output_error(str(e), "model_error", {"traceback": traceback.format_exc()})
                 return
             except Exception as e:
-                console.print(f"[red]Error:[/red] {e}")
                 import traceback
-                console.print("[dim]" + traceback.format_exc() + "[/dim]")
+                self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
                 return
-        
-        console.print("[yellow]⚠️  Reached maximum iterations[/yellow]")
+
+        self._output_warning("Reached maximum iterations")
     
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get current conversation history"""

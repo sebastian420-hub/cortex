@@ -182,7 +182,7 @@ class TaskTool(Tool):
         # Import here to avoid circular imports
         from ..agent import LocalAgent
         from ..config import AgentConfig
-        from ..hooks import HookManager
+        from ..hooks import HookManager, PermissionHook
 
         # Create restricted config for subagent
         subagent_config = AgentConfig(
@@ -195,6 +195,16 @@ class TaskTool(Tool):
         if self.parent_agent:
             model = self.parent_agent.model
 
+        # Create hook manager with tool restrictions
+        subagent_hooks = HookManager()
+
+        # Add PermissionHook to enforce allowed_tools whitelist
+        # This ensures the subagent can ONLY use tools in allowed_tools list
+        permission_hook = PermissionHook(allowed=context.allowed_tools)
+        subagent_hooks.register(permission_hook)
+
+        logger.debug(f"Subagent tools restricted to: {context.allowed_tools}")
+
         # Create subagent with isolated context
         # Use PLAN mode by default for safety (read-only)
         subagent = LocalAgent(
@@ -202,7 +212,7 @@ class TaskTool(Tool):
             project_dir=str(context.working_directory or self.project_dir),
             permission_mode=PermissionMode.PLAN,
             config=subagent_config,
-            hook_manager=HookManager(),  # Fresh hook manager
+            hook_manager=subagent_hooks,  # Hook manager with tool restrictions
         )
 
         # Override system prompt for focused task

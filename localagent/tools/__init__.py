@@ -1,6 +1,6 @@
 """Tool implementations for LocalAgent"""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 from pathlib import Path
 
 from .base import Tool
@@ -10,6 +10,10 @@ from .search_tools import ListFilesTool, SearchFilesTool
 from .git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GitLogTool
 from .test_tools import RunTestsTool
 from .registry import ToolRegistry, get_registry, reset_registry
+from ..subagent import TaskTool, TASK_TOOL_SCHEMA
+
+if TYPE_CHECKING:
+    from ..agent import LocalAgent
 
 # Tool definitions matching Anthropic's function calling format
 # NOTE: This list is kept for backward compatibility.
@@ -199,11 +203,19 @@ TOOLS: List[Dict[str, Any]] = [
                 "required": []
             }
         }
-    }
+    },
+    # Task tool for subagent delegation
+    TASK_TOOL_SCHEMA
 ]
 
 
-def create_tool_instance(tool_name: str, project_dir: Path, permission_mode: str, console) -> Tool:
+def create_tool_instance(
+    tool_name: str,
+    project_dir: Path,
+    permission_mode: str,
+    console,
+    parent_agent: Optional["LocalAgent"] = None
+) -> Tool:
     """
     Create a tool instance by name.
 
@@ -215,6 +227,7 @@ def create_tool_instance(tool_name: str, project_dir: Path, permission_mode: str
         project_dir: Project directory path
         permission_mode: Permission mode string
         console: Console instance for output
+        parent_agent: Parent agent instance (required for task tool)
 
     Returns:
         Tool instance
@@ -222,12 +235,22 @@ def create_tool_instance(tool_name: str, project_dir: Path, permission_mode: str
     Raises:
         ValueError: If tool is not found or disabled
     """
+    # Special handling for task tool which needs parent_agent
+    if tool_name == "task":
+        return TaskTool(
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            console=console,
+            parent_agent=parent_agent
+        )
+
     return get_registry().create_instance(tool_name, project_dir, permission_mode, console)
 
 
 __all__ = [
     # Tool schemas (backward compatible)
     "TOOLS",
+    "TASK_TOOL_SCHEMA",
     # Base class
     "Tool",
     # Tool implementations
@@ -241,6 +264,7 @@ __all__ = [
     "GitCommitTool",
     "GitLogTool",
     "RunTestsTool",
+    "TaskTool",
     # Factory function (backward compatible)
     "create_tool_instance",
     # Registry (new)
