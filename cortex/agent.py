@@ -105,6 +105,63 @@ class Cortex:
         # Dispatch session start event
         self._dispatch_session_start()
     
+    def switch_model(self, new_model: str, provider_override: Optional[str] = None) -> None:
+        """
+        Switch to a different model while maintaining conversation history.
+        
+        Reinitializes the provider and updates conversation manager's model reference.
+        This allows switching between models (e.g., local to cloud) while keeping
+        the same conversation context.
+        
+        Args:
+            new_model: New model name to use
+            provider_override: Optional provider override
+            
+        Raises:
+            ProviderError: If provider initialization fails or API key is missing
+        """
+        # Skip if same model
+        if new_model == self.model:
+            return
+        
+        old_model = self.model
+        old_provider_name = ProviderFactory.get_provider_name(self.model)
+        
+        try:
+            # Reinitialize provider for new model
+            provider_override = provider_override or getattr(self.config, 'provider', None)
+            new_provider = ProviderFactory.get_provider(new_model, provider_override)
+            
+            # Validate API key for cloud providers
+            if not new_provider.validate_api_key():
+                provider_name = ProviderFactory.get_provider_name(new_model)
+                raise ProviderError(
+                    f"API key not set for {provider_name} provider. "
+                    f"Please set the required environment variable."
+                )
+            
+            # Update model and provider
+            self.model = new_model
+            self.provider = new_provider
+            
+            # Update conversation manager's model reference for token counting
+            self.conversation.update_model(new_model)
+            
+            # Notify user of model switch
+            new_provider_name = ProviderFactory.get_provider_name(new_model)
+            if old_provider_name != new_provider_name:
+                console.print(
+                    f"[cyan]🔄 Switched model:[/cyan] {old_model} ({old_provider_name}) → "
+                    f"{new_model} ({new_provider_name})"
+                )
+            else:
+                console.print(f"[cyan]🔄 Switched model:[/cyan] {old_model} → {new_model}")
+                
+        except ProviderError as e:
+            # Keep old model on error
+            console.print(f"[red]Failed to switch model:[/red] {e}")
+            raise ProviderError(f"Failed to switch model: {e}") from e
+    
     def _load_project_context(self) -> str:
         """Load AGENT.md or README.md for project context"""
         context_files = ["AGENT.md", "CLAUDE.md", "README.md"]

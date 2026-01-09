@@ -259,6 +259,9 @@ Examples:
         else:
             console.print(f"[yellow]Warning:[/yellow] Config file not found: {args.config}")
     
+    # Track if model was explicitly provided (for session loading logic)
+    model_explicitly_provided = args.model is not None
+    
     # Override with CLI arguments
     if args.model:
         config.model = args.model
@@ -331,8 +334,37 @@ Examples:
     if args.load_session:
         session_data = session_manager.load_session(args.load_session)
         if session_data:
+            # Load conversation history
             agent.conversation.history = session_data["conversation_history"]
-            agent.model = session_data.get("model", agent.model)
+            
+            # Determine which model to use
+            if model_explicitly_provided:
+                # User explicitly provided --model, use it (switch model if different)
+                target_model = config.model
+                if target_model != agent.model:
+                    try:
+                        agent.switch_model(target_model, config.provider)
+                    except ProviderError as e:
+                        console.print(f"[red]Error switching model:[/red] {e}")
+                        # Fall back to session's model if switch fails
+                        session_model = session_data.get("model", agent.model)
+                        if session_model != agent.model:
+                            try:
+                                agent.switch_model(session_model, config.provider)
+                            except ProviderError:
+                                # If both fail, keep current model (already initialized)
+                                console.print(f"[yellow]Using current model:[/yellow] {agent.model}")
+            else:
+                # No --model provided, use session's saved model (backward compatible)
+                session_model = session_data.get("model", agent.model)
+                if session_model != agent.model:
+                    try:
+                        agent.switch_model(session_model, config.provider)
+                    except ProviderError as e:
+                        console.print(f"[yellow]Warning:[/yellow] Could not switch to session's model ({session_model}): {e}")
+                        console.print(f"[yellow]Continuing with current model:[/yellow] {agent.model}")
+            
+            # Restore permission mode
             agent.permission_mode = session_data.get("permission_mode", agent.permission_mode)
     
     # Run

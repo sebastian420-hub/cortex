@@ -87,4 +87,15 @@ class ConversationManager:
     def get_token_count(self) -> int:
         """Get current token count"""
         return get_conversation_tokens(self.history, self.model)
+    
+    def update_model(self, new_model: str) -> None:
+        """
+        Update the model reference for token counting.
+        
+        This is used when switching models while maintaining conversation history.
+        
+        Args:
+            new_model: New model name to use for token counting
+        """
+        self.model = new_model
 
