@@ -13,6 +13,8 @@ from .test_tools import RunTestsTool
 from .grep_tool import GrepTool
 from .glob_tool import GlobTool
 from .edit_tool import EditTool
+# Phase 3 web tools
+from .web_tools import WebFetchTool, WebSearchTool, clear_fetch_cache
 from .todo_tool import (
     TodoWriteTool,
     TodoManager,
@@ -341,6 +343,63 @@ TOOLS: List[Dict[str, Any]] = [
             }
         }
     },
+    # Phase 3 Web tools
+    {
+        "type": "function",
+        "function": {
+            "name": "web_fetch",
+            "description": "Fetch content from a URL and convert to markdown. Use this to read documentation, web pages, or API responses. Includes 15-minute cache.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "The URL to fetch (e.g., 'https://docs.python.org/3/library/json.html')"
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Optional: What to extract/analyze from the content"
+                    },
+                    "max_content_length": {
+                        "type": "integer",
+                        "description": "Maximum content length to return (default: 50000)"
+                    }
+                },
+                "required": ["url"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web for information. Returns titles, URLs, and snippets. Use to find documentation, examples, or solutions.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query (e.g., 'python requests library documentation')"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results (default: 10)"
+                    },
+                    "allowed_domains": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Only include results from these domains"
+                    },
+                    "blocked_domains": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Exclude results from these domains"
+                    }
+                },
+                "required": ["query"]
+            }
+        }
+    },
     # Task tool for subagent delegation
     TASK_TOOL_SCHEMA,
     # Todo tracking tool
@@ -438,6 +497,10 @@ __all__ = [
     "GrepTool",
     "GlobTool",
     "EditTool",
+    # Phase 3 web tools
+    "WebFetchTool",
+    "WebSearchTool",
+    "clear_fetch_cache",
     # Todo management
     "TodoManager",
     "TodoItem",

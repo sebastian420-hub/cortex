@@ -232,6 +232,8 @@ class ToolRegistry:
         from .grep_tool import GrepTool
         from .glob_tool import GlobTool
         from .edit_tool import EditTool
+        # Phase 3 web tools
+        from .web_tools import WebFetchTool, WebSearchTool
 
         # Tool class mapping
         builtin_tools = {
@@ -249,6 +251,9 @@ class ToolRegistry:
             "grep": GrepTool,
             "glob": GlobTool,
             "edit": EditTool,
+            # Phase 3 web tools
+            "web_fetch": WebFetchTool,
+            "web_search": WebSearchTool,
         }
 
         # Tool schemas (inline definitions)
@@ -551,6 +556,63 @@ class ToolRegistry:
                             }
                         },
                         "required": ["file_path", "old_string", "new_string"]
+                    }
+                }
+            },
+            # Phase 3 web tools
+            "web_fetch": {
+                "type": "function",
+                "function": {
+                    "name": "web_fetch",
+                    "description": "Fetch content from a URL and convert to markdown.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "description": "The URL to fetch"
+                            },
+                            "prompt": {
+                                "type": "string",
+                                "description": "What to extract/analyze from the content"
+                            },
+                            "max_content_length": {
+                                "type": "integer",
+                                "description": "Maximum content length (default: 50000)"
+                            }
+                        },
+                        "required": ["url"]
+                    }
+                }
+            },
+            "web_search": {
+                "type": "function",
+                "function": {
+                    "name": "web_search",
+                    "description": "Search the web for information.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Search query"
+                            },
+                            "max_results": {
+                                "type": "integer",
+                                "description": "Maximum results (default: 10)"
+                            },
+                            "allowed_domains": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Only include results from these domains"
+                            },
+                            "blocked_domains": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Exclude results from these domains"
+                            }
+                        },
+                        "required": ["query"]
                     }
                 }
             }
