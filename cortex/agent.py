@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 from datetime import datetime
 
 from rich.console import Console
@@ -54,6 +54,7 @@ class Cortex:
         config: Optional[AgentConfig] = None,
         hook_manager: Optional[HookManager] = None,
         output_format: OutputFormat = OutputFormat.TEXT,
+        on_max_iterations_reached: Optional[Callable[[int, int], Optional[int]]] = None,
     ):
         self.model = model
         self.project_dir = Path(project_dir).resolve()
@@ -122,6 +123,16 @@ class Cortex:
         # Shutdown flag for graceful termination
         self._shutdown_requested = False
         self._session_dirty = False  # Track if session needs saving
+
+        # Set default callback if configured
+        if on_max_iterations_reached is None and self.config.max_iterations_continue_default:
+            def default_callback(current: int, max_iter: int) -> Optional[int]:
+                # Auto-continue with configured amount
+                return self.config.max_iterations_continue_amount
+            
+            self._on_max_iterations_reached = default_callback
+        else:
+            self._on_max_iterations_reached = on_max_iterations_reached
 
         # Dispatch session start event
         self._dispatch_session_start()
@@ -584,15 +595,37 @@ Remember: Use tools only when necessary. For conversational interactions, respon
         self.conversation.add_user_message(user_message)
         self._session_dirty = True
 
-        # Agent loop
+        # Agent loop - use while True with explicit break for dynamic iteration extension
         max_iterations = self.config.max_iterations
+        iteration = 0
 
-        for iteration in range(max_iterations):
+        while True:
+            iteration += 1
+            
             # Check for shutdown request
             if self._shutdown_requested:
                 self._output_warning("Shutdown requested. Cleaning up...")
                 self._cleanup()
                 return
+            
+            # Check if we've exceeded max iterations (before processing)
+            if iteration > max_iterations:
+                # Check if callback is set
+                if self._on_max_iterations_reached:
+                    additional = self._on_max_iterations_reached(iteration, max_iterations)
+                    if additional is not None and additional > 0:
+                        # Extend max_iterations and continue
+                        max_iterations += additional
+                        console.print(f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})")
+                        continue  # Continue the loop with extended limit
+                    else:
+                        # Callback returned 0 or None - stop
+                        self._output_warning("Reached maximum iterations")
+                        return
+                else:
+                    # No callback - default behavior (stop)
+                    self._output_warning("Reached maximum iterations")
+                    return
             
             self.loop_guard.increment_iteration()
             console.print(f"[dim]{'─' * 60}[/dim]")
@@ -726,8 +759,6 @@ Remember: Use tools only when necessary. For conversational interactions, respon
                 import traceback
                 self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
                 return
-
-        self._output_warning("Reached maximum iterations")
     
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get current conversation history"""

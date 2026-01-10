@@ -20,7 +20,7 @@
 
 ## 🎯 Project Vision
 
-Transform LocalAgent into SecurityAgent - an AI-powered ethical hacking assistant that:
+Transform Cortex into SecurityAgent - an AI-powered ethical hacking assistant that:
 - Automates penetration testing workflows
 - Analyzes code for vulnerabilities
 - Assists with security audits
@@ -66,7 +66,7 @@ SecurityAgent
 
 ### Phase 1: Reconnaissance Tools
 
-**New file:** `localagent/tools/recon_tools.py`
+**New file:** `cortex/tools/recon_tools.py`
 
 ```python
 """Reconnaissance tools for ethical security testing"""
@@ -211,7 +211,7 @@ class WhoisLookupTool(Tool):
 
 ### Phase 2: Vulnerability Scanning
 
-**New file:** `localagent/tools/vuln_scan_tools.py`
+**New file:** `cortex/tools/vuln_scan_tools.py`
 
 ```python
 """Vulnerability scanning tools"""
@@ -315,7 +315,7 @@ class DependencyCheckTool(Tool):
 
 ### Phase 3: Code Security Analysis
 
-**New file:** `localagent/tools/code_security_tools.py`
+**New file:** `cortex/tools/code_security_tools.py`
 
 ```python
 """Code security analysis tools"""
@@ -393,7 +393,7 @@ class SecretScannerTool(Tool):
 
 ### Phase 4: Exploitation Framework Integration
 
-**New file:** `localagent/tools/exploit_tools.py`
+**New file:** `cortex/tools/exploit_tools.py`
 
 ```python
 """Exploitation tools (EXTREME CAUTION REQUIRED)"""
@@ -529,7 +529,7 @@ class ExploitDBSearchTool(Tool):
 
 ### Phase 5: Reporting Tools
 
-**New file:** `localagent/tools/security_report_tools.py`
+**New file:** `cortex/tools/security_report_tools.py`
 
 ```python
 """Security reporting and documentation tools"""
@@ -607,7 +607,7 @@ class RiskMatrixTool(Tool):
 
 ## 🔐 Authorization System
 
-**New file:** `localagent/core/authorization.py`
+**New file:** `cortex/core/authorization.py`
 
 ```python
 """Authorization and scope management for security testing"""
@@ -709,7 +709,7 @@ class AuthorizationManager:
 
 ## 📋 Tool Definitions
 
-**Add to `localagent/tools/__init__.py`:**
+**Add to `cortex/tools/__init__.py`:**
 
 ```python
 SECURITY_TOOLS = [

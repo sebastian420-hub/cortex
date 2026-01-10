@@ -70,7 +70,7 @@ Added support for cloud API providers (DeepSeek and Anthropic) to enable cost-ef
 **File**: `cortex/config.py`
 
 - Added `provider` field to `AgentConfig`
-- Added environment variable support for `LOCALAGENT_PROVIDER`
+- Added environment variable support for `CORTEX_PROVIDER`
 - API keys read from environment variables (secure)
 
 **File**: `config/default.yaml`

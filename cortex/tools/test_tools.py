@@ -12,7 +12,10 @@ from ..utils.errors import create_error_response, create_success_response, Error
 
 class RunTestsTool(Tool):
     """Tool for running tests"""
-    
+
+    default_timeout: int = 120
+    timeout_category: str = "test"
+
     def _detect_test_framework(self) -> Optional[str]:
         """Detect which test framework is being used"""
         # Check for pytest
@@ -91,12 +94,13 @@ class RunTestsTool(Tool):
                 if verbose:
                     cmd.append("-v")
             
+            timeout = self.get_timeout()
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir,
-                timeout=120  # Tests can take longer
+                timeout=timeout  # Tests can take longer
             )
             
             output = result.stdout + result.stderr
@@ -124,9 +128,9 @@ class RunTestsTool(Tool):
                 )
         except subprocess.TimeoutExpired:
             return create_error_response(
-                "Tests timed out after 120 seconds",
+                f"Tests timed out after {timeout} seconds",
                 ErrorType.TIMEOUT,
-                {"pattern": pattern, "framework": framework}
+                {"pattern": pattern, "framework": framework, "timeout": timeout}
             )
         except Exception as e:
             return create_error_response(

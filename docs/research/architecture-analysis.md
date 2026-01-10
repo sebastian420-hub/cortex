@@ -1,27 +1,27 @@
-# LocalAgent Architecture and Data Flow Analysis
+# Cortex Architecture and Data Flow Analysis
 
 ## Overview
-This document provides a comprehensive analysis of LocalAgent's architecture, data flow, and workflow patterns.
+This document provides a comprehensive analysis of Cortex's architecture, data flow, and workflow patterns.
 
 ## 1. System Architecture
 
 ### 1.1 Component Overview
 
-LocalAgent is organized into the following main components:
+Cortex is organized into the following main components:
 
-- **CLI Layer** (`localagent/cli.py`): Entry point, argument parsing, session management
-- **Agent Core** (`localagent/agent.py`): Main orchestration, agent loop, tool execution
-- **Conversation Management** (`localagent/core/conversation.py`): History tracking and optimization
-- **Tool System** (`localagent/tools/`): Tool definitions and implementations
-- **Streaming** (`localagent/core/streaming.py`): Streaming response handling
-- **Context Management** (`localagent/core/context.py`): Token counting and history truncation
-- **Security** (`localagent/core/security.py`): Path validation and safety checks
-- **UI** (`localagent/ui/`): Console output and REPL interface
+- **CLI Layer** (`cortex/cli.py`): Entry point, argument parsing, session management
+- **Agent Core** (`cortex/agent.py`): Main orchestration, agent loop, tool execution
+- **Conversation Management** (`cortex/core/conversation.py`): History tracking and optimization
+- **Tool System** (`cortex/tools/`): Tool definitions and implementations
+- **Streaming** (`cortex/core/streaming.py`): Streaming response handling
+- **Context Management** (`cortex/core/context.py`): Token counting and history truncation
+- **Security** (`cortex/core/security.py`): Path validation and safety checks
+- **UI** (`cortex/ui/`): Console output and REPL interface
 
 ### 1.2 Entry Points
 
 **Primary Entry Point:**
-- `localagent/cli.py::main()` - CLI argument parsing and initialization
+- `cortex/cli.py::main()` - CLI argument parsing and initialization
 
 **Two Execution Modes:**
 1. **One-shot mode**: `agent._process_message(prompt)` - Single task execution
@@ -40,7 +40,7 @@ Load Configuration (AgentConfig)
     ↓
 Determine Permission Mode
     ↓
-Create LocalAgent Instance
+Create Cortex Instance
     ├─ Load Project Context (AGENT.md, README.md)
     ├─ Generate System Prompt
     └─ Initialize ConversationManager
@@ -330,7 +330,7 @@ flowchart TD
     CLI --> CheckOllama{Ollama Available?}
     CheckOllama -->|No| Error1[Display Error & Exit]
     CheckOllama -->|Yes| LoadConfig[Load Configuration]
-    LoadConfig --> CreateAgent[Create LocalAgent]
+    LoadConfig --> CreateAgent[Create Cortex]
     CreateAgent --> LoadContext[Load Project Context]
     LoadContext --> InitConversation[Initialize ConversationManager]
     InitConversation --> Mode{Execution Mode?}

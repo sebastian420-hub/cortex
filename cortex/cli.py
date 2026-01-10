@@ -422,6 +422,24 @@ def run_interactive(
         permission_mode=agent.permission_mode
     )
     
+    # Create callback for max iterations
+    def on_max_iterations_reached(current: int, max_iter: int) -> Optional[int]:
+        from rich.prompt import Confirm, IntPrompt
+        
+        console.print(f"\n[yellow]⚠️  Reached maximum iterations ({current}/{max_iter})[/yellow]")
+        
+        if Confirm.ask("[cyan]Continue processing?[/cyan]", default=False):
+            # Ask how many additional iterations
+            additional = IntPrompt.ask(
+                f"[cyan]How many additional iterations?[/cyan]",
+                default=agent.config.max_iterations_continue_amount
+            )
+            return max(1, additional)  # Ensure at least 1
+        return None  # Stop
+    
+    # Set callback on agent
+    agent._on_max_iterations_reached = on_max_iterations_reached
+    
     # Register signal handlers for graceful shutdown
     def signal_handler(signum, frame):
         """Handle SIGINT and SIGTERM signals"""

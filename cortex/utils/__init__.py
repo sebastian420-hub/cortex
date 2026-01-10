@@ -6,11 +6,14 @@ from .errors import (
     ModelError,
     retry_with_backoff
 )
+from .timeouts import TimeoutConfig, DEFAULT_TIMEOUT_CONFIG
 
 __all__ = [
     "AgentError",
     "ToolExecutionError",
     "ModelError",
-    "retry_with_backoff"
+    "retry_with_backoff",
+    "TimeoutConfig",
+    "DEFAULT_TIMEOUT_CONFIG",
 ]
 

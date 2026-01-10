@@ -14,6 +14,7 @@ from ..subagent import TaskTool, TASK_TOOL_SCHEMA
 
 if TYPE_CHECKING:
     from ..agent import Cortex
+    from ..utils.timeouts import TimeoutConfig
 
 # Tool definitions matching Anthropic's function calling format
 # NOTE: This list is kept for backward compatibility.
@@ -214,7 +215,8 @@ def create_tool_instance(
     project_dir: Path,
     permission_mode: str,
     console,
-    parent_agent: Optional["Cortex"] = None
+    parent_agent: Optional["Cortex"] = None,
+    timeout_config: Optional["TimeoutConfig"] = None
 ) -> Tool:
     """
     Create a tool instance by name.
@@ -228,6 +230,7 @@ def create_tool_instance(
         permission_mode: Permission mode string
         console: Console instance for output
         parent_agent: Parent agent instance (required for task tool)
+        timeout_config: Optional timeout configuration for tool operations
 
     Returns:
         Tool instance
@@ -241,10 +244,14 @@ def create_tool_instance(
             project_dir=project_dir,
             permission_mode=permission_mode,
             console=console,
-            parent_agent=parent_agent
+            parent_agent=parent_agent,
+            timeout_config=timeout_config
         )
 
-    return get_registry().create_instance(tool_name, project_dir, permission_mode, console)
+    return get_registry().create_instance(
+        tool_name, project_dir, permission_mode, console,
+        timeout_config=timeout_config
+    )
 
 
 __all__ = [

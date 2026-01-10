@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(cat:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(dir \"C:\\\\Users\\\\lwinz\\\\.cortex\")"
     ]
   }
 }

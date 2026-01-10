@@ -14,7 +14,10 @@ from ..utils.errors import create_error_response, create_success_response, creat
 
 class ExecuteCommandTool(Tool):
     """Tool for executing shell commands"""
-    
+
+    default_timeout: int = 30
+    timeout_category: str = "default"
+
     def execute(self, command: str, reason: str = "") -> Dict[str, Any]:
         """Execute shell command"""
         
@@ -54,13 +57,14 @@ class ExecuteCommandTool(Tool):
                 )
         
         try:
+            timeout = self.get_timeout()
             result = subprocess.run(
                 command,
                 shell=True,
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir,
-                timeout=30
+                timeout=timeout
             )
             
             output = result.stdout + result.stderr
@@ -94,9 +98,9 @@ class ExecuteCommandTool(Tool):
             
         except subprocess.TimeoutExpired:
             return create_error_response(
-                "Command timed out after 30 seconds",
+                f"Command timed out after {timeout} seconds",
                 ErrorType.TIMEOUT,
-                {"command": command},
+                {"command": command, "timeout": timeout},
                 retryable=True
             )
         except Exception as e:
