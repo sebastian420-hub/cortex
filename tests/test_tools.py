@@ -10,14 +10,15 @@ def test_read_file_tool(tmp_path, monkeypatch):
     """Test read_file tool"""
     test_file = tmp_path / "test.txt"
     test_file.write_text("Hello, World!")
-    
+
     from cortex.ui.console import console
     tool = create_tool_instance("read_file", tmp_path, PermissionMode.NORMAL, console)
     result = tool.execute(path="test.txt")
-    
+
     assert result["success"] is True
-    assert result["content"] == "Hello, World!"
-    assert result["lines"] == 1
+    # Content now includes line numbers (cat -n style)
+    assert "Hello, World!" in result["content"]
+    assert result["total_lines"] == 1
 
 
 def test_write_file_tool(tmp_path, monkeypatch):

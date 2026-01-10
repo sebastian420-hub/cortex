@@ -14,23 +14,46 @@ from ..utils.errors import create_error_response, create_success_response, creat
 
 
 class ReadFileTool(Tool):
-    """Tool for reading files"""
-    
-    def execute(self, path: str) -> Dict[str, Any]:
-        """Read file contents"""
+    """Tool for reading files with optional offset and limit support."""
+
+    # Maximum characters per line before truncation
+    MAX_LINE_LENGTH = 2000
+    # Default line limit
+    DEFAULT_LIMIT = 2000
+
+    def execute(
+        self,
+        path: str,
+        offset: int = 0,
+        limit: int = 0,
+    ) -> Dict[str, Any]:
+        """
+        Read file contents with optional offset and limit.
+
+        Args:
+            path: Relative path to the file from project root
+            offset: Line number to start reading from (1-indexed, default: 0 = start)
+            limit: Maximum number of lines to read (default: 0 = up to DEFAULT_LIMIT)
+
+        Returns:
+            Standardized response with file content
+        """
         if self.console:
-            self.console.print(f"[cyan]📖 Reading:[/cyan] {path}")
-        
+            if offset > 0 or limit > 0:
+                self.console.print(f"[cyan]Reading:[/cyan] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})")
+            else:
+                self.console.print(f"[cyan]Reading:[/cyan] {path}")
+
         try:
             full_path = validate_path(self.project_dir, path)
-            
+
             if not full_path.exists():
                 return create_error_response(
                     f"File not found: {path}",
                     ErrorType.NOT_FOUND,
                     {"path": path}
                 )
-            
+
             if not full_path.is_file():
                 return create_error_response(
                     f"Path is not a file: {path}",
@@ -38,33 +61,74 @@ class ReadFileTool(Tool):
                     {"path": path},
                     retryable=True
                 )
-            
-            content = full_path.read_text()
-            
-            # Show preview
+
+            # Read file content
+            raw_content = full_path.read_text()
+            all_lines = raw_content.split('\n')
+            total_lines = len(all_lines)
+
+            # Apply offset and limit
+            effective_limit = limit if limit > 0 else self.DEFAULT_LIMIT
+            start_line = max(0, offset)
+            end_line = min(total_lines, start_line + effective_limit)
+
+            # Get requested lines
+            selected_lines = all_lines[start_line:end_line]
+
+            # Truncate long lines
+            truncated_lines = []
+            for line in selected_lines:
+                if len(line) > self.MAX_LINE_LENGTH:
+                    truncated_lines.append(line[:self.MAX_LINE_LENGTH] + "... (truncated)")
+                else:
+                    truncated_lines.append(line)
+
+            # Format with line numbers (cat -n style, 1-indexed)
+            numbered_content = ""
+            for i, line in enumerate(truncated_lines, start=start_line + 1):
+                # Format: "     1\tline content"
+                numbered_content += f"{i:6}\t{line}\n"
+
+            # Track if content was truncated
+            was_truncated = end_line < total_lines
+
+            # Show preview in console
             if self.console:
                 ext = full_path.suffix.lstrip('.') or "txt"
-                content_lines = content.split('\n')
-                preview_lines = content_lines[:15]
+                preview_lines = truncated_lines[:15]
                 preview = '\n'.join(preview_lines)
-                if len(content_lines) > 15:
-                    more_lines = len(content_lines) - 15
-                    preview += f"\n... ({more_lines} more lines)"
-                
-                syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
-                self.console.print(Panel(syntax, title=f"📄 {path}", border_style="cyan"))
-            
+                if len(truncated_lines) > 15:
+                    preview += f"\n... ({len(truncated_lines) - 15} more lines shown)"
+
+                syntax = Syntax(preview, ext, theme="monokai", line_numbers=True, start_line=start_line + 1)
+                self.console.print(Panel(syntax, title=f"{path}", border_style="cyan"))
+
+                if was_truncated:
+                    self.console.print(
+                        f"[dim]Showing lines {start_line + 1}-{end_line} of {total_lines}. "
+                        f"Use offset/limit for more.[/dim]"
+                    )
+
             return create_success_response({
-                "content": content,
-                "lines": len(content.split('\n')),
-                "size": len(content)
+                "content": numbered_content,
+                "lines_returned": len(truncated_lines),
+                "total_lines": total_lines,
+                "offset": start_line,
+                "truncated": was_truncated,
+                "size": len(raw_content)
             })
-            
+
         except SecurityError as e:
             return create_error_response(
                 str(e),
                 ErrorType.SECURITY,
                 {"path": path}
+            )
+        except UnicodeDecodeError:
+            return create_error_response(
+                f"File appears to be binary or has encoding issues: {path}",
+                ErrorType.VALIDATION,
+                {"path": path, "hint": "This may be a binary file"}
             )
         except Exception as e:
             return create_error_response(

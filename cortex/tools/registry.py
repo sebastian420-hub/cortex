@@ -228,6 +228,10 @@ class ToolRegistry:
         from .search_tools import ListFilesTool, SearchFilesTool
         from .git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GitLogTool
         from .test_tools import RunTestsTool
+        # New Phase 1 tools
+        from .grep_tool import GrepTool
+        from .glob_tool import GlobTool
+        from .edit_tool import EditTool
 
         # Tool class mapping
         builtin_tools = {
@@ -241,6 +245,10 @@ class ToolRegistry:
             "git_commit": GitCommitTool,
             "git_log": GitLogTool,
             "run_tests": RunTestsTool,
+            # New Phase 1 tools
+            "grep": GrepTool,
+            "glob": GlobTool,
+            "edit": EditTool,
         }
 
         # Tool schemas (inline definitions)
@@ -249,13 +257,21 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "read_file",
-                    "description": "Read the contents of a file. Use this when the user explicitly asks to read a file, or when you need to read code to answer a question about it.",
+                    "description": "Read the contents of a file. Supports reading large files in chunks with offset and limit.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "path": {
                                 "type": "string",
                                 "description": "Relative path to the file from project root"
+                            },
+                            "offset": {
+                                "type": "integer",
+                                "description": "Line number to start reading from (0-indexed)"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of lines to read"
                             }
                         },
                         "required": ["path"]
@@ -427,6 +443,114 @@ class ToolRegistry:
                             }
                         },
                         "required": []
+                    }
+                }
+            },
+            # New Phase 1 tools
+            "grep": {
+                "type": "function",
+                "function": {
+                    "name": "grep",
+                    "description": "Powerful regex search tool. Searches for patterns in files with multiple output modes.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "description": "Regex pattern to search for"
+                            },
+                            "path": {
+                                "type": "string",
+                                "description": "Directory or file to search in"
+                            },
+                            "glob": {
+                                "type": "string",
+                                "description": "Glob pattern to filter files"
+                            },
+                            "file_type": {
+                                "type": "string",
+                                "description": "File type to search (e.g., 'py', 'js')"
+                            },
+                            "output_mode": {
+                                "type": "string",
+                                "description": "Output mode: files_with_matches, content, count"
+                            },
+                            "case_insensitive": {
+                                "type": "boolean",
+                                "description": "Case insensitive search"
+                            },
+                            "context": {
+                                "type": "integer",
+                                "description": "Lines of context"
+                            },
+                            "multiline": {
+                                "type": "boolean",
+                                "description": "Enable multiline matching"
+                            },
+                            "head_limit": {
+                                "type": "integer",
+                                "description": "Limit number of results"
+                            }
+                        },
+                        "required": ["pattern"]
+                    }
+                }
+            },
+            "glob": {
+                "type": "function",
+                "function": {
+                    "name": "glob",
+                    "description": "Fast file pattern matching. Find files by glob patterns.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "pattern": {
+                                "type": "string",
+                                "description": "Glob pattern to match (e.g., '**/*.py')"
+                            },
+                            "path": {
+                                "type": "string",
+                                "description": "Base directory to search from"
+                            },
+                            "include_hidden": {
+                                "type": "boolean",
+                                "description": "Include hidden files"
+                            },
+                            "max_results": {
+                                "type": "integer",
+                                "description": "Maximum number of results"
+                            }
+                        },
+                        "required": ["pattern"]
+                    }
+                }
+            },
+            "edit": {
+                "type": "function",
+                "function": {
+                    "name": "edit",
+                    "description": "Surgical file editing - replace exact strings.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "file_path": {
+                                "type": "string",
+                                "description": "Path to the file to edit"
+                            },
+                            "old_string": {
+                                "type": "string",
+                                "description": "Exact text to replace"
+                            },
+                            "new_string": {
+                                "type": "string",
+                                "description": "Text to replace it with"
+                            },
+                            "replace_all": {
+                                "type": "boolean",
+                                "description": "Replace all occurrences"
+                            }
+                        },
+                        "required": ["file_path", "old_string", "new_string"]
                     }
                 }
             }

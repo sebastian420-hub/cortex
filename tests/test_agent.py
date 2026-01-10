@@ -42,18 +42,19 @@ def test_agent_execute_tool_string_args(tmp_path):
         project_dir=str(tmp_path),
         permission_mode=PermissionMode.AUTO_APPROVE
     )
-    
+
     # Create a test file
     test_file = tmp_path / "test.txt"
     test_file.write_text("Hello")
-    
+
     # Test with string arguments (JSON)
     import json
     args_str = json.dumps({"path": "test.txt"})
     result = agent.execute_tool("read_file", args_str)
-    
+
     assert result["success"] is True
-    assert result["content"] == "Hello"
+    # Content now includes line numbers (cat -n style)
+    assert "Hello" in result["content"]
 
 
 def test_agent_clear_conversation(tmp_path):

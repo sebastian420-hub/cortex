@@ -9,6 +9,26 @@ from .command_tools import ExecuteCommandTool
 from .search_tools import ListFilesTool, SearchFilesTool
 from .git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GitLogTool
 from .test_tools import RunTestsTool
+# New Phase 1 tools
+from .grep_tool import GrepTool
+from .glob_tool import GlobTool
+from .edit_tool import EditTool
+from .todo_tool import (
+    TodoWriteTool,
+    TodoManager,
+    TodoItem,
+    TodoStatus,
+    TODO_TOOL_SCHEMA,
+    get_todo_manager,
+    set_todo_manager,
+    display_todos,
+)
+from .ask_user_tool import (
+    AskUserQuestionTool,
+    QuestionOption,
+    QuestionAnswer,
+    ASK_USER_TOOL_SCHEMA,
+)
 from .registry import ToolRegistry, get_registry, reset_registry
 from ..subagent import TaskTool, TASK_TOOL_SCHEMA
 
@@ -24,13 +44,21 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read the contents of a file. Use this when the user explicitly asks to read a file, or when you need to read code to answer a question about it. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "Read the contents of a file. Supports reading large files in chunks with offset and limit. Use this when you need to read code or file contents.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "path": {
                         "type": "string",
                         "description": "Relative path to the file from project root"
+                    },
+                    "offset": {
+                        "type": "integer",
+                        "description": "Line number to start reading from (0-indexed). Useful for large files."
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of lines to read. Default: 2000 lines."
                     }
                 },
                 "required": ["path"]
@@ -104,7 +132,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "search_files",
-            "description": "Search for text content across files in the project. Similar to grep. Use this when the user explicitly requests searching for code or text, or when you need to find where something is used. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "[DEPRECATED - Use 'grep' instead] Basic text search. The 'grep' tool is more powerful.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -118,6 +146,114 @@ TOOLS: List[Dict[str, Any]] = [
                     }
                 },
                 "required": ["query"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "grep",
+            "description": "Powerful regex search tool. Searches for patterns in files with multiple output modes. Use this to find code, text, or patterns across the codebase.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Regex pattern to search for (e.g., 'def.*async', 'class\\s+\\w+')"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Directory or file to search in (default: current directory)"
+                    },
+                    "glob": {
+                        "type": "string",
+                        "description": "Glob pattern to filter files (e.g., '*.py', '*.{ts,tsx}')"
+                    },
+                    "file_type": {
+                        "type": "string",
+                        "description": "File type to search (e.g., 'py', 'js', 'rust', 'go')"
+                    },
+                    "output_mode": {
+                        "type": "string",
+                        "enum": ["files_with_matches", "content", "count"],
+                        "description": "Output mode: 'files_with_matches' (default), 'content' (show matches), 'count' (match counts)"
+                    },
+                    "case_insensitive": {
+                        "type": "boolean",
+                        "description": "Case insensitive search (default: false)"
+                    },
+                    "context": {
+                        "type": "integer",
+                        "description": "Lines of context before and after matches"
+                    },
+                    "multiline": {
+                        "type": "boolean",
+                        "description": "Enable multiline matching (default: false)"
+                    },
+                    "head_limit": {
+                        "type": "integer",
+                        "description": "Limit number of results (default: 50)"
+                    }
+                },
+                "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "glob",
+            "description": "Fast file pattern matching. Find files by glob patterns like '**/*.py'. Results sorted by modification time (newest first).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Glob pattern to match (e.g., '**/*.py', 'src/**/*.ts', '*.md')"
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Base directory to search from (default: current directory)"
+                    },
+                    "include_hidden": {
+                        "type": "boolean",
+                        "description": "Include hidden files/directories (default: false)"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "description": "Maximum number of results (default: 500)"
+                    }
+                },
+                "required": ["pattern"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "edit",
+            "description": "Surgical file editing - replace exact strings. More precise than rewriting entire files. The old_string must match exactly (including whitespace/indentation).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {
+                        "type": "string",
+                        "description": "Path to the file to edit"
+                    },
+                    "old_string": {
+                        "type": "string",
+                        "description": "Exact text to replace (must be unique in file unless using replace_all)"
+                    },
+                    "new_string": {
+                        "type": "string",
+                        "description": "Text to replace it with (must be different from old_string)"
+                    },
+                    "replace_all": {
+                        "type": "boolean",
+                        "description": "Replace all occurrences (default: false, requires unique match)"
+                    }
+                },
+                "required": ["file_path", "old_string", "new_string"]
             }
         }
     },
@@ -206,7 +342,11 @@ TOOLS: List[Dict[str, Any]] = [
         }
     },
     # Task tool for subagent delegation
-    TASK_TOOL_SCHEMA
+    TASK_TOOL_SCHEMA,
+    # Todo tracking tool
+    TODO_TOOL_SCHEMA,
+    # Ask user questions tool
+    ASK_USER_TOOL_SCHEMA,
 ]
 
 
@@ -248,6 +388,24 @@ def create_tool_instance(
             timeout_config=timeout_config
         )
 
+    # Special handling for todo_write tool
+    if tool_name == "todo_write":
+        return TodoWriteTool(
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            console=console,
+            timeout_config=timeout_config
+        )
+
+    # Special handling for ask_user_question tool
+    if tool_name == "ask_user_question":
+        return AskUserQuestionTool(
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            console=console,
+            timeout_config=timeout_config
+        )
+
     return get_registry().create_instance(
         tool_name, project_dir, permission_mode, console,
         timeout_config=timeout_config
@@ -258,6 +416,8 @@ __all__ = [
     # Tool schemas (backward compatible)
     "TOOLS",
     "TASK_TOOL_SCHEMA",
+    "TODO_TOOL_SCHEMA",
+    "ASK_USER_TOOL_SCHEMA",
     # Base class
     "Tool",
     # Tool implementations
@@ -272,6 +432,22 @@ __all__ = [
     "GitLogTool",
     "RunTestsTool",
     "TaskTool",
+    "TodoWriteTool",
+    "AskUserQuestionTool",
+    # New Phase 1 tools
+    "GrepTool",
+    "GlobTool",
+    "EditTool",
+    # Todo management
+    "TodoManager",
+    "TodoItem",
+    "TodoStatus",
+    "get_todo_manager",
+    "set_todo_manager",
+    "display_todos",
+    # Ask user question helpers
+    "QuestionOption",
+    "QuestionAnswer",
     # Factory function (backward compatible)
     "create_tool_instance",
     # Registry (new)
