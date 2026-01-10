@@ -62,15 +62,15 @@ def warn_large_file(size: int, threshold: int = 100000) -> bool:
 def display_thinking(
     reasoning_content: str,
     expanded: bool = False,
-    max_preview_length: int = 150
+    max_preview_length: int = 80
 ) -> None:
     """
     Display reasoning/thinking content from models like DeepSeek.
 
     Args:
         reasoning_content: The raw thinking content from the model
-        expanded: If True, show full content. If False, show collapsed preview.
-        max_preview_length: Maximum characters to show in collapsed preview
+        expanded: If True, show full content. If False, show minimal one-liner.
+        max_preview_length: Maximum characters for the preview
     """
     if not reasoning_content:
         return
@@ -81,15 +81,15 @@ def display_thinking(
         return
 
     if expanded:
-        # Full display with markdown-like formatting
+        # Full display with panel
         console.print(Panel(
             content,
-            title="[bold yellow]💭 Thinking Process[/bold yellow]",
+            title="[bold yellow]💭 Thinking[/bold yellow]",
             border_style="yellow",
-            padding=(1, 2)
+            padding=(0, 1)
         ))
     else:
-        # Collapsed preview
+        # Minimal one-liner preview (no panel, no box)
         lines = content.split('\n')
         first_line = lines[0].strip() if lines else ""
 
@@ -98,19 +98,10 @@ def display_thinking(
             preview = first_line[:max_preview_length] + "..."
         else:
             preview = first_line
-            if len(lines) > 1:
-                preview += "..."
 
-        # Count total lines for hint
-        total_lines = len(lines)
-        line_hint = f"({total_lines} lines)" if total_lines > 1 else ""
-
-        console.print(Panel(
-            f"[dim]{preview}[/dim]\n[cyan]Use /thinking on to see full reasoning {line_hint}[/cyan]",
-            title="[yellow]💭 Thinking[/yellow]",
-            border_style="dim",
-            padding=(0, 1)
-        ))
+        # Simple dim one-liner
+        if preview:
+            console.print(f"[dim]💭 {preview}[/dim]")
 
 
 def display_progress_summary(

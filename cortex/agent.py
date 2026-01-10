@@ -823,12 +823,17 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                 else:
                     # No more tools - final response
                     final_text = response_message.get("content", "")
+                    reasoning = response_message.get("reasoning_content", "")
 
                     if final_text:
                         self._output_response({"content": final_text}, is_final=True)
                         return
+                    elif reasoning:
+                        # Model had reasoning but no content - this can happen with some models
+                        # The thinking was already displayed above, so just exit cleanly
+                        return
                     else:
-                        # Empty response - this shouldn't happen, but handle gracefully
+                        # Truly empty response - this shouldn't happen
                         self._output_warning("Model returned empty response. Exiting.")
                         return
                     
