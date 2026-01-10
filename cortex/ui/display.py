@@ -58,3 +58,116 @@ def warn_large_file(size: int, threshold: int = 100000) -> bool:
         return True
     return False
 
+
+def display_thinking(
+    reasoning_content: str,
+    expanded: bool = False,
+    max_preview_length: int = 150
+) -> None:
+    """
+    Display reasoning/thinking content from models like DeepSeek.
+
+    Args:
+        reasoning_content: The raw thinking content from the model
+        expanded: If True, show full content. If False, show collapsed preview.
+        max_preview_length: Maximum characters to show in collapsed preview
+    """
+    if not reasoning_content:
+        return
+
+    # Clean up the content
+    content = reasoning_content.strip()
+    if not content:
+        return
+
+    if expanded:
+        # Full display with markdown-like formatting
+        console.print(Panel(
+            content,
+            title="[bold yellow]💭 Thinking Process[/bold yellow]",
+            border_style="yellow",
+            padding=(1, 2)
+        ))
+    else:
+        # Collapsed preview
+        lines = content.split('\n')
+        first_line = lines[0].strip() if lines else ""
+
+        # Truncate if too long
+        if len(first_line) > max_preview_length:
+            preview = first_line[:max_preview_length] + "..."
+        else:
+            preview = first_line
+            if len(lines) > 1:
+                preview += "..."
+
+        # Count total lines for hint
+        total_lines = len(lines)
+        line_hint = f"({total_lines} lines)" if total_lines > 1 else ""
+
+        console.print(Panel(
+            f"[dim]{preview}[/dim]\n[cyan]Use /thinking on to see full reasoning {line_hint}[/cyan]",
+            title="[yellow]💭 Thinking[/yellow]",
+            border_style="dim",
+            padding=(0, 1)
+        ))
+
+
+def display_progress_summary(
+    operation: str,
+    completed: int,
+    total: int = None,
+    details: str = ""
+) -> None:
+    """
+    Display a progress summary for operations.
+
+    Args:
+        operation: Name of the operation
+        completed: Number completed
+        total: Total count (if known)
+        details: Additional details
+    """
+    if total:
+        percent = (completed / total) * 100
+        progress_text = f"[cyan]{operation}:[/cyan] {completed}/{total} ({percent:.0f}%)"
+    else:
+        progress_text = f"[cyan]{operation}:[/cyan] {completed} processed"
+
+    if details:
+        progress_text += f" - {details}"
+
+    console.print(progress_text)
+
+
+def display_operation_complete(
+    operation: str,
+    success: bool = True,
+    summary: str = "",
+    duration_ms: float = None
+) -> None:
+    """
+    Display operation completion status.
+
+    Args:
+        operation: Name of the operation
+        success: Whether it succeeded
+        summary: Brief summary of results
+        duration_ms: Duration in milliseconds
+    """
+    icon = "✓" if success else "✗"
+    color = "green" if success else "red"
+
+    parts = [f"[{color}]{icon}[/{color}] {operation}"]
+
+    if summary:
+        parts.append(f"- {summary}")
+
+    if duration_ms is not None:
+        if duration_ms < 1000:
+            parts.append(f"[dim]({duration_ms:.0f}ms)[/dim]")
+        else:
+            parts.append(f"[dim]({duration_ms/1000:.1f}s)[/dim]")
+
+    console.print(" ".join(parts))
+

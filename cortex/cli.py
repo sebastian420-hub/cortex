@@ -640,6 +640,120 @@ Newest: {stats['newest_session'] or 'N/A'}
     elif cmd == '/exit':
         raise KeyboardInterrupt
 
+    # Phase 4: New slash commands
+    elif cmd == '/summary':
+        # Show conversation summary
+        from .core.summarization import SimpleSummarizer
+        summarizer = SimpleSummarizer()
+        history = agent.get_conversation_history()
+        if len(history) > 1:  # More than just system prompt
+            summary = summarizer.summarize(history[1:])  # Skip system prompt
+            summary_msg = summary.to_message()
+            console.print(Panel(
+                summary_msg.get("content", "No summary available"),
+                title="[bold]Conversation Summary[/bold]",
+                border_style="cyan"
+            ))
+        else:
+            console.print("[dim]No conversation to summarize yet.[/dim]")
+
+    elif cmd == '/plan':
+        # Enter planning mode
+        agent.permission_mode = PermissionMode.PLAN
+        agent.conversation.history[0]["content"] = agent._get_system_prompt()
+        console.print("[cyan]📋 Entered PLAN mode (read-only)[/cyan]")
+        console.print("[dim]Use /mode normal to return to normal mode[/dim]")
+
+    elif cmd.startswith('/reset-context'):
+        # Clear conversation but preserve memory bank
+        memory_backup = agent.memory_bank.to_dict() if agent.memory_bank else None
+        agent.clear_conversation()
+        if memory_backup:
+            from .core.memory import MemoryBank
+            agent.memory_bank = MemoryBank.from_dict(memory_backup)
+            # Re-inject memory into system prompt
+            agent.conversation.history[0]["content"] = agent._get_system_prompt()
+        console.print("[green]✓[/green] Context cleared. Memory preserved.")
+        console.print(f"[dim]Memory items: {len(agent.memory_bank.items) if agent.memory_bank else 0}[/dim]")
+
+    elif cmd.startswith('/focus'):
+        # Focus on a specific directory
+        parts = command.split(maxsplit=1)
+        if len(parts) > 1:
+            from pathlib import Path
+            from .core.memory import MemorySource
+            focus_path = Path(parts[1]).resolve()
+            if focus_path.exists() and focus_path.is_dir():
+                # Add to memory as a fact
+                agent.memory_bank.add_fact(
+                    f"User focused on directory: {focus_path}",
+                    source=MemorySource.USER
+                )
+                console.print(f"[green]✓[/green] Focus set to: {focus_path}")
+                console.print("[dim]Future searches will prioritize this directory[/dim]")
+            else:
+                console.print(f"[red]Directory not found: {parts[1]}[/red]")
+        else:
+            console.print("[dim]Usage: /focus <directory_path>[/dim]")
+
+    elif cmd.startswith('/thinking'):
+        # Toggle thinking display
+        parts = cmd.split()
+        if len(parts) > 1:
+            toggle = parts[1].lower()
+            if toggle == 'on':
+                agent.show_thinking = True
+                console.print("[green]✓[/green] Thinking display enabled")
+            elif toggle == 'off':
+                agent.show_thinking = False
+                console.print("[green]✓[/green] Thinking display disabled")
+            else:
+                console.print("[red]Usage: /thinking [on|off][/red]")
+        else:
+            agent.show_thinking = not agent.show_thinking
+            status = "enabled" if agent.show_thinking else "disabled"
+            console.print(f"[green]✓[/green] Thinking display {status}")
+
+    elif cmd == '/memory':
+        # Show memory bank contents
+        if agent.memory_bank and agent.memory_bank.items:
+            console.print(Panel(
+                agent.memory_bank.get_full_display(),
+                title="[bold]Memory Bank[/bold]",
+                border_style="yellow"
+            ))
+        else:
+            console.print("[dim]Memory bank is empty.[/dim]")
+
+    elif cmd == '/stats':
+        # Show session statistics
+        history = agent.get_conversation_history()
+        truncation_stats = agent.conversation.get_truncation_stats()
+        loop_stats = agent.loop_guard.get_stats()
+
+        stats_text = f"""
+[bold]Session Statistics[/bold]
+
+Messages: {len(history)}
+Tokens: {agent.conversation.get_token_count()}
+Tools Used: {len(set(agent._tools_used))} unique / {len(agent._tools_used)} total
+
+[bold]Context Management[/bold]
+Truncations: {truncation_stats.get('truncation_count', 0)}
+Summarizations: {truncation_stats.get('summarization_count', 0)}
+Messages Removed: {truncation_stats.get('total_messages_removed', 0)}
+
+[bold]Loop Guard[/bold]
+Iterations: {loop_stats.get('current_iteration', 0)}
+Unique Operations: {loop_stats.get('unique_operations_count', 0)}
+Files Read: {loop_stats.get('files_read_count', 0)}
+Files Written: {loop_stats.get('files_written_count', 0)}
+
+[bold]Memory Bank[/bold]
+Items: {len(agent.memory_bank.items) if agent.memory_bank else 0}
+"""
+        console.print(Panel(stats_text, title="Stats", border_style="cyan"))
+
     else:
         console.print(f"[red]Unknown command: {command}[/red]")
         console.print("[dim]Type /help for available commands[/dim]")

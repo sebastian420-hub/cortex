@@ -113,19 +113,43 @@ class RecoveryManager:
         return handler(context)
 
     def _recover_not_found(self, context: RecoveryContext) -> RecoveryAction:
-        """Recovery for not_found errors."""
-        if context.tool_name in ("read_file", "write_file"):
-            path = context.arguments.get("path", "unknown")
+        """Recovery for not_found errors with enhanced debugging."""
+        path = context.arguments.get("path", "unknown")
+
+        # Extract filename from path for search suggestions
+        filename = path.split("/")[-1].split("\\")[-1] if path != "unknown" else ""
+        filename_base = filename.rsplit(".", 1)[0] if "." in filename else filename
+
+        if context.tool_name in ("read_file", "write_file", "edit"):
             return RecoveryAction(
                 strategy=RecoveryStrategy.SUGGEST,
-                message="File not found - suggesting alternative approaches",
+                message="File not found - initiating file discovery",
                 suggested_prompt=(
-                    f"The file '{path}' was not found. "
-                    "Please try one of these alternatives:\n"
-                    "1. Use list_files to find the correct file name or location\n"
-                    "2. Use search_files to search for content that might be in a different file\n"
-                    "3. Check if the path is correct (relative to project root)\n"
-                    "4. Ask the user for the correct path if uncertain"
+                    f"DEBUG: File '{path}' was not found.\n\n"
+                    f"**Self-Debugging Steps:**\n"
+                    f"1. Search for similar filenames:\n"
+                    f"   glob(pattern=\"**/*{filename_base}*\")\n\n"
+                    f"2. List the parent directory to check path:\n"
+                    f"   list_files(path=\"{'/'.join(path.split('/')[:-1]) or '.'}\")\n\n"
+                    f"3. Search for related content:\n"
+                    f"   grep(pattern=\"{filename_base}\", output_mode=\"files_with_matches\")\n\n"
+                    f"4. Check case sensitivity - the file might exist with different casing.\n\n"
+                    f"**Before asking user:** Try at least one of these searches first."
+                ),
+            )
+        elif context.tool_name == "grep":
+            return RecoveryAction(
+                strategy=RecoveryStrategy.SUGGEST,
+                message="Search path not found",
+                suggested_prompt=(
+                    f"DEBUG: Search path '{path}' not found.\n\n"
+                    f"**Self-Debugging Steps:**\n"
+                    f"1. Verify the directory exists:\n"
+                    f"   list_files(path=\".\")\n\n"
+                    f"2. Search from project root instead:\n"
+                    f"   grep(pattern=\"{context.arguments.get('pattern', '')}\", path=\".\")\n\n"
+                    f"3. Use glob to find relevant directories:\n"
+                    f"   glob(pattern=\"**/\")\n"
                 ),
             )
         return self._default_recovery(context)
@@ -204,17 +228,67 @@ class RecoveryManager:
         )
 
     def _recover_execution(self, context: RecoveryContext) -> RecoveryAction:
-        """Recovery for execution errors."""
+        """Recovery for execution errors with enhanced debugging."""
+        error_msg = context.error_message.lower()
+
+        # Detect common error patterns and provide specific guidance
+        specific_guidance = ""
+
+        if "command not found" in error_msg or "not recognized" in error_msg:
+            cmd = context.arguments.get("command", "").split()[0] if context.arguments.get("command") else ""
+            specific_guidance = (
+                f"**Command Not Found Debug:**\n"
+                f"The command '{cmd}' is not available.\n"
+                f"1. Check if it needs to be installed (pip install, npm install, etc.)\n"
+                f"2. Check if it's a platform-specific command (use Python equivalent)\n"
+                f"3. For Windows: Use PowerShell syntax or Python scripts instead\n\n"
+            )
+        elif "permission denied" in error_msg or "access denied" in error_msg:
+            specific_guidance = (
+                f"**Permission Debug:**\n"
+                f"Access was denied.\n"
+                f"1. Check if the file/directory is read-only\n"
+                f"2. Check if another process has the file locked\n"
+                f"3. Try a different approach that doesn't require elevated access\n\n"
+            )
+        elif "syntax error" in error_msg or "invalid syntax" in error_msg:
+            specific_guidance = (
+                f"**Syntax Error Debug:**\n"
+                f"There's a syntax issue in the code or command.\n"
+                f"1. Review the exact error message for line number/position\n"
+                f"2. Check for mismatched quotes, brackets, or parentheses\n"
+                f"3. Read the file and examine the problematic area\n\n"
+            )
+        elif "import" in error_msg or "module" in error_msg:
+            specific_guidance = (
+                f"**Import/Module Debug:**\n"
+                f"A module couldn't be imported.\n"
+                f"1. Check if the package is installed in the environment\n"
+                f"2. Check for typos in the import path\n"
+                f"3. Verify the module exists: glob(pattern=\"**/{context.arguments.get('command', '').split()[-1] if 'import' in error_msg else '*'}.py\")\n\n"
+            )
+        elif "test" in context.tool_name.lower() or "test" in error_msg:
+            specific_guidance = (
+                f"**Test Failure Debug:**\n"
+                f"Tests are failing.\n"
+                f"1. Read the failing test file to understand expectations\n"
+                f"2. Check the test output for assertion details\n"
+                f"3. Run a single test to isolate the issue\n"
+                f"4. Check if test fixtures or setup is correct\n\n"
+            )
+
         return RecoveryAction(
             strategy=RecoveryStrategy.SUGGEST,
-            message="Execution error - analyzing alternatives",
+            message="Execution error - initiating self-debugging",
             suggested_prompt=(
-                f"The {context.tool_name} execution failed: {context.error_message}. "
-                "Consider:\n"
-                "1. Checking if all prerequisites are met\n"
-                "2. Trying an alternative approach to achieve the same goal\n"
-                "3. Breaking the operation into smaller steps\n"
-                "4. Informing the user about the failure and asking for guidance"
+                f"DEBUG: {context.tool_name} failed: {context.error_message}\n\n"
+                f"{specific_guidance}"
+                f"**General Debug Steps:**\n"
+                f"1. Analyze the exact error message above\n"
+                f"2. Check prerequisites (dependencies, environment)\n"
+                f"3. Try a simpler version of the operation first\n"
+                f"4. Break complex operations into smaller steps\n\n"
+                f"**Before escalating to user:** Try to diagnose and fix the issue yourself."
             ),
         )
 

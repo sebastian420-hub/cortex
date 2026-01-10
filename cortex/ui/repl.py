@@ -68,7 +68,7 @@ class REPL:
     def show_help(self) -> None:
         """Show help message"""
         help_text = """
-[bold cyan]Commands:[/bold cyan]
+[bold cyan]Session Commands:[/bold cyan]
   /help              Show this help
   /clear             Clear conversation history
   /mode [normal|auto|plan]  Change permission mode
@@ -77,6 +77,19 @@ class REPL:
   /load [name]       Load a saved session
   /sessions          List saved sessions
   /exit              Exit Cortex
+
+[bold cyan]Context Commands:[/bold cyan]
+  /summary           Show conversation summary
+  /plan              Enter read-only planning mode
+  /reset-context     Clear history but keep memory
+  /focus <path>      Focus on a directory
+  /memory            Show memory bank contents
+  /stats             Show session statistics
+
+[bold cyan]Display Commands:[/bold cyan]
+  /thinking [on|off] Toggle thinking/reasoning display
+  /storage           Show storage statistics
+  /cleanup           Run session cleanup
 
 [bold cyan]Tips:[/bold cyan]
   - Be specific about what you want

@@ -212,7 +212,8 @@ class TestAgentSystemPrompt:
         )
 
         prompt = agent._get_system_prompt()
-        assert "exploration" in prompt.lower() or "explore" in prompt.lower()
+        # Check for exploration-related content (exploring, Mental Model, codebase)
+        assert "exploring" in prompt.lower() or "mental model" in prompt.lower()
 
 
 class TestAgentTypes:

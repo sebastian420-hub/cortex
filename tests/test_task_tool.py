@@ -161,9 +161,9 @@ class TestTaskToolExecution:
             assert result["success"] is True
             assert "task_id" in result  # Result fields are at top level
 
-            # Check context was created with default tools
+            # Check context was created with default tools (now includes grep/glob)
             context = mock_run.call_args[0][0]
-            assert context.allowed_tools == ["read_file", "list_files", "search_files"]
+            assert context.allowed_tools == ["read_file", "list_files", "grep", "glob"]
 
     def test_execute_with_custom_tools(self, tmp_path):
         """Test execution with custom allowed tools"""
