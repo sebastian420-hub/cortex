@@ -13,6 +13,7 @@ from .base import Tool
 from ..core.security import validate_path, SecurityError
 from ..models import PermissionMode
 from ..utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType
+from ..cache import invalidate_file
 
 
 class EditTool(Tool):
@@ -96,7 +97,7 @@ class EditTool(Tool):
 
         # Read file content
         try:
-            content = full_path.read_text()
+            content = full_path.read_text(encoding='utf-8-sig')
         except Exception as e:
             return create_error_response(
                 f"Failed to read file: {e}",
@@ -138,6 +139,20 @@ class EditTool(Tool):
             new_content = content.replace(old_string, new_string, 1)
             replacements = 1
 
+        # Verify replacement actually occurred (prevents silent failures)
+        if old_string not in new_content and new_content == content:
+            # The replacement didn't change anything - old_string must be gone
+            # But if new_content == content, it means no replacement occurred
+            return create_error_response(
+                "Replacement verification failed - old_string not found or replacement had no effect",
+                ErrorType.EXECUTION,
+                {
+                    "file_path": file_path,
+                    "hint": "The old_string was not found in the file. Check for whitespace differences (tabs vs spaces) or line ending differences.",
+                    "file_preview": content[:500]
+                }
+            )
+
         # Show diff preview
         if self.console:
             self._show_diff(file_path, content, new_content, old_string, new_string)
@@ -153,9 +168,14 @@ class EditTool(Tool):
                     {"file_path": file_path}
                 )
 
+        # Backup before edit
+        self.backup_file(full_path, "edit")
+
         # Write file
         try:
             full_path.write_text(new_content)
+            # Invalidate cache for this file
+            invalidate_file(full_path)
         except Exception as e:
             return create_error_response(
                 f"Failed to write file: {e}",

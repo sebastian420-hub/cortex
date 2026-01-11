@@ -18,6 +18,40 @@ class ExecuteCommandTool(Tool):
     default_timeout: int = 30
     timeout_category: str = "default"
 
+    def _validate_python_command(self, command: str) -> tuple[bool, str]:
+        """
+        Validate Python commands for safety.
+        
+        Args:
+            command: The command string to validate
+            
+        Returns:
+            Tuple of (is_safe, error_message)
+        """
+        if not command.strip().startswith("python"):
+            return True, ""  # Not a Python command, use default validation
+        
+        # Dangerous patterns that could erase or modify files
+        dangerous_patterns = [
+            "truncate()",           # Empty file
+            "write('')",            # Write empty string
+            "write(\"\")",          # Write empty string (double quotes)
+            ".remove(",             # Delete file
+            ".unlink(",             # Delete file (pathlib)
+            "os.remove(",           # Delete file
+            "os.unlink(",           # Delete file
+            "shutil.rmtree(",       # Delete directory
+            "os.rmdir(",            # Delete directory
+            "pathlib.Path",         # Pathlib operations - combined with above patterns
+        ]
+        
+        # Check for dangerous patterns
+        for pattern in dangerous_patterns:
+            if pattern in command:
+                return False, f"Dangerous pattern '{pattern}' detected in Python command"
+        
+        return True, ""
+
     def execute(self, command: str, reason: str = "") -> Dict[str, Any]:
         """Execute shell command"""
         
@@ -35,7 +69,18 @@ class ExecuteCommandTool(Tool):
             if reason:
                 self.console.print(f"[dim]Reason: {reason}[/dim]")
         
-        # Safety check
+        # Safety check - Python command validation
+        is_safe, error_msg = self._validate_python_command(command)
+        if not is_safe:
+            if self.console:
+                self.console.print(f"[red]🛑 BLOCKED:[/red] {error_msg}")
+            return create_error_response(
+                error_msg,
+                ErrorType.SECURITY,
+                {"command": command, "reason": "dangerous_python_pattern"}
+            )
+        
+        # Safety check - general dangerous commands
         if is_dangerous_command(command):
             if self.console:
                 self.console.print("[red]🛑 BLOCKED:[/red] Dangerous command detected")
@@ -110,4 +155,3 @@ class ExecuteCommandTool(Tool):
                 {"command": command},
                 retryable=True
             )
-

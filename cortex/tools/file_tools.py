@@ -11,6 +11,7 @@ from .base import Tool
 from ..core.security import validate_path, SecurityError
 from ..models import PermissionMode
 from ..utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType
+from ..cache import get_file_cache, invalidate_file
 
 
 class ReadFileTool(Tool):
@@ -62,8 +63,34 @@ class ReadFileTool(Tool):
                     retryable=True
                 )
 
-            # Read file content
-            raw_content = full_path.read_text()
+            # Try to get from cache first
+            cache = get_file_cache()
+            raw_content = cache.get(full_path)
+            from_cache = raw_content is not None
+
+            if raw_content is None:
+                # Cache miss - read from disk with encoding fallback
+                encoding_errors = []
+
+                # Try different encodings
+                encodings_to_try = ['utf-8', 'utf-8-sig', 'latin-1']
+                for encoding in encodings_to_try:
+                    try:
+                        raw_content = full_path.read_text(encoding=encoding)
+                        break  # Success!
+                    except UnicodeDecodeError as e:
+                        encoding_errors.append(f"{encoding}: {e}")
+
+                if raw_content is None:
+                    # All encodings failed
+                    return create_error_response(
+                        f"File encoding issue: could not decode {path} with any encoding",
+                        ErrorType.VALIDATION,
+                        {"path": path, "errors": encoding_errors, "hint": "This may be a binary file"}
+                    )
+
+                # Cache the content for future reads
+                cache.set(full_path, raw_content)
             all_lines = raw_content.split('\n')
             total_lines = len(all_lines)
 
@@ -101,7 +128,8 @@ class ReadFileTool(Tool):
                     preview += f"\n... ({len(truncated_lines) - 15} more lines shown)"
 
                 syntax = Syntax(preview, ext, theme="monokai", line_numbers=True, start_line=start_line + 1)
-                self.console.print(Panel(syntax, title=f"{path}", border_style="cyan"))
+                cache_indicator = " [dim](cached)[/dim]" if from_cache else ""
+                self.console.print(Panel(syntax, title=f"{path}{cache_indicator}", border_style="cyan"))
 
                 if was_truncated:
                     self.console.print(
@@ -154,6 +182,18 @@ class WriteFileTool(Tool):
                 {"path": path, "permission_mode": "plan"}
             )
         
+        # Validate content is not empty (prevents accidental file erasure)
+        if not content or not content.strip():
+            return create_error_response(
+                "Content is empty or whitespace-only. Cannot write empty content to file.",
+                ErrorType.VALIDATION,
+                {
+                    "path": path,
+                    "hint": "This may indicate a JSON parsing error in the tool arguments. Please provide actual file content.",
+                    "content_length": len(content) if content else 0
+                }
+            )
+        
         if self.console:
             self.console.print(f"[yellow]📝 Writing:[/yellow] {path}")
         
@@ -162,7 +202,7 @@ class WriteFileTool(Tool):
             
             # Show diff if file exists
             if full_path.exists():
-                old_content = full_path.read_text()
+                old_content = full_path.read_text(encoding='utf-8-sig')
                 if self.console:
                     self.console.print(Panel(
                         f"[red]- Old ({len(old_content)} bytes)[/red]\n"
@@ -194,13 +234,40 @@ class WriteFileTool(Tool):
                         {"path": path}
                     )
             
+            # Backup before write
+            self.backup_file(full_path, "write")
+
             # Write file
             full_path.parent.mkdir(parents=True, exist_ok=True)
             full_path.write_text(content)
-            
+
+            # Verify written content matches (checksum validation to detect corruption)
+            try:
+                written_content = full_path.read_text(encoding='utf-8-sig')
+                if written_content != content:
+                    return create_error_response(
+                        "Content verification failed - written content does not match intended content",
+                        ErrorType.EXECUTION,
+                        {
+                            "path": path,
+                            "intended_size": len(content),
+                            "written_size": len(written_content),
+                            "hint": "File may have been corrupted during write operation"
+                        }
+                    )
+            except Exception as verify_error:
+                return create_error_response(
+                    f"Failed to verify written content: {verify_error}",
+                    ErrorType.EXECUTION,
+                    {"path": path}
+                )
+
+            # Invalidate cache for this file
+            invalidate_file(full_path)
+
             if self.console:
                 self.console.print(f"[green]✓[/green] Wrote {len(content)} bytes to {path}")
-            
+
             return create_success_response({"bytes_written": len(content)})
             
         except SecurityError as e:
@@ -216,4 +283,3 @@ class WriteFileTool(Tool):
                 {"path": path},
                 retryable=True
             )
-

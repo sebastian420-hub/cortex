@@ -7,6 +7,7 @@ from ..models import PermissionMode
 
 if TYPE_CHECKING:
     from ..utils.timeouts import TimeoutConfig
+    from ..core.transaction import TransactionManager
 
 
 class Tool(ABC):
@@ -22,12 +23,14 @@ class Tool(ABC):
         project_dir: Path,
         permission_mode: str = PermissionMode.NORMAL,
         console=None,
-        timeout_config: Optional["TimeoutConfig"] = None
+        timeout_config: Optional["TimeoutConfig"] = None,
+        transaction_manager: Optional["TransactionManager"] = None
     ):
         self.project_dir = project_dir
         self.permission_mode = permission_mode
         self.console = console
         self._timeout_config = timeout_config
+        self._transaction_manager = transaction_manager
 
     def get_timeout(self, operation: Optional[str] = None) -> int:
         """
@@ -61,10 +64,10 @@ class Tool(ABC):
     def check_permission(self, action: str) -> bool:
         """
         Check if action is allowed based on permission mode.
-        
+
         Args:
             action: Description of the action
-            
+
         Returns:
             True if action is allowed
         """
@@ -75,3 +78,37 @@ class Tool(ABC):
         # NORMAL mode - ask user (handled by caller)
         return True
 
+    def backup_file(self, path: Path, operation: str) -> bool:
+        """
+        Backup a file before modification.
+
+        Args:
+            path: Path to the file to backup
+            operation: Type of operation ('write', 'edit', 'delete')
+
+        Returns:
+            True if backup was successful or not available
+
+        Note:
+            If transaction manager is not available, logs a warning and returns True
+            to allow operations to proceed. In production, transaction manager should
+            always be initialized to ensure recoverability.
+        """
+        if self._transaction_manager is None:
+            # Transaction manager not available - log warning but don't block
+            # This can happen in tests or if initialization is incomplete
+            import logging
+            logging.warning(
+                f"Transaction manager not available for {operation} on {path}. "
+                f"File modifications will not be backed up for recovery."
+            )
+            return False
+
+        try:
+            self._transaction_manager.backup_file(path, operation)
+            return True
+        except Exception as e:
+            # Log the backup failure but don't block the operation
+            import logging
+            logging.warning(f"Backup failed for {path}: {e}")
+            return False
