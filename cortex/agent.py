@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 from .models import PermissionMode
 from .config import AgentConfig
 from .core.conversation import ConversationManager
+from .core.parallel import ParallelToolExecutor, ToolCall
 from .core.streaming import stream_model_response, display_streaming_response
 from .core.providers import ProviderFactory, ProviderError
 from .core.security import SecurityError
@@ -98,13 +99,13 @@ class Cortex:
         # Create summarizer for intelligent context management
         # Use simple summarization by default (no extra API calls)
         # Can be upgraded to LLM-based or hybrid via config
-        summarization_config = getattr(self.config, 'summarization', {})
-        enable_summarization = summarization_config.get('enabled', True)
-        strategy_name = summarization_config.get('strategy', 'simple')
+        summarization_config = getattr(self.config, "summarization", {})
+        enable_summarization = summarization_config.get("enabled", True)
+        strategy_name = summarization_config.get("strategy", "simple")
 
-        if strategy_name == 'llm':
+        if strategy_name == "llm":
             strategy = SummarizationStrategy.LLM_BASED
-        elif strategy_name == 'hybrid':
+        elif strategy_name == "hybrid":
             strategy = SummarizationStrategy.HYBRID
         else:
             strategy = SummarizationStrategy.SIMPLE
@@ -120,27 +121,36 @@ class Cortex:
             on_truncation=self._on_context_truncation,
             summarizer=summarizer,
             enable_summarization=enable_summarization,
-            summarization_threshold=summarization_config.get('threshold', 0.8)
+            summarization_threshold=summarization_config.get("threshold", 0.8),
         )
 
         # Initialize loop guard with recovery manager if enabled
         recovery_manager = None
         if self.config.error_recovery.get("enable_smart_recovery", False):
             from .core.recovery import create_recovery_manager_from_config
+
             recovery_manager = create_recovery_manager_from_config(self.config.error_recovery)
 
         self.loop_guard = LoopGuard(
             max_repeats=self.config.error_recovery.get("max_repeats", 3),
             stuck_threshold=self.config.error_recovery.get("stuck_threshold", 5),
             buffer_size=self.config.error_recovery.get("buffer_size", 10),
-            recovery_manager=recovery_manager
+            recovery_manager=recovery_manager,
+        )
+
+        # Initialize parallel tool executor
+        parallel_config = self.config.get_parallel_execution_config()
+        self.parallel_executor = ParallelToolExecutor(
+            execute_fn=self.execute_tool,
+            max_workers=parallel_config.get("max_workers", 4),
+            enabled=parallel_config.get("enabled", True),
         )
 
         # Initialize timeout configuration
         self._timeout_config = self.config.get_timeout_config()
 
         # Initialize model provider
-        provider_override = getattr(self.config, 'provider', None)
+        provider_override = getattr(self.config, "provider", None)
         try:
             self.provider = ProviderFactory.get_provider(self.model, provider_override)
             # Validate API key for cloud providers
@@ -164,10 +174,11 @@ class Cortex:
 
         # Set default callback if configured
         if on_max_iterations_reached is None and self.config.max_iterations_continue_default:
+
             def default_callback(current: int, max_iter: int) -> Optional[int]:
                 # Auto-continue with configured amount
                 return self.config.max_iterations_continue_amount
-            
+
             self._on_max_iterations_reached = default_callback
         else:
             self._on_max_iterations_reached = on_max_iterations_reached
@@ -186,30 +197,30 @@ class Cortex:
     def switch_model(self, new_model: str, provider_override: Optional[str] = None) -> None:
         """
         Switch to a different model while maintaining conversation history.
-        
+
         Reinitializes the provider and updates conversation manager's model reference.
         This allows switching between models (e.g., local to cloud) while keeping
         the same conversation context.
-        
+
         Args:
             new_model: New model name to use
             provider_override: Optional provider override
-            
+
         Raises:
             ProviderError: If provider initialization fails or API key is missing
         """
         # Skip if same model
         if new_model == self.model:
             return
-        
+
         old_model = self.model
         old_provider_name = ProviderFactory.get_provider_name(self.model)
-        
+
         try:
             # Reinitialize provider for new model
-            provider_override = provider_override or getattr(self.config, 'provider', None)
+            provider_override = provider_override or getattr(self.config, "provider", None)
             new_provider = ProviderFactory.get_provider(new_model, provider_override)
-            
+
             # Validate API key for cloud providers
             if not new_provider.validate_api_key():
                 provider_name = ProviderFactory.get_provider_name(new_model)
@@ -217,14 +228,14 @@ class Cortex:
                     f"API key not set for {provider_name} provider. "
                     f"Please set the required environment variable."
                 )
-            
+
             # Update model and provider
             self.model = new_model
             self.provider = new_provider
-            
+
             # Update conversation manager's model reference for token counting
             self.conversation.update_model(new_model)
-            
+
             # Notify user of model switch
             new_provider_name = ProviderFactory.get_provider_name(new_model)
             if old_provider_name != new_provider_name:
@@ -234,16 +245,16 @@ class Cortex:
                 )
             else:
                 console.print(f"[cyan]🔄 Switched model:[/cyan] {old_model} → {new_model}")
-                
+
         except ProviderError as e:
             # Keep old model on error
             console.print(f"[red]Failed to switch model:[/red] {e}")
             raise ProviderError(f"Failed to switch model: {e}") from e
-    
+
     def _load_project_context(self) -> str:
         """Load AGENT.md or README.md for project context"""
         context_files = ["AGENT.md", "CLAUDE.md", "README.md"]
-        
+
         for filename in context_files:
             filepath = self.project_dir / filename
             if filepath.exists():
@@ -254,18 +265,18 @@ class Cortex:
                 except:
                     pass
         return ""
-    
+
     def _get_system_prompt(self) -> str:
         """Generate comprehensive system prompt for the agent"""
         mode_instructions = {
             PermissionMode.NORMAL: "Ask for user approval before making changes.",
             PermissionMode.AUTO_APPROVE: "You can make changes without asking. Be careful!",
-            PermissionMode.PLAN: "You are in PLAN MODE - read-only. Do not write files or execute commands. Only analyze and create plans."
+            PermissionMode.PLAN: "You are in PLAN MODE - read-only. Do not write files or execute commands. Only analyze and create plans.",
         }
 
         # Get memory summary if available
         memory_summary = ""
-        if hasattr(self, 'memory_bank') and self.memory_bank:
+        if hasattr(self, "memory_bank") and self.memory_bank:
             memory_summary = self.memory_bank.get_summary()
 
         return f"""You are Cortex, a powerful AI coding assistant working in: {self.project_dir}
@@ -434,7 +445,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             config={
                 "max_iterations": self.config.max_iterations,
                 "max_tokens": self.config.max_tokens,
-            }
+            },
         )
         self.hook_manager.dispatch(event)
 
@@ -444,7 +455,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             model=self.model,
             project_dir=str(self.project_dir),
             messages_count=len(self.conversation.get_history()),
-            tools_used=list(set(self._tools_used))
+            tools_used=list(set(self._tools_used)),
         )
         self.hook_manager.dispatch(event)
 
@@ -473,7 +484,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             self.formatter.write(formatted)
         # In text mode, tool results are shown by the tools themselves
 
-    def _output_error(self, error: str, error_type: str = "error", context: Optional[Dict[str, Any]] = None) -> None:
+    def _output_error(
+        self, error: str, error_type: str = "error", context: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Output an error using the appropriate formatter."""
         if self._is_text_output():
             console.print(f"[red]{error_type.upper()}:[/red] {error}")
@@ -490,21 +503,19 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             self.formatter.write(formatted)
 
     @retry_with_backoff(max_retries=3, exceptions=(Exception,))
-    def _call_model(self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _call_model(
+        self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Call model via provider with retry logic"""
         try:
             # Normalize model name for provider
             normalized_model = self.provider.normalize_model_name(self.model)
-            return self.provider.chat(
-                model=normalized_model,
-                messages=messages,
-                tools=tools
-            )
+            return self.provider.chat(model=normalized_model, messages=messages, tools=tools)
         except ProviderError as e:
             raise ModelError(f"Provider error: {e}") from e
         except Exception as e:
             raise ModelError(f"Failed to call model: {e}") from e
-    
+
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a tool and return result with hook support."""
 
@@ -516,14 +527,12 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                 return create_error_response(
                     f"Invalid JSON in tool arguments: {arguments}",
                     ErrorType.VALIDATION,
-                    {"tool_name": tool_name}
+                    {"tool_name": tool_name},
                 )
 
         # Dispatch PreToolUse hook
         pre_event = PreToolUseEvent(
-            tool_name=tool_name,
-            arguments=arguments,
-            permission_mode=self.permission_mode
+            tool_name=tool_name, arguments=arguments, permission_mode=self.permission_mode
         )
         pre_result = self.hook_manager.dispatch(pre_event)
 
@@ -532,13 +541,13 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             return create_error_response(
                 pre_result.message or "Blocked by hook",
                 ErrorType.PERMISSION,
-                {"tool_name": tool_name, "blocked_by": "hook"}
+                {"tool_name": tool_name, "blocked_by": "hook"},
             )
         elif pre_result.action == HookAction.SKIP:
             return {
                 "success": True,
                 "skipped": True,
-                "reason": pre_result.message or "Skipped by hook"
+                "reason": pre_result.message or "Skipped by hook",
             }
         elif pre_result.action == HookAction.MODIFY and pre_result.modified_data:
             # Use modified arguments from hook
@@ -561,7 +570,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                 self.permission_mode,
                 console,
                 parent_agent=self,
-                timeout_config=self._timeout_config
+                timeout_config=self._timeout_config,
             )
 
             # Execute tool
@@ -570,22 +579,12 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
 
         except ValueError as e:
             result = create_error_response(
-                f"Unknown tool: {tool_name}",
-                ErrorType.VALIDATION,
-                {"tool_name": tool_name}
+                f"Unknown tool: {tool_name}", ErrorType.VALIDATION, {"tool_name": tool_name}
             )
         except SecurityError as e:
-            result = create_error_response(
-                str(e),
-                ErrorType.SECURITY,
-                {"tool_name": tool_name}
-            )
+            result = create_error_response(str(e), ErrorType.SECURITY, {"tool_name": tool_name})
         except Exception as e:
-            result = create_error_response(
-                str(e),
-                ErrorType.EXECUTION,
-                {"tool_name": tool_name}
-            )
+            result = create_error_response(str(e), ErrorType.EXECUTION, {"tool_name": tool_name})
 
         # Calculate duration
         duration_ms = (time.time() - start_time) * 1000
@@ -596,7 +595,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             arguments=arguments,
             result=result,
             success=success,
-            duration_ms=duration_ms
+            duration_ms=duration_ms,
         )
         post_result = self.hook_manager.dispatch(post_event)
 
@@ -606,28 +605,28 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                 result = post_result.modified_data["result"]
 
         return result
-    
+
     def _is_tool_result_success(self, result: Dict[str, Any]) -> bool:
         """Check if tool result indicates success"""
         return result.get("success", False) and "error" not in result
-    
+
     def _validate_tool_result(self, tool_name: str, result: Dict[str, Any]) -> bool:
         """Validate tool result has expected structure"""
         # Must have success field
         if "success" not in result:
             return False
-        
+
         # If error, must have error field or error_type
         if not result["success"]:
             if "error" not in result and "error_type" not in result:
                 return False
-        
+
         return True
-    
+
     def request_shutdown(self) -> None:
         """Request graceful shutdown."""
         self._shutdown_requested = True
-    
+
     def _cleanup(self) -> None:
         """
         Cleanup resources on shutdown.
@@ -637,13 +636,17 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             # Dispatch session end event
             self._dispatch_session_end()
 
+            # Shutdown parallel executor
+            if self.parallel_executor:
+                self.parallel_executor.shutdown()
+
             # Note: Session saving is handled by CLI layer if needed
             # This cleanup focuses on internal state
 
         except Exception as e:
             # Log with traceback for debugging, but don't raise
             logger.warning(f"Error during cleanup: {e}", exc_info=True)
-    
+
     def _process_message(self, user_message: str, use_streaming: bool = False):
         """Process a user message through the agent loop with hook support."""
 
@@ -653,8 +656,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
 
         # Dispatch UserPromptSubmit hook
         prompt_event = UserPromptSubmitEvent(
-            prompt=user_message,
-            conversation_length=len(self.conversation.get_history())
+            prompt=user_message, conversation_length=len(self.conversation.get_history())
         )
         prompt_result = self.hook_manager.dispatch(prompt_event)
 
@@ -676,13 +678,13 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
 
         while True:
             iteration += 1
-            
+
             # Check for shutdown request
             if self._shutdown_requested:
                 self._output_warning("Shutdown requested. Cleaning up...")
                 self._cleanup()
                 return
-            
+
             # Check if we've exceeded max iterations (before processing)
             if iteration > max_iterations:
                 # Check if callback is set
@@ -691,7 +693,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     if additional is not None and additional > 0:
                         # Extend max_iterations and continue
                         max_iterations += additional
-                        console.print(f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})")
+                        console.print(
+                            f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})"
+                        )
                         continue  # Continue the loop with extended limit
                     else:
                         # Callback returned 0 or None - stop
@@ -701,69 +705,83 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     # No callback - default behavior (stop)
                     self._output_warning("Reached maximum iterations")
                     return
-            
+
             self.loop_guard.increment_iteration()
             console.print(f"[dim]{'─' * 60}[/dim]")
-            
+
             try:
                 # Get conversation history
                 messages = self.conversation.get_history()
-                
+
                 # Show thinking indicator
                 with console.status("[cyan]🤔 Thinking...[/cyan]", spinner="dots"):
-                    if use_streaming and stream_model_response and self.provider.supports_streaming():
+                    if (
+                        use_streaming
+                        and stream_model_response
+                        and self.provider.supports_streaming()
+                    ):
                         # Streaming mode
                         normalized_model = self.provider.normalize_model_name(self.model)
                         stream = stream_model_response(
-                            self.provider,
-                            normalized_model,
-                            messages,
-                            TOOLS
+                            self.provider, normalized_model, messages, TOOLS
                         )
                         response_message = display_streaming_response(stream)
                     else:
                         # Non-streaming mode
                         response = self._call_model(messages, TOOLS)
                         response_message = response["message"]
-                
+
                 # Add assistant response
                 self.conversation.add_assistant_message(
                     content=response_message.get("content", ""),
                     tool_calls=response_message.get("tool_calls"),
-                    reasoning_content=response_message.get("reasoning_content")
+                    reasoning_content=response_message.get("reasoning_content"),
                 )
 
                 # Display thinking/reasoning if enabled and present
                 reasoning_content = response_message.get("reasoning_content")
                 if reasoning_content and self._is_text_output():
                     from .ui.display import display_thinking
+
                     display_thinking(reasoning_content, expanded=self.show_thinking)
 
                 # Check if using tools
                 if response_message.get("tool_calls"):
                     # Don't display content here if tools are present - wait for final response
-                    # Execute tools
-                    for tool_call in response_message["tool_calls"]:
+                    # Create ToolCall objects for batch execution
+                    tool_calls_to_run = []
+                    for i, tool_call_data in enumerate(response_message["tool_calls"]):
+                        tool_calls_to_run.append(
+                            ToolCall(
+                                id=tool_call_data.get("id", f"call_{iteration}_{i}"),
+                                name=tool_call_data["function"]["name"],
+                                arguments=tool_call_data["function"]["arguments"],
+                                index=i,
+                            )
+                        )
+
+                    # Execute tools in batch
+                    batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
+
+                    # Process results
+                    for tool_result in batch_result.results:
                         # Check for shutdown request before each tool
                         if self._shutdown_requested:
                             self._output_warning("Shutdown requested. Stopping tool execution...")
                             self._cleanup()
                             return
-                        
-                        tool_name = tool_call["function"]["name"]
-                        arguments = tool_call["function"]["arguments"]
-                        
-                        # Parse arguments to dict if it's a JSON string (for loop guards)
-                        parsed_arguments = arguments
-                        if isinstance(arguments, str):
-                            try:
-                                parsed_arguments = json.loads(arguments)
-                            except json.JSONDecodeError:
-                                parsed_arguments = {}  # Fallback to empty dict if parsing fails
-                        
-                        # Execute (execute_tool handles string parsing internally)
-                        result = self.execute_tool(tool_name, arguments)
-                        
+
+                        tool_name = tool_result.name
+                        arguments = next(
+                            (
+                                tc.arguments
+                                for tc in tool_calls_to_run
+                                if tc.id == tool_result.id
+                            ),
+                            {},
+                        )
+                        result = tool_result.result
+
                         # Output tool result (for JSON modes)
                         self._output_tool_result(tool_name, result)
 
@@ -773,53 +791,62 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                             result = create_error_response(
                                 "Tool returned invalid result format",
                                 ErrorType.EXECUTION,
-                                {"tool_name": tool_name}
+                                {"tool_name": tool_name},
                             )
-                        
-                        # Add result to conversation first (before recovery handling)
-                        tool_call_id = tool_call.get("id", f"call_{iteration}")
-                        self.conversation.add_tool_result(tool_call_id, result)
-                        
+
+                        # Add result to conversation
+                        self.conversation.add_tool_result(tool_result.id, result)
+
+                        # Parse arguments for loop guards
+                        parsed_arguments = arguments
+                        if isinstance(arguments, str):
+                            try:
+                                parsed_arguments = json.loads(arguments)
+                            except json.JSONDecodeError:
+                                parsed_arguments = {}
+
                         # Check loop guards
                         if not self._is_tool_result_success(result):
                             self.loop_guard.record_error(result)
                             if self.loop_guard.check_repeated_error(result):
-                                # Try recovery if enabled
                                 recovery_action = self.loop_guard.get_recovery_action(
                                     result, tool_name, parsed_arguments
                                 )
                                 if recovery_action:
                                     from .core.recovery import RecoveryStrategy
+
                                     if recovery_action.strategy != RecoveryStrategy.ESCALATE:
-                                        # Inject recovery suggestion and continue
                                         self._output_warning(
                                             f"Recovery triggered: {recovery_action.message}"
                                         )
                                         if recovery_action.suggested_prompt:
-                                            # Add recovery guidance as additional context
-                                            # The original tool result was already added above
                                             self.conversation.add_user_message(
                                                 f"[Recovery Guidance] {recovery_action.suggested_prompt}"
                                             )
-                                        continue  # Continue loop to let model try recovery
-                                # No recovery or escalate - stop
-                                self._output_error("Repeated error detected. Stopping to prevent infinite loop.", "loop_guard")
+                                        continue
+                                self._output_error(
+                                    "Repeated error detected. Stopping to prevent infinite loop.",
+                                    "loop_guard",
+                                )
                                 return
 
-                        # Use parsed_arguments for loop guards (must be dict)
                         self.loop_guard.record_tool_call(tool_name, parsed_arguments)
                         self.loop_guard.record_operation(tool_name, parsed_arguments)
 
-                        # Check stuck state
                         if self.loop_guard.check_stuck_state():
-                            self._output_error("Agent appears stuck. Stopping to prevent infinite loop.", "loop_guard")
+                            self._output_error(
+                                "Agent appears stuck. Stopping to prevent infinite loop.",
+                                "loop_guard",
+                            )
                             return
 
                         if self.loop_guard.check_repeated_tool_call(tool_name, parsed_arguments):
-                            self._output_error("Same tool called repeatedly. Stopping to prevent infinite loop.", "loop_guard")
+                            self._output_error(
+                                "Same tool called repeatedly. Stopping to prevent infinite loop.",
+                                "loop_guard",
+                            )
                             return
-                        
-                        # Note: Tool result is already added to conversation above (before recovery handling)
+
                 else:
                     # No more tools - final response
                     final_text = response_message.get("content", "")
@@ -836,23 +863,24 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                         # Truly empty response - this shouldn't happen
                         self._output_warning("Model returned empty response. Exiting.")
                         return
-                    
+
             except (ModelError, ProviderError) as e:
                 import traceback
+
                 self._output_error(str(e), "model_error", {"traceback": traceback.format_exc()})
                 return
             except Exception as e:
                 import traceback
+
                 self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
                 return
-    
+
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get current conversation history"""
         return self.conversation.get_history()
-    
+
     def clear_conversation(self) -> None:
         """Clear conversation history"""
         self.conversation.clear(keep_system=True)
         # Update system prompt
         self.conversation.history[0]["content"] = self._get_system_prompt()
-

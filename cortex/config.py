@@ -7,6 +7,7 @@ import yaml
 
 try:
     from pydantic import BaseModel, Field
+
     PYDANTIC_AVAILABLE = True
 except ImportError:
     PYDANTIC_AVAILABLE = False
@@ -41,6 +42,27 @@ DEFAULT_ERROR_RECOVERY = {
     "enable_smart_recovery": False,  # Disabled by default for backward compat
 }
 
+# Default file cache settings
+DEFAULT_FILE_CACHE = {
+    "enabled": True,
+    "max_entries": 100,
+    "max_size_mb": 50.0,
+}
+
+# Default transaction settings
+DEFAULT_TRANSACTIONS = {
+    "enabled": True,
+    "max_backups": 10,
+    "backup_dir": None,  # Uses .cortex/backups by default
+}
+
+# Default parallel execution settings
+DEFAULT_PARALLEL_EXECUTION = {
+    "enabled": True,
+    "max_workers": 4,
+    "batch_size": 10,
+}
+
 
 class AgentConfig:
     """
@@ -73,6 +95,9 @@ class AgentConfig:
         subagent_allowed_tools: Optional[List[str]] = None,
         # Provider settings
         provider: Optional[str] = None,
+        # MCP settings (new)
+        mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
+        mcp_enabled: bool = False,
         # Timeout settings (new)
         timeouts: Optional[Dict[str, Any]] = None,
         tool_timeouts: Optional[Dict[str, int]] = None,
@@ -80,7 +105,13 @@ class AgentConfig:
         session_retention: Optional[Dict[str, Any]] = None,
         # Error recovery settings (new)
         error_recovery: Optional[Dict[str, Any]] = None,
-        **kwargs
+        # File cache settings (new)
+        file_cache: Optional[Dict[str, Any]] = None,
+        # Transaction settings (new)
+        transactions: Optional[Dict[str, Any]] = None,
+        # Parallel execution settings (new)
+        parallel_execution: Optional[Dict[str, Any]] = None,
+        **kwargs,
     ):
         # Core settings
         self.model = model
@@ -106,11 +137,17 @@ class AgentConfig:
         # Subagent settings
         self.subagent_max_iterations = subagent_max_iterations
         self.subagent_allowed_tools = subagent_allowed_tools or [
-            "read_file", "list_files", "search_files"
+            "read_file",
+            "list_files",
+            "search_files",
         ]
 
         # Provider settings
         self.provider = provider  # Auto-detected if None
+
+        # MCP settings
+        self.mcp_servers = mcp_servers or {}
+        self.mcp_enabled = mcp_enabled
 
         # Timeout settings (merge with defaults)
         self.timeouts = {**DEFAULT_TIMEOUTS, **(timeouts or {})}
@@ -122,12 +159,22 @@ class AgentConfig:
         # Error recovery settings (merge with defaults)
         self.error_recovery = {**DEFAULT_ERROR_RECOVERY, **(error_recovery or {})}
 
+        # File cache settings (merge with defaults)
+        self.file_cache = {**DEFAULT_FILE_CACHE, **(file_cache or {})}
+
+        # Transaction settings (merge with defaults)
+        self.transactions = {**DEFAULT_TRANSACTIONS, **(transactions or {})}
+
+        # Parallel execution settings (merge with defaults)
+        self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
+
         # Extra settings for extensibility
         self.extra = kwargs
 
     def get_timeout_config(self) -> "TimeoutConfig":
         """Get TimeoutConfig instance from settings."""
         from .utils.timeouts import TimeoutConfig
+
         config = TimeoutConfig.from_dict(self.timeouts)
         # Apply per-tool overrides
         for tool_name, timeout in self.tool_timeouts.items():
@@ -149,22 +196,34 @@ class AgentConfig:
                 "plugins": self.tools_plugins,
             }
         }
-    
+
+    def get_file_cache_config(self) -> Dict[str, Any]:
+        """Get configuration for FileCache."""
+        return self.file_cache
+
+    def get_transactions_config(self) -> Dict[str, Any]:
+        """Get configuration for TransactionManager."""
+        return self.transactions
+
+    def get_parallel_execution_config(self) -> Dict[str, Any]:
+        """Get configuration for ParallelToolExecutor."""
+        return self.parallel_execution
+
     @classmethod
     def from_file(cls, config_path: Path) -> "AgentConfig":
         """Load configuration from YAML file"""
         if not config_path.exists():
             return cls()
-        
+
         try:
-            with open(config_path, 'r') as f:
+            with open(config_path, "r") as f:
                 config_data = yaml.safe_load(f) or {}
-            
+
             return cls(**config_data)
         except Exception as e:
             print(f"Warning: Error loading config file: {e}")
             return cls()
-    
+
     @classmethod
     def from_env(cls) -> "AgentConfig":
         """Load configuration from environment variables"""
@@ -186,26 +245,34 @@ class AgentConfig:
         if os.getenv("CORTEX_SESSION_MAX_COUNT"):
             session_retention["max_count"] = int(os.getenv("CORTEX_SESSION_MAX_COUNT"))
         if os.getenv("CORTEX_SESSION_CLEANUP_ON_STARTUP"):
-            session_retention["cleanup_on_startup"] = os.getenv("CORTEX_SESSION_CLEANUP_ON_STARTUP").lower() == "true"
+            session_retention["cleanup_on_startup"] = (
+                os.getenv("CORTEX_SESSION_CLEANUP_ON_STARTUP").lower() == "true"
+            )
 
         # Build error recovery from env vars
         error_recovery = {}
         if os.getenv("CORTEX_RECOVERY_ENABLED"):
-            error_recovery["enable_smart_recovery"] = os.getenv("CORTEX_RECOVERY_ENABLED").lower() == "true"
+            error_recovery["enable_smart_recovery"] = (
+                os.getenv("CORTEX_RECOVERY_ENABLED").lower() == "true"
+            )
 
         return cls(
             model=os.getenv("CORTEX_MODEL", "llama3.2"),
             permission_mode=os.getenv("CORTEX_MODE", "normal"),
             max_iterations=int(os.getenv("CORTEX_MAX_ITERATIONS", "15")),
-            max_iterations_continue_default=bool(os.getenv("CORTEX_MAX_ITERATIONS_CONTINUE_DEFAULT", "false").lower() == "true"),
-            max_iterations_continue_amount=int(os.getenv("CORTEX_MAX_ITERATIONS_CONTINUE_AMOUNT", "10")),
+            max_iterations_continue_default=bool(
+                os.getenv("CORTEX_MAX_ITERATIONS_CONTINUE_DEFAULT", "false").lower() == "true"
+            ),
+            max_iterations_continue_amount=int(
+                os.getenv("CORTEX_MAX_ITERATIONS_CONTINUE_AMOUNT", "10")
+            ),
             max_tokens=int(os.getenv("CORTEX_MAX_TOKENS", "100000")),
             provider=os.getenv("CORTEX_PROVIDER", None),
             timeouts=timeouts if timeouts else None,
             session_retention=session_retention if session_retention else None,
             error_recovery=error_recovery if error_recovery else None,
         )
-    
+
     @classmethod
     def load(cls, config_path: Optional[Path] = None) -> "AgentConfig":
         """
@@ -285,5 +352,6 @@ class AgentConfig:
             "tool_timeouts": self.tool_timeouts,
             "session_retention": self.session_retention,
             "error_recovery": self.error_recovery,
+            "file_cache": self.file_cache,
+            "transactions": self.transactions,
         }
-
