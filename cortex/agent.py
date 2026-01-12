@@ -627,10 +627,6 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         """Request graceful shutdown."""
         self._shutdown_requested = True
 
-    def clear_shutdown_request(self) -> None:
-        """Clear the shutdown flag to allow new tasks."""
-        self._shutdown_requested = False
-
     def _cleanup(self) -> None:
         """
         Cleanup resources on shutdown.
