@@ -10,6 +10,7 @@ from typing import Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+from rich.prompt import Confirm
 
 from .agent import Cortex
 from .models import PermissionMode
@@ -408,103 +409,54 @@ def run_interactive(agent: Cortex, session_manager: SessionManager, use_streamin
         console.print(f"\n[yellow]⚠️  Reached maximum iterations ({current}/{max_iter})[/yellow]")
 
         if Confirm.ask("[cyan]Continue processing?[/cyan]", default=False):
-            # Ask how many additional iterations
             additional = IntPrompt.ask(
                 f"[cyan]How many additional iterations?[/cyan]",
                 default=agent.config.max_iterations_continue_amount,
             )
-            return max(1, additional)  # Ensure at least 1
-        return None  # Stop
+            return max(1, additional)
+        return None
 
-    # Set callback on agent
     agent._on_max_iterations_reached = on_max_iterations_reached
 
-    # Register signal handlers for graceful shutdown
-    def signal_handler(signum, frame):
-        """Handle SIGINT and SIGTERM signals"""
-        console.print("\n[yellow]Shutdown signal received. Cleaning up...[/yellow]")
-        agent.request_shutdown()
-        agent._cleanup()
-
-        # Optionally save session if dirty
-        if agent._session_dirty:
-            try:
-                from datetime import datetime
-
-                auto_save_name = f"autosave_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                session_manager.save_session(
-                    auto_save_name,
-                    agent.get_conversation_history(),
-                    str(agent.project_dir),
-                    agent.model,
-                    agent.permission_mode,
-                )
-                console.print(f"[dim]Session auto-saved as: {auto_save_name}[/dim]")
-            except Exception as e:
-                console.print(f"[yellow]Warning:[/yellow] Could not auto-save session: {e}")
-
-        console.print("[cyan]👋 Goodbye![/cyan]")
-        sys.exit(0)
-
-    # Register handlers (Unix/Linux)
-    if hasattr(signal, "SIGINT"):
-        signal.signal(signal.SIGINT, signal_handler)
-    if hasattr(signal, "SIGTERM"):
-        signal.signal(signal.SIGTERM, signal_handler)
-
     # Main loop
-    while True:
+    while not agent._shutdown_requested:
         try:
-            # Check for shutdown request
-            if agent._shutdown_requested:
-                break
-
-            # Get user input
             user_input = repl.prompt("\n> ")
+
+            if user_input is None:
+                # Handle Ctrl+D (EOF)
+                raise EOFError
 
             if not user_input.strip():
                 continue
 
-            # Handle commands
             if user_input.startswith("/"):
+                # Gracefully exit on /exit command
+                if user_input.lower().strip() == '/exit':
+                    raise EOFError
                 handle_command(user_input, agent, session_manager, repl)
                 continue
 
-            # Process with agent
-            agent._process_message(user_input, use_streaming=use_streaming)
+            # This is where the agent processes the message.
+            # We wrap it in a try/except to catch the user's interrupt.
+            try:
+                agent._process_message(user_input, use_streaming=use_streaming)
+            except KeyboardInterrupt:
+                agent.request_shutdown()  # Tell the agent loop to stop
+                console.print("\n[bold red]Task interrupted.[/bold red] Returning to prompt.")
+            finally:
+                # Ensure the shutdown request is cleared so the agent can be used again.
+                agent.clear_shutdown_request()
 
-        except KeyboardInterrupt:
-            # Handle Ctrl+C gracefully
-            from rich.prompt import Confirm
-
+        except (EOFError, KeyboardInterrupt):
+            # Handle Ctrl+D or /exit to gracefully exit the application
             if Confirm.ask("\n[yellow]Exit Cortex?[/yellow]"):
                 agent.request_shutdown()
                 agent._cleanup()
-
-                # Optionally save session if dirty
-                if agent._session_dirty:
-                    try:
-                        from datetime import datetime
-
-                        auto_save_name = f"autosave_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                        session_manager.save_session(
-                            auto_save_name,
-                            agent.get_conversation_history(),
-                            str(agent.project_dir),
-                            agent.model,
-                            agent.permission_mode,
-                        )
-                        console.print(f"[dim]Session auto-saved as: {auto_save_name}[/dim]")
-                    except Exception as e:
-                        console.print(f"[yellow]Warning:[/yellow] Could not auto-save session: {e}")
-
-                console.print("[cyan]👋 Goodbye![/cyan]")
+                console.print("\n[cyan]👋 Goodbye![/cyan]")
                 break
-        except EOFError:
-            # Handle EOF (Ctrl+D)
-            agent.request_shutdown()
-            agent._cleanup()
-            break
+            else:
+                continue
 
 
 def handle_command(command: str, agent: Cortex, session_manager: SessionManager, repl: REPL):
