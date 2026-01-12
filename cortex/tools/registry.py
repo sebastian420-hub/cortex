@@ -243,6 +243,9 @@ class ToolRegistry:
 
         # Phase 3 web tools
         from .web_tools import WebFetchTool, WebSearchTool
+        
+        # Skill tools
+        from .skill_tools import SkillLoaderTool
 
         # Tool class mapping
         builtin_tools = {
@@ -272,6 +275,8 @@ class ToolRegistry:
             # Phase 3 web tools
             "web_fetch": WebFetchTool,
             "web_search": WebSearchTool,
+            # Skill tools
+            "skill_loader": SkillLoaderTool,
         }
 
         # Tool schemas (inline definitions)
@@ -786,6 +791,36 @@ class ToolRegistry:
                             },
                         },
                         "required": ["query"],
+                    },
+                },
+            },
+            "skill_loader": {
+                "type": "function",
+                "function": {
+                    "name": "skill_loader",
+                    "description": "Load and manage development skills for common tasks like TDD, refactoring, debugging, etc.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "enum": ["list", "load", "suggest", "get"],
+                                "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)"
+                            },
+                            "skill_name": {
+                                "type": "string",
+                                "description": "Name of skill (for load/get actions)"
+                            },
+                            "task_description": {
+                                "type": "string",
+                                "description": "Task description (for suggest action)"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "description": "Maximum number of skills to return (for list/suggest)"
+                            }
+                        },
+                        "required": ["action"],
                     },
                 },
             },

@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 from datetime import datetime
 from .context import truncate_history, get_conversation_tokens
+from ..utils.encoding import sanitize_object
 
 if TYPE_CHECKING:
     from .summarization import ConversationSummarizer, SummaryChunk
@@ -90,7 +91,7 @@ class ConversationManager:
             {
                 "role": "tool",
                 "tool_call_id": tool_call_id,
-                "content": json.dumps(result, ensure_ascii=False),  # Keep JSON but ensure format
+                "content": json.dumps(sanitize_object(result), ensure_ascii=False),  # Keep JSON but ensure format
             }
         )
         self._optimize()

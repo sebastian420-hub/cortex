@@ -1,6 +1,6 @@
 """Loop guard system to prevent infinite loops and detect stuck states"""
 
-from typing import List, Tuple, Dict, Any, Set, Optional, TYPE_CHECKING
+from typing import List, Tuple, Dict, Any, Set, Optional, TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from .recovery import RecoveryManager, RecoveryAction, RecoveryContext
@@ -15,6 +15,9 @@ class LoopGuard:
         stuck_threshold: int = 5,
         buffer_size: int = 10,
         recovery_manager: Optional["RecoveryManager"] = None,
+        reflection_threshold_iterations: int = 10,
+        reflection_threshold_failures: int = 3,
+        reflection_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
     ):
         """
         Initialize loop guard.
@@ -31,11 +34,17 @@ class LoopGuard:
         self.stuck_threshold = stuck_threshold
         self.buffer_size = buffer_size
         self.recovery_manager = recovery_manager
+        # Reflection configuration
+        self.reflection_threshold_iterations = reflection_threshold_iterations
+        self.reflection_threshold_failures = reflection_threshold_failures
+        self.reflection_callback = reflection_callback
         # Progress tracking
         self.unique_operations: Set[str] = set()  # Track unique operations
         self.files_read: Set[str] = set()  # Track files read
         self.files_written: Set[str] = set()  # Track files written
         self.iteration_count: int = 0
+        self.consecutive_failures: int = 0
+        self.last_reflection_iteration: int = 0
 
     def check_repeated_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
         """
@@ -130,6 +139,10 @@ class LoopGuard:
         # Keep only last N errors to prevent memory growth
         if len(self.error_history) > self.buffer_size:
             self.error_history.pop(0)
+        
+        # Track consecutive failures for reflection
+        self.consecutive_failures += 1
+        self._check_reflection_triggers()
 
     def check_stuck_state(self) -> bool:
         """
@@ -157,6 +170,58 @@ class LoopGuard:
         # - Decreasing error rate
         return len(self.unique_operations) > 0
 
+    def _check_reflection_triggers(self) -> None:
+        """
+        Check if reflection should be triggered based on configured thresholds.
+        
+        Triggers reflection when:
+        1. Iteration threshold reached (every N iterations)
+        2. Consecutive failure threshold reached
+        3. Stuck state detected
+        """
+        if not self.reflection_callback:
+            return
+        
+        triggers = []
+        
+        # Check iteration threshold
+        if self.reflection_threshold_iterations > 0:
+            iterations_since_last_reflection = self.iteration_count - self.last_reflection_iteration
+            if iterations_since_last_reflection >= self.reflection_threshold_iterations:
+                triggers.append(f"iteration_threshold ({iterations_since_last_reflection} iterations since last reflection)")
+        
+        # Check consecutive failures threshold
+        if self.reflection_threshold_failures > 0 and self.consecutive_failures >= self.reflection_threshold_failures:
+            triggers.append(f"failure_threshold ({self.consecutive_failures} consecutive failures)")
+        
+        # Check stuck state
+        if self.check_stuck_state():
+            triggers.append("stuck_state (no progress detected)")
+        
+        # If any triggers, invoke callback
+        if triggers:
+            reflection_data = {
+                "triggers": triggers,
+                "iteration_count": self.iteration_count,
+                "consecutive_failures": self.consecutive_failures,
+                "unique_operations": len(self.unique_operations),
+                "files_read": len(self.files_read),
+                "files_written": len(self.files_written),
+                "stuck_state": self.check_stuck_state(),
+                "tool_calls_in_buffer": len(self.tool_call_history),
+                "errors_in_buffer": len(self.error_history),
+            }
+            
+            try:
+                self.reflection_callback("loop_guard_reflection", reflection_data)
+                # Update last reflection iteration to prevent immediate retriggering
+                self.last_reflection_iteration = self.iteration_count
+            except Exception as e:
+                # Don't let reflection callback failures break the loop
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Reflection callback failed: {e}")
+
     def record_operation(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Record a unique operation for progress tracking."""
         # Handle case where arguments might still be a string (defensive check)
@@ -176,10 +241,14 @@ class LoopGuard:
             self.files_read.add(arguments["path"])
         elif tool_name == "write_file" and "path" in arguments:
             self.files_written.add(arguments["path"])
+        
+        # Reset consecutive failures on successful operation
+        self.consecutive_failures = 0
 
     def increment_iteration(self) -> None:
-        """Increment iteration counter."""
+        """Increment iteration counter and check for reflection triggers."""
         self.iteration_count += 1
+        self._check_reflection_triggers()
 
     def reset(self) -> None:
         """Reset guard history (useful for testing or new conversation)"""
@@ -189,6 +258,8 @@ class LoopGuard:
         self.files_read.clear()
         self.files_written.clear()
         self.iteration_count = 0
+        self.consecutive_failures = 0
+        self.last_reflection_iteration = 0
         if self.recovery_manager:
             self.recovery_manager.reset()
 
@@ -251,6 +322,12 @@ class LoopGuard:
             "max_repeats": self.max_repeats,
             "stuck_threshold": self.stuck_threshold,
             "buffer_size": self.buffer_size,
+            "consecutive_failures": self.consecutive_failures,
+            "last_reflection_iteration": self.last_reflection_iteration,
+            "reflection_threshold_iterations": self.reflection_threshold_iterations,
+            "reflection_threshold_failures": self.reflection_threshold_failures,
+            "has_reflection_callback": self.reflection_callback is not None,
+            "stuck_state": self.check_stuck_state(),
         }
         if self.recovery_manager:
             stats["recovery"] = self.recovery_manager.get_stats()

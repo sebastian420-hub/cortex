@@ -8,6 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from ..utils.encoding import sanitize_string, sanitize_object
 
 class ProviderError(Exception):
     """Error related to model provider operations"""
@@ -73,6 +74,12 @@ class ModelProvider(ABC):
         """Validate that API key is set (for cloud providers)"""
         pass
 
+    def _sanitize_request(self, messages, tools=None):
+        """Sanitize messages and tools to remove invalid UTF-8 characters."""
+        sanitized_messages = sanitize_object(messages)
+        sanitized_tools = sanitize_object(tools) if tools else None
+        return sanitized_messages, sanitized_tools
+
 
 class OllamaProvider(ModelProvider):
     """Provider for local Ollama models"""
@@ -93,9 +100,11 @@ class OllamaProvider(ModelProvider):
     ) -> Dict[str, Any]:
         """Call Ollama chat API"""
         try:
-            kwargs = {"model": model, "messages": messages}
-            if tools:
-                kwargs["tools"] = tools
+            # Sanitize messages and tools to remove invalid UTF-8 characters
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+            kwargs = {"model": model, "messages": sanitized_messages}
+            if sanitized_tools:
+                kwargs["tools"] = sanitized_tools
 
             return self.ollama.chat(**kwargs)
         except Exception as e:
@@ -109,9 +118,11 @@ class OllamaProvider(ModelProvider):
     ) -> Iterator[Dict[str, Any]]:
         """Stream responses from Ollama"""
         try:
-            kwargs = {"model": model, "messages": messages, "stream": True}
-            if tools:
-                kwargs["tools"] = tools
+            # Sanitize messages and tools to remove invalid UTF-8 characters
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+            kwargs = {"model": model, "messages": sanitized_messages, "stream": True}
+            if sanitized_tools:
+                kwargs["tools"] = sanitized_tools
 
             stream = self.ollama.chat(**kwargs)
             for chunk in stream:
@@ -159,9 +170,11 @@ class DeepSeekProvider(ModelProvider):
     ) -> Dict[str, Any]:
         """Call DeepSeek API"""
         try:
-            kwargs = {"model": model, "messages": messages}
-            if tools:
-                kwargs["tools"] = tools
+            # Sanitize messages and tools to remove invalid UTF-8 characters
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+            kwargs = {"model": model, "messages": sanitized_messages}
+            if sanitized_tools:
+                kwargs["tools"] = sanitized_tools
 
             response = self.client.chat.completions.create(**kwargs)
 
@@ -197,9 +210,11 @@ class DeepSeekProvider(ModelProvider):
     ) -> Iterator[Dict[str, Any]]:
         """Stream responses from DeepSeek API"""
         try:
-            kwargs = {"model": model, "messages": messages, "stream": True}
-            if tools:
-                kwargs["tools"] = tools
+            # Sanitize messages and tools to remove invalid UTF-8 characters
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+            kwargs = {"model": model, "messages": sanitized_messages, "stream": True}
+            if sanitized_tools:
+                kwargs["tools"] = sanitized_tools
 
             stream = self.client.chat.completions.create(**kwargs)
 
@@ -332,17 +347,19 @@ class AnthropicProvider(ModelProvider):
     ) -> Dict[str, Any]:
         """Call Anthropic API"""
         try:
+            # Sanitize messages and tools to remove invalid UTF-8 characters
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
             # Extract system prompt
-            system_prompt = self._extract_system_prompt(messages)
-            anthropic_messages = self._convert_messages_to_anthropic_format(messages)
+            system_prompt = self._extract_system_prompt(sanitized_messages)
+            anthropic_messages = self._convert_messages_to_anthropic_format(sanitized_messages)
 
             kwargs = {"model": model, "messages": anthropic_messages, "max_tokens": 4096}
 
             if system_prompt:
                 kwargs["system"] = system_prompt
 
-            if tools:
-                anthropic_tools = self._convert_tools_to_anthropic_format(tools)
+            if sanitized_tools:
+                anthropic_tools = self._convert_tools_to_anthropic_format(sanitized_tools)
                 kwargs["tools"] = anthropic_tools
 
             response = self.client.messages.create(**kwargs)
@@ -389,8 +406,10 @@ class AnthropicProvider(ModelProvider):
     ) -> Iterator[Dict[str, Any]]:
         """Stream responses from Anthropic API"""
         try:
-            system_prompt = self._extract_system_prompt(messages)
-            anthropic_messages = self._convert_messages_to_anthropic_format(messages)
+            # Sanitize messages and tools to remove invalid UTF-8 characters
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+            system_prompt = self._extract_system_prompt(sanitized_messages)
+            anthropic_messages = self._convert_messages_to_anthropic_format(sanitized_messages)
 
             kwargs = {
                 "model": model,
@@ -402,8 +421,8 @@ class AnthropicProvider(ModelProvider):
             if system_prompt:
                 kwargs["system"] = system_prompt
 
-            if tools:
-                anthropic_tools = self._convert_tools_to_anthropic_format(tools)
+            if sanitized_tools:
+                anthropic_tools = self._convert_tools_to_anthropic_format(sanitized_tools)
                 kwargs["tools"] = anthropic_tools
 
             stream = self.client.messages.create(**kwargs)
