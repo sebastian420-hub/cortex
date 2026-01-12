@@ -10,24 +10,27 @@ from enum import Enum
 
 class MemoryType(str, Enum):
     """Types of memory items."""
-    DECISION = "decision"      # A choice made (e.g., "chose pytest over unittest")
-    FACT = "fact"              # Learned information (e.g., "entry point is main.py")
+
+    DECISION = "decision"  # A choice made (e.g., "chose pytest over unittest")
+    FACT = "fact"  # Learned information (e.g., "entry point is main.py")
     PREFERENCE = "preference"  # User preference (e.g., "prefers TypeScript")
-    FILE = "file"              # Important file reference
-    ERROR = "error"            # Notable error encountered
-    CONTEXT = "context"        # General context information
+    FILE = "file"  # Important file reference
+    ERROR = "error"  # Notable error encountered
+    CONTEXT = "context"  # General context information
 
 
 class MemorySource(str, Enum):
     """Source of memory item."""
-    USER = "user"              # Explicitly stated by user
-    INFERRED = "inferred"      # Inferred from context/actions
+
+    USER = "user"  # Explicitly stated by user
+    INFERRED = "inferred"  # Inferred from context/actions
     TOOL_RESULT = "tool_result"  # Learned from tool execution
 
 
 @dataclass
 class MemoryItem:
     """A single memory item."""
+
     type: MemoryType
     content: str
     source: MemorySource
@@ -43,7 +46,7 @@ class MemoryItem:
             "source": self.source.value,
             "confidence": self.confidence,
             "timestamp": self.timestamp,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -55,7 +58,7 @@ class MemoryItem:
             source=MemorySource(data["source"]),
             confidence=data.get("confidence", 1.0),
             timestamp=data.get("timestamp", datetime.now().isoformat()),
-            metadata=data.get("metadata", {})
+            metadata=data.get("metadata", {}),
         )
 
 
@@ -101,38 +104,37 @@ class MemoryBank:
         self.items.append(item)
         self._prune()
 
-    def add_decision(self, decision: str, source: MemorySource = MemorySource.INFERRED,
-                     confidence: float = 0.8) -> None:
+    def add_decision(
+        self, decision: str, source: MemorySource = MemorySource.INFERRED, confidence: float = 0.8
+    ) -> None:
         """Add a decision memory."""
-        self.add(MemoryItem(
-            type=MemoryType.DECISION,
-            content=decision,
-            source=source,
-            confidence=confidence
-        ))
+        self.add(
+            MemoryItem(
+                type=MemoryType.DECISION, content=decision, source=source, confidence=confidence
+            )
+        )
 
-    def add_fact(self, fact: str, source: MemorySource = MemorySource.TOOL_RESULT,
-                 confidence: float = 1.0) -> None:
+    def add_fact(
+        self, fact: str, source: MemorySource = MemorySource.TOOL_RESULT, confidence: float = 1.0
+    ) -> None:
         """Add a fact memory."""
-        self.add(MemoryItem(
-            type=MemoryType.FACT,
-            content=fact,
-            source=source,
-            confidence=confidence
-        ))
+        self.add(
+            MemoryItem(type=MemoryType.FACT, content=fact, source=source, confidence=confidence)
+        )
 
-    def add_preference(self, preference: str, source: MemorySource = MemorySource.USER,
-                       confidence: float = 0.9) -> None:
+    def add_preference(
+        self, preference: str, source: MemorySource = MemorySource.USER, confidence: float = 0.9
+    ) -> None:
         """Add a user preference."""
-        self.add(MemoryItem(
-            type=MemoryType.PREFERENCE,
-            content=preference,
-            source=source,
-            confidence=confidence
-        ))
+        self.add(
+            MemoryItem(
+                type=MemoryType.PREFERENCE, content=preference, source=source, confidence=confidence
+            )
+        )
 
-    def add_file(self, filepath: str, description: str = "",
-                 source: MemorySource = MemorySource.TOOL_RESULT) -> None:
+    def add_file(
+        self, filepath: str, description: str = "", source: MemorySource = MemorySource.TOOL_RESULT
+    ) -> None:
         """Add an important file reference."""
         if filepath in self._files_read:
             return  # Already tracked
@@ -142,27 +144,25 @@ class MemoryBank:
         if description:
             content += f" - {description}"
 
-        self.add(MemoryItem(
-            type=MemoryType.FILE,
-            content=content,
-            source=source,
-            confidence=1.0,
-            metadata={"filepath": filepath}
-        ))
+        self.add(
+            MemoryItem(
+                type=MemoryType.FILE,
+                content=content,
+                source=source,
+                confidence=1.0,
+                metadata={"filepath": filepath},
+            )
+        )
 
-    def add_error(self, error: str, context: str = "",
-                  source: MemorySource = MemorySource.TOOL_RESULT) -> None:
+    def add_error(
+        self, error: str, context: str = "", source: MemorySource = MemorySource.TOOL_RESULT
+    ) -> None:
         """Add a notable error for future reference."""
         content = error
         if context:
             content = f"{error} (context: {context})"
 
-        self.add(MemoryItem(
-            type=MemoryType.ERROR,
-            content=content,
-            source=source,
-            confidence=1.0
-        ))
+        self.add(MemoryItem(type=MemoryType.ERROR, content=content, source=source, confidence=1.0))
 
     def get_by_type(self, memory_type: MemoryType) -> List[MemoryItem]:
         """Get all items of a specific type."""
@@ -256,7 +256,7 @@ class MemoryBank:
             MemoryType.PREFERENCE: "Preferences",
             MemoryType.FILE: "Files",
             MemoryType.ERROR: "Errors",
-            MemoryType.CONTEXT: "Context"
+            MemoryType.CONTEXT: "Context",
         }
 
         for mem_type, items in type_groups.items():
@@ -280,7 +280,7 @@ class MemoryBank:
             # Sort by confidence, then by timestamp
             # Keep highest confidence and most recent
             self.items.sort(key=lambda x: (x.confidence, x.timestamp), reverse=True)
-            self.items = self.items[:self.max_items]
+            self.items = self.items[: self.max_items]
 
     def _is_similar(self, a: str, b: str, threshold: float = 0.7) -> bool:
         """Check if two strings are similar (simple word overlap)."""
@@ -298,7 +298,7 @@ class MemoryBank:
         return {
             "items": [item.to_dict() for item in self.items],
             "max_items": self.max_items,
-            "files_read": list(self._files_read)
+            "files_read": list(self._files_read),
         }
 
     @classmethod
@@ -310,10 +310,7 @@ class MemoryBank:
         return bank
 
 
-def extract_memories_from_messages(
-    messages: List[Dict[str, Any]],
-    memory_bank: MemoryBank
-) -> None:
+def extract_memories_from_messages(messages: List[Dict[str, Any]], memory_bank: MemoryBank) -> None:
     """
     Extract memories from conversation messages.
 
