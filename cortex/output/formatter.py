@@ -10,8 +10,9 @@ import sys
 
 class OutputFormat(Enum):
     """Supported output formats"""
-    TEXT = "text"           # Human-readable text (default)
-    JSON = "json"           # Structured JSON output
+
+    TEXT = "text"  # Human-readable text (default)
+    JSON = "json"  # Structured JSON output
     STREAM_JSON = "stream-json"  # Real-time newline-delimited JSON
 
 
@@ -51,7 +52,9 @@ class OutputFormatter(ABC):
         pass
 
     @abstractmethod
-    def format_error(self, error: str, error_type: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def format_error(
+        self, error: str, error_type: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
         """
         Format an error message.
 
@@ -108,6 +111,7 @@ class TextFormatter(OutputFormatter):
         self.console = console
         if self.console is None:
             from rich.console import Console
+
             self.console = Console()
 
     def format_response(self, response: Dict[str, Any]) -> str:
@@ -123,7 +127,9 @@ class TextFormatter(OutputFormatter):
             error = result.get("error", "Unknown error")
             return f"[red]Tool {tool_name}: Error - {error}[/red]"
 
-    def format_error(self, error: str, error_type: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def format_error(
+        self, error: str, error_type: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Format error with color coding."""
         return f"[red][{error_type.upper()}][/red] {error}"
 
@@ -169,41 +175,51 @@ class JSONFormatter(OutputFormatter):
 
     def format_response(self, response: Dict[str, Any]) -> str:
         """Format response as JSON object."""
-        return self._to_json({
-            "type": "response",
-            "content": response.get("content", ""),
-            "tool_calls": response.get("tool_calls"),
-            "timestamp": self._timestamp()
-        })
+        return self._to_json(
+            {
+                "type": "response",
+                "content": response.get("content", ""),
+                "tool_calls": response.get("tool_calls"),
+                "timestamp": self._timestamp(),
+            }
+        )
 
     def format_tool_result(self, tool_name: str, result: Dict[str, Any]) -> str:
         """Format tool result as JSON object."""
-        return self._to_json({
-            "type": "tool_result",
-            "tool_name": tool_name,
-            "success": result.get("success", False),
-            "result": result,
-            "timestamp": self._timestamp()
-        })
+        return self._to_json(
+            {
+                "type": "tool_result",
+                "tool_name": tool_name,
+                "success": result.get("success", False),
+                "result": result,
+                "timestamp": self._timestamp(),
+            }
+        )
 
-    def format_error(self, error: str, error_type: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def format_error(
+        self, error: str, error_type: str, context: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Format error as JSON object."""
-        return self._to_json({
-            "type": "error",
-            "error": error,
-            "error_type": error_type,
-            "context": context,
-            "timestamp": self._timestamp()
-        })
+        return self._to_json(
+            {
+                "type": "error",
+                "error": error,
+                "error_type": error_type,
+                "context": context,
+                "timestamp": self._timestamp(),
+            }
+        )
 
     def format_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> str:
         """Format tool call as JSON object."""
-        return self._to_json({
-            "type": "tool_call",
-            "tool_name": tool_name,
-            "arguments": arguments,
-            "timestamp": self._timestamp()
-        })
+        return self._to_json(
+            {
+                "type": "tool_call",
+                "tool_name": tool_name,
+                "arguments": arguments,
+                "timestamp": self._timestamp(),
+            }
+        )
 
     def write(self, content: str) -> None:
         """Write to output stream."""
@@ -236,12 +252,14 @@ class StreamJSONFormatter(JSONFormatter):
             event_type: Type of event starting (e.g., "response", "tool_execution")
             metadata: Optional metadata about the event
         """
-        output = self._to_json({
-            "type": "stream_start",
-            "event": event_type,
-            "metadata": metadata,
-            "timestamp": self._timestamp()
-        })
+        output = self._to_json(
+            {
+                "type": "stream_start",
+                "event": event_type,
+                "metadata": metadata,
+                "timestamp": self._timestamp(),
+            }
+        )
         self.stream.write(output + "\n")
         self.stream.flush()
 
@@ -253,12 +271,9 @@ class StreamJSONFormatter(JSONFormatter):
             chunk: Chunk data to stream
             event_type: Type of event this chunk belongs to
         """
-        output = self._to_json({
-            "type": "chunk",
-            "event": event_type,
-            "data": chunk,
-            "timestamp": self._timestamp()
-        })
+        output = self._to_json(
+            {"type": "chunk", "event": event_type, "data": chunk, "timestamp": self._timestamp()}
+        )
         self.stream.write(output + "\n")
         self.stream.flush()
 
@@ -270,12 +285,14 @@ class StreamJSONFormatter(JSONFormatter):
             event_type: Type of event ending
             summary: Optional summary of the completed event
         """
-        output = self._to_json({
-            "type": "stream_end",
-            "event": event_type,
-            "summary": summary,
-            "timestamp": self._timestamp()
-        })
+        output = self._to_json(
+            {
+                "type": "stream_end",
+                "event": event_type,
+                "summary": summary,
+                "timestamp": self._timestamp(),
+            }
+        )
         self.stream.write(output + "\n")
         self.stream.flush()
 
@@ -288,22 +305,21 @@ class StreamJSONFormatter(JSONFormatter):
             error_type: Type of error
             event_type: Type of event where error occurred
         """
-        output = self._to_json({
-            "type": "stream_error",
-            "event": event_type,
-            "error": error,
-            "error_type": error_type,
-            "timestamp": self._timestamp()
-        })
+        output = self._to_json(
+            {
+                "type": "stream_error",
+                "event": event_type,
+                "error": error,
+                "error_type": error_type,
+                "timestamp": self._timestamp(),
+            }
+        )
         self.stream.write(output + "\n")
         self.stream.flush()
 
 
 def create_formatter(
-    output_format: OutputFormat,
-    console=None,
-    stream: Optional[TextIO] = None,
-    pretty: bool = False
+    output_format: OutputFormat, console=None, stream: Optional[TextIO] = None, pretty: bool = False
 ) -> OutputFormatter:
     """
     Factory function to create appropriate formatter.

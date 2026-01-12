@@ -153,7 +153,7 @@ class TestTaskToolExecution:
         )
 
         # Mock _run_subagent to avoid actual agent creation
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Task completed"}
 
             result = tool.execute(description="Find all Python files")
@@ -174,7 +174,7 @@ class TestTaskToolExecution:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Done"}
 
             result = tool.execute(
@@ -195,7 +195,7 @@ class TestTaskToolExecution:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Done"}
 
             result = tool.execute(
@@ -215,7 +215,7 @@ class TestTaskToolExecution:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Done"}
 
             result = tool.execute(
@@ -235,7 +235,7 @@ class TestTaskToolExecution:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.side_effect = Exception("Subagent crashed")
 
             result = tool.execute(description="Failing task")
@@ -310,9 +310,7 @@ class TestAllowedToolsEnforcement:
 
         # Allowed tool should continue
         event1 = PreToolUseEvent(
-            tool_name="read_file",
-            arguments={"path": "test.txt"},
-            permission_mode="normal"
+            tool_name="read_file", arguments={"path": "test.txt"}, permission_mode="normal"
         )
         result1 = hook.execute(event1)
         assert result1.action == HookAction.CONTINUE
@@ -321,7 +319,7 @@ class TestAllowedToolsEnforcement:
         event2 = PreToolUseEvent(
             tool_name="write_file",
             arguments={"path": "test.txt", "content": "data"},
-            permission_mode="normal"
+            permission_mode="normal",
         )
         result2 = hook.execute(event2)
         assert result2.action == HookAction.ABORT
@@ -341,9 +339,7 @@ class TestAllowedToolsEnforcement:
 
         # Test that allowed tool passes
         event1 = PreToolUseEvent(
-            tool_name="read_file",
-            arguments={"path": "test.txt"},
-            permission_mode="normal"
+            tool_name="read_file", arguments={"path": "test.txt"}, permission_mode="normal"
         )
         result1 = subagent_hooks.dispatch(event1)
         assert result1.action == HookAction.CONTINUE
@@ -352,7 +348,7 @@ class TestAllowedToolsEnforcement:
         event2 = PreToolUseEvent(
             tool_name="write_file",
             arguments={"path": "test.txt", "content": "data"},
-            permission_mode="normal"
+            permission_mode="normal",
         )
         result2 = subagent_hooks.dispatch(event2)
         assert result2.action == HookAction.ABORT
@@ -370,7 +366,7 @@ class TestTaskToolIntegration:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {
                 "final_response": "Found 5 Python files",
                 "messages_count": 3,
@@ -396,7 +392,7 @@ class TestTaskToolIntegration:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Done"}
 
             result = tool.execute(description="Quick task")
@@ -414,7 +410,7 @@ class TestTaskToolIntegration:
             console=console,
         )
 
-        with patch.object(tool, '_run_subagent') as mock_run:
+        with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.side_effect = Exception("Failed")
 
             result = tool.execute(description="Failing task")

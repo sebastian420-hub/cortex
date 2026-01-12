@@ -12,7 +12,12 @@ from rich.text import Text
 from .base import Tool
 from ..core.security import validate_path, SecurityError
 from ..models import PermissionMode
-from ..utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType
+from ..utils.errors import (
+    create_error_response,
+    create_success_response,
+    create_permission_denial,
+    ErrorType,
+)
 from ..cache import invalidate_file
 
 
@@ -55,9 +60,7 @@ class EditTool(Tool):
             if self.console:
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would edit {file_path}")
             return create_permission_denial(
-                "Plan mode - no edits allowed",
-                "edit",
-                {"file_path": file_path}
+                "Plan mode - no edits allowed", "edit", {"file_path": file_path}
             )
 
         # Validate inputs
@@ -65,14 +68,12 @@ class EditTool(Tool):
             return create_error_response(
                 "old_string and new_string must be different",
                 ErrorType.VALIDATION,
-                {"file_path": file_path}
+                {"file_path": file_path},
             )
 
         if not old_string:
             return create_error_response(
-                "old_string cannot be empty",
-                ErrorType.VALIDATION,
-                {"file_path": file_path}
+                "old_string cannot be empty", ErrorType.VALIDATION, {"file_path": file_path}
             )
 
         # Validate path
@@ -83,26 +84,20 @@ class EditTool(Tool):
 
         if not full_path.exists():
             return create_error_response(
-                f"File not found: {file_path}",
-                ErrorType.NOT_FOUND,
-                {"file_path": file_path}
+                f"File not found: {file_path}", ErrorType.NOT_FOUND, {"file_path": file_path}
             )
 
         if not full_path.is_file():
             return create_error_response(
-                f"Path is not a file: {file_path}",
-                ErrorType.VALIDATION,
-                {"file_path": file_path}
+                f"Path is not a file: {file_path}", ErrorType.VALIDATION, {"file_path": file_path}
             )
 
         # Read file content
         try:
-            content = full_path.read_text(encoding='utf-8-sig')
+            content = full_path.read_text(encoding="utf-8-sig")
         except Exception as e:
             return create_error_response(
-                f"Failed to read file: {e}",
-                ErrorType.EXECUTION,
-                {"file_path": file_path}
+                f"Failed to read file: {e}", ErrorType.EXECUTION, {"file_path": file_path}
             )
 
         # Check if old_string exists
@@ -112,7 +107,7 @@ class EditTool(Tool):
             return create_error_response(
                 f"String not found in file",
                 ErrorType.VALIDATION,
-                {"file_path": file_path, "hint": hint, "old_string_preview": old_string[:100]}
+                {"file_path": file_path, "hint": hint, "old_string_preview": old_string[:100]},
             )
 
         # Check uniqueness (unless replace_all)
@@ -127,8 +122,8 @@ class EditTool(Tool):
                     "file_path": file_path,
                     "occurrence_count": count,
                     "locations": locations[:5],  # Show first 5 locations
-                    "hint": "Add more surrounding context to old_string to make it unique"
-                }
+                    "hint": "Add more surrounding context to old_string to make it unique",
+                },
             )
 
         # Perform replacement
@@ -149,8 +144,8 @@ class EditTool(Tool):
                 {
                     "file_path": file_path,
                     "hint": "The old_string was not found in the file. Check for whitespace differences (tabs vs spaces) or line ending differences.",
-                    "file_preview": content[:500]
-                }
+                    "file_preview": content[:500],
+                },
             )
 
         # Show diff preview
@@ -163,9 +158,7 @@ class EditTool(Tool):
                 if self.console:
                     self.console.print("[red]Cancelled by user[/red]")
                 return create_permission_denial(
-                    "Edit cancelled by user",
-                    "edit",
-                    {"file_path": file_path}
+                    "Edit cancelled by user", "edit", {"file_path": file_path}
                 )
 
         # Backup before edit
@@ -178,34 +171,36 @@ class EditTool(Tool):
             invalidate_file(full_path)
         except Exception as e:
             return create_error_response(
-                f"Failed to write file: {e}",
-                ErrorType.EXECUTION,
-                {"file_path": file_path}
+                f"Failed to write file: {e}", ErrorType.EXECUTION, {"file_path": file_path}
             )
 
         if self.console:
-            self.console.print(f"[green]Edited {file_path}[/green] ({replacements} replacement{'s' if replacements > 1 else ''})")
+            self.console.print(
+                f"[green]Edited {file_path}[/green] ({replacements} replacement{'s' if replacements > 1 else ''})"
+            )
 
-        return create_success_response({
-            "file": file_path,
-            "replacements": replacements,
-            "old_string_length": len(old_string),
-            "new_string_length": len(new_string)
-        })
+        return create_success_response(
+            {
+                "file": file_path,
+                "replacements": replacements,
+                "old_string_length": len(old_string),
+                "new_string_length": len(new_string),
+            }
+        )
 
     def _get_match_hint(self, content: str, search_string: str) -> str:
         """Generate helpful hint when string not found."""
         hints = []
 
         # Check for common issues
-        if '\\n' in search_string:
+        if "\\n" in search_string:
             hints.append("Literal '\\n' found in search - use actual newlines instead")
 
-        if '\\t' in search_string:
+        if "\\t" in search_string:
             hints.append("Literal '\\t' found in search - use actual tabs instead")
 
         # Check for similar strings
-        lines = content.split('\n')
+        lines = content.split("\n")
         search_lower = search_string.lower().strip()
 
         for i, line in enumerate(lines):
@@ -218,26 +213,32 @@ class EditTool(Tool):
             hints.append("Search string has leading/trailing whitespace")
 
         if not hints:
-            hints.append("Make sure old_string matches exactly, including indentation and whitespace")
+            hints.append(
+                "Make sure old_string matches exactly, including indentation and whitespace"
+            )
 
         return "; ".join(hints)
 
     def _find_occurrences(self, content: str, search_string: str) -> List[Dict[str, Any]]:
         """Find all occurrences of search string with line numbers."""
         occurrences = []
-        lines = content.split('\n')
+        lines = content.split("\n")
         current_pos = 0
 
         for line_num, line in enumerate(lines, 1):
             while True:
-                pos = line.find(search_string.split('\n')[0] if '\n' in search_string else search_string)
+                pos = line.find(
+                    search_string.split("\n")[0] if "\n" in search_string else search_string
+                )
                 if pos == -1:
                     break
-                occurrences.append({
-                    "line": line_num,
-                    "column": pos + 1,
-                    "preview": line[max(0, pos - 20):pos + 50].strip()
-                })
+                occurrences.append(
+                    {
+                        "line": line_num,
+                        "column": pos + 1,
+                        "preview": line[max(0, pos - 20) : pos + 50].strip(),
+                    }
+                )
                 # For multi-line strings, only find the first match per search
                 break
             current_pos += len(line) + 1
@@ -245,39 +246,34 @@ class EditTool(Tool):
         return occurrences
 
     def _show_diff(
-        self,
-        file_path: str,
-        old_content: str,
-        new_content: str,
-        old_string: str,
-        new_string: str
+        self, file_path: str, old_content: str, new_content: str, old_string: str, new_string: str
     ) -> None:
         """Show a diff preview of the changes."""
         # Generate unified diff
         old_lines = old_content.splitlines(keepends=True)
         new_lines = new_content.splitlines(keepends=True)
 
-        diff = list(difflib.unified_diff(
-            old_lines,
-            new_lines,
-            fromfile=f"a/{file_path}",
-            tofile=f"b/{file_path}",
-            lineterm=""
-        ))
+        diff = list(
+            difflib.unified_diff(
+                old_lines,
+                new_lines,
+                fromfile=f"a/{file_path}",
+                tofile=f"b/{file_path}",
+                lineterm="",
+            )
+        )
 
         if diff:
             # Limit diff output
-            diff_text = ''.join(diff[:50])
+            diff_text = "".join(diff[:50])
             if len(diff) > 50:
                 diff_text += f"\n... ({len(diff) - 50} more lines)"
 
             # Use Syntax for diff highlighting
             syntax = Syntax(diff_text, "diff", theme="monokai")
-            self.console.print(Panel(
-                syntax,
-                title=f"Changes to {file_path}",
-                border_style="yellow"
-            ))
+            self.console.print(
+                Panel(syntax, title=f"Changes to {file_path}", border_style="yellow")
+            )
         else:
             # Fallback: show simple before/after
             text = Text()

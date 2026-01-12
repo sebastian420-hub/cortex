@@ -9,10 +9,12 @@ from .command_tools import ExecuteCommandTool
 from .search_tools import ListFilesTool, SearchFilesTool
 from .git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GitLogTool
 from .test_tools import RunTestsTool
+
 # New Phase 1 tools
 from .grep_tool import GrepTool
 from .glob_tool import GlobTool
 from .edit_tool import EditTool
+
 # Phase 3 web tools
 from .web_tools import WebFetchTool, WebSearchTool, clear_fetch_cache
 from .todo_tool import (
@@ -37,6 +39,7 @@ from ..subagent import TaskTool, TASK_TOOL_SCHEMA
 if TYPE_CHECKING:
     from ..agent import Cortex
     from ..utils.timeouts import TimeoutConfig
+    from ..core.transaction import TransactionManager
 
 # Tool definitions matching Anthropic's function calling format
 # NOTE: This list is kept for backward compatibility.
@@ -52,20 +55,20 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Relative path to the file from project root"
+                        "description": "Relative path to the file from project root",
                     },
                     "offset": {
                         "type": "integer",
-                        "description": "Line number to start reading from (0-indexed). Useful for large files."
+                        "description": "Line number to start reading from (0-indexed). Useful for large files.",
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of lines to read. Default: 2000 lines."
-                    }
+                        "description": "Maximum number of lines to read. Default: 2000 lines.",
+                    },
                 },
-                "required": ["path"]
-            }
-        }
+                "required": ["path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -75,18 +78,12 @@ TOOLS: List[Dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "Relative path to the file"
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Complete file content to write"
-                    }
+                    "path": {"type": "string", "description": "Relative path to the file"},
+                    "content": {"type": "string", "description": "Complete file content to write"},
                 },
-                "required": ["path", "content"]
-            }
-        }
+                "required": ["path", "content"],
+            },
+        },
     },
     {
         "type": "function",
@@ -96,18 +93,15 @@ TOOLS: List[Dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The shell command to execute"
-                    },
+                    "command": {"type": "string", "description": "The shell command to execute"},
                     "reason": {
                         "type": "string",
-                        "description": "Brief explanation of why this command is needed"
-                    }
+                        "description": "Brief explanation of why this command is needed",
+                    },
                 },
-                "required": ["command", "reason"]
-            }
-        }
+                "required": ["command", "reason"],
+            },
+        },
     },
     {
         "type": "function",
@@ -119,16 +113,16 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Directory path to list (default: current directory)"
+                        "description": "Directory path to list (default: current directory)",
                     },
                     "pattern": {
                         "type": "string",
-                        "description": "Optional glob pattern to filter files (e.g., '*.py')"
-                    }
+                        "description": "Optional glob pattern to filter files (e.g., '*.py')",
+                    },
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -138,18 +132,15 @@ TOOLS: List[Dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Text to search for"
-                    },
+                    "query": {"type": "string", "description": "Text to search for"},
                     "file_pattern": {
                         "type": "string",
-                        "description": "Limit search to files matching pattern (e.g., '*.py')"
-                    }
+                        "description": "Limit search to files matching pattern (e.g., '*.py')",
+                    },
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -161,45 +152,45 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Regex pattern to search for (e.g., 'def.*async', 'class\\s+\\w+')"
+                        "description": "Regex pattern to search for (e.g., 'def.*async', 'class\\s+\\w+')",
                     },
                     "path": {
                         "type": "string",
-                        "description": "Directory or file to search in (default: current directory)"
+                        "description": "Directory or file to search in (default: current directory)",
                     },
                     "glob": {
                         "type": "string",
-                        "description": "Glob pattern to filter files (e.g., '*.py', '*.{ts,tsx}')"
+                        "description": "Glob pattern to filter files (e.g., '*.py', '*.{ts,tsx}')",
                     },
                     "file_type": {
                         "type": "string",
-                        "description": "File type to search (e.g., 'py', 'js', 'rust', 'go')"
+                        "description": "File type to search (e.g., 'py', 'js', 'rust', 'go')",
                     },
                     "output_mode": {
                         "type": "string",
                         "enum": ["files_with_matches", "content", "count"],
-                        "description": "Output mode: 'files_with_matches' (default), 'content' (show matches), 'count' (match counts)"
+                        "description": "Output mode: 'files_with_matches' (default), 'content' (show matches), 'count' (match counts)",
                     },
                     "case_insensitive": {
                         "type": "boolean",
-                        "description": "Case insensitive search (default: false)"
+                        "description": "Case insensitive search (default: false)",
                     },
                     "context": {
                         "type": "integer",
-                        "description": "Lines of context before and after matches"
+                        "description": "Lines of context before and after matches",
                     },
                     "multiline": {
                         "type": "boolean",
-                        "description": "Enable multiline matching (default: false)"
+                        "description": "Enable multiline matching (default: false)",
                     },
                     "head_limit": {
                         "type": "integer",
-                        "description": "Limit number of results (default: 50)"
-                    }
+                        "description": "Limit number of results (default: 50)",
+                    },
                 },
-                "required": ["pattern"]
-            }
-        }
+                "required": ["pattern"],
+            },
+        },
     },
     {
         "type": "function",
@@ -211,24 +202,24 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Glob pattern to match (e.g., '**/*.py', 'src/**/*.ts', '*.md')"
+                        "description": "Glob pattern to match (e.g., '**/*.py', 'src/**/*.ts', '*.md')",
                     },
                     "path": {
                         "type": "string",
-                        "description": "Base directory to search from (default: current directory)"
+                        "description": "Base directory to search from (default: current directory)",
                     },
                     "include_hidden": {
                         "type": "boolean",
-                        "description": "Include hidden files/directories (default: false)"
+                        "description": "Include hidden files/directories (default: false)",
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum number of results (default: 500)"
-                    }
+                        "description": "Maximum number of results (default: 500)",
+                    },
                 },
-                "required": ["pattern"]
-            }
-        }
+                "required": ["pattern"],
+            },
+        },
     },
     {
         "type": "function",
@@ -238,38 +229,31 @@ TOOLS: List[Dict[str, Any]] = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "file_path": {
-                        "type": "string",
-                        "description": "Path to the file to edit"
-                    },
+                    "file_path": {"type": "string", "description": "Path to the file to edit"},
                     "old_string": {
                         "type": "string",
-                        "description": "Exact text to replace (must be unique in file unless using replace_all)"
+                        "description": "Exact text to replace (must be unique in file unless using replace_all)",
                     },
                     "new_string": {
                         "type": "string",
-                        "description": "Text to replace it with (must be different from old_string)"
+                        "description": "Text to replace it with (must be different from old_string)",
                     },
                     "replace_all": {
                         "type": "boolean",
-                        "description": "Replace all occurrences (default: false, requires unique match)"
-                    }
+                        "description": "Replace all occurrences (default: false, requires unique match)",
+                    },
                 },
-                "required": ["file_path", "old_string", "new_string"]
-            }
-        }
+                "required": ["file_path", "old_string", "new_string"],
+            },
+        },
     },
     {
         "type": "function",
         "function": {
             "name": "git_status",
             "description": "Show git status and uncommitted changes. Use this when the user explicitly requests git status or wants to see what files have changed. Do NOT use this for greetings, general questions, or casual conversation.",
-            "parameters": {
-                "type": "object",
-                "properties": {},
-                "required": []
-            }
-        }
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
     },
     {
         "type": "function",
@@ -281,12 +265,12 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "File path (optional, shows all changes if omitted)"
+                        "description": "File path (optional, shows all changes if omitted)",
                     }
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -295,15 +279,10 @@ TOOLS: List[Dict[str, Any]] = [
             "description": "Commit changes with a message. Use this when the user explicitly requests to commit changes. Do NOT use this for greetings, general questions, or casual conversation.",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "Commit message"
-                    }
-                },
-                "required": ["message"]
-            }
-        }
+                "properties": {"message": {"type": "string", "description": "Commit message"}},
+                "required": ["message"],
+            },
+        },
     },
     {
         "type": "function",
@@ -315,12 +294,12 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "limit": {
                         "type": "integer",
-                        "description": "Number of commits to show (default: 10)"
+                        "description": "Number of commits to show (default: 10)",
                     }
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -332,16 +311,13 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Test pattern (e.g., 'test_auth.py' or 'tests/test_auth.py')"
+                        "description": "Test pattern (e.g., 'test_auth.py' or 'tests/test_auth.py')",
                     },
-                    "verbose": {
-                        "type": "boolean",
-                        "description": "Verbose output"
-                    }
+                    "verbose": {"type": "boolean", "description": "Verbose output"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     # Phase 3 Web tools
     {
@@ -354,20 +330,20 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "The URL to fetch (e.g., 'https://docs.python.org/3/library/json.html')"
+                        "description": "The URL to fetch (e.g., 'https://docs.python.org/3/library/json.html')",
                     },
                     "prompt": {
                         "type": "string",
-                        "description": "Optional: What to extract/analyze from the content"
+                        "description": "Optional: What to extract/analyze from the content",
                     },
                     "max_content_length": {
                         "type": "integer",
-                        "description": "Maximum content length to return (default: 50000)"
-                    }
+                        "description": "Maximum content length to return (default: 50000)",
+                    },
                 },
-                "required": ["url"]
-            }
-        }
+                "required": ["url"],
+            },
+        },
     },
     {
         "type": "function",
@@ -379,26 +355,26 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query (e.g., 'python requests library documentation')"
+                        "description": "Search query (e.g., 'python requests library documentation')",
                     },
                     "max_results": {
                         "type": "integer",
-                        "description": "Maximum number of results (default: 10)"
+                        "description": "Maximum number of results (default: 10)",
                     },
                     "allowed_domains": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Only include results from these domains"
+                        "description": "Only include results from these domains",
                     },
                     "blocked_domains": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "description": "Exclude results from these domains"
-                    }
+                        "description": "Exclude results from these domains",
+                    },
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     # Task tool for subagent delegation
     TASK_TOOL_SCHEMA,
@@ -415,7 +391,8 @@ def create_tool_instance(
     permission_mode: str,
     console,
     parent_agent: Optional["Cortex"] = None,
-    timeout_config: Optional["TimeoutConfig"] = None
+    timeout_config: Optional["TimeoutConfig"] = None,
+    transaction_manager: Optional["TransactionManager"] = None,
 ) -> Tool:
     """
     Create a tool instance by name.
@@ -430,6 +407,7 @@ def create_tool_instance(
         console: Console instance for output
         parent_agent: Parent agent instance (required for task tool)
         timeout_config: Optional timeout configuration for tool operations
+        transaction_manager: Optional transaction manager for file operations
 
     Returns:
         Tool instance
@@ -444,7 +422,7 @@ def create_tool_instance(
             permission_mode=permission_mode,
             console=console,
             parent_agent=parent_agent,
-            timeout_config=timeout_config
+            timeout_config=timeout_config,
         )
 
     # Special handling for todo_write tool
@@ -453,7 +431,7 @@ def create_tool_instance(
             project_dir=project_dir,
             permission_mode=permission_mode,
             console=console,
-            timeout_config=timeout_config
+            timeout_config=timeout_config,
         )
 
     # Special handling for ask_user_question tool
@@ -462,12 +440,16 @@ def create_tool_instance(
             project_dir=project_dir,
             permission_mode=permission_mode,
             console=console,
-            timeout_config=timeout_config
+            timeout_config=timeout_config,
         )
 
     return get_registry().create_instance(
-        tool_name, project_dir, permission_mode, console,
-        timeout_config=timeout_config
+        tool_name,
+        project_dir,
+        permission_mode,
+        console,
+        timeout_config=timeout_config,
+        transaction_manager=transaction_manager,
     )
 
 
@@ -518,4 +500,3 @@ __all__ = [
     "get_registry",
     "reset_registry",
 ]
-

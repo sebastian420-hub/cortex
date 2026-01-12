@@ -23,9 +23,9 @@ class SubagentContext:
     parent_context: Dict[str, Any] = field(default_factory=dict)
 
     # Constraints
-    allowed_tools: List[str] = field(default_factory=lambda: [
-        "read_file", "list_files", "search_files"
-    ])
+    allowed_tools: List[str] = field(
+        default_factory=lambda: ["read_file", "list_files", "search_files"]
+    )
     max_iterations: int = 10
     timeout_seconds: int = 300
     working_directory: Optional[Path] = None

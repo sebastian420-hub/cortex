@@ -13,37 +13,29 @@ def show_file_diff(old_content: str, new_content: str, path: str) -> None:
     """Show a visual diff between old and new file content"""
     old_lines = old_content.splitlines(keepends=True)
     new_lines = new_content.splitlines(keepends=True)
-    
+
     diff = difflib.unified_diff(
-        old_lines,
-        new_lines,
-        fromfile=f"old/{path}",
-        tofile=f"new/{path}",
-        lineterm=""
+        old_lines, new_lines, fromfile=f"old/{path}", tofile=f"new/{path}", lineterm=""
     )
-    
+
     diff_text = "".join(diff)
-    
+
     if diff_text:
-        console.print(Panel(
-            diff_text,
-            title=f"📊 Diff: {path}",
-            border_style="yellow"
-        ))
+        console.print(Panel(diff_text, title=f"📊 Diff: {path}", border_style="yellow"))
     else:
         console.print(f"[dim]No changes in {path}[/dim]")
 
 
 def show_file_preview(content: str, path: str, max_lines: int = 20) -> None:
     """Show a syntax-highlighted preview of file content"""
-    ext = path.split('.')[-1] if '.' in path else "txt"
-    content_lines = content.split('\n')
+    ext = path.split(".")[-1] if "." in path else "txt"
+    content_lines = content.split("\n")
     preview_lines = content_lines[:max_lines]
-    preview = '\n'.join(preview_lines)
+    preview = "\n".join(preview_lines)
     if len(content_lines) > max_lines:
         more_lines = len(content_lines) - max_lines
         preview += f"\n... ({more_lines} more lines)"
-    
+
     syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
     console.print(Panel(syntax, title=f"📄 {path}", border_style="cyan"))
 
@@ -60,9 +52,7 @@ def warn_large_file(size: int, threshold: int = 100000) -> bool:
 
 
 def display_thinking(
-    reasoning_content: str,
-    expanded: bool = False,
-    max_preview_length: int = 80
+    reasoning_content: str, expanded: bool = False, max_preview_length: int = 80
 ) -> None:
     """
     Display reasoning/thinking content from models like DeepSeek.
@@ -82,15 +72,17 @@ def display_thinking(
 
     if expanded:
         # Full display with panel
-        console.print(Panel(
-            content,
-            title="[bold yellow]💭 Thinking[/bold yellow]",
-            border_style="yellow",
-            padding=(0, 1)
-        ))
+        console.print(
+            Panel(
+                content,
+                title="[bold yellow]💭 Thinking[/bold yellow]",
+                border_style="yellow",
+                padding=(0, 1),
+            )
+        )
     else:
         # Minimal one-liner preview (no panel, no box)
-        lines = content.split('\n')
+        lines = content.split("\n")
         first_line = lines[0].strip() if lines else ""
 
         # Truncate if too long
@@ -105,10 +97,7 @@ def display_thinking(
 
 
 def display_progress_summary(
-    operation: str,
-    completed: int,
-    total: int = None,
-    details: str = ""
+    operation: str, completed: int, total: int = None, details: str = ""
 ) -> None:
     """
     Display a progress summary for operations.
@@ -132,10 +121,7 @@ def display_progress_summary(
 
 
 def display_operation_complete(
-    operation: str,
-    success: bool = True,
-    summary: str = "",
-    duration_ms: float = None
+    operation: str, success: bool = True, summary: str = "", duration_ms: float = None
 ) -> None:
     """
     Display operation completion status.
@@ -161,4 +147,3 @@ def display_operation_complete(
             parts.append(f"[dim]({duration_ms/1000:.1f}s)[/dim]")
 
     console.print(" ".join(parts))
-

@@ -53,9 +53,7 @@ class LoggingHook(BaseHook):
         self.logger = logging.getLogger("cortex.hooks")
         if log_file:
             handler = logging.FileHandler(log_file)
-            handler.setFormatter(
-                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            )
+            handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
             self.logger.addHandler(handler)
 
     def execute(self, event: HookEvent) -> HookResult:
@@ -135,15 +133,11 @@ class PermissionHook(BaseHook):
 
         # Check if tool is blocked
         if tool_name in self.blocked:
-            return HookResult.abort_operation(
-                f"Tool '{tool_name}' is blocked by permission policy"
-            )
+            return HookResult.abort_operation(f"Tool '{tool_name}' is blocked by permission policy")
 
         # Check whitelist if enabled
         if self.allowed is not None and tool_name not in self.allowed:
-            return HookResult.abort_operation(
-                f"Tool '{tool_name}' is not in the allowed list"
-            )
+            return HookResult.abort_operation(f"Tool '{tool_name}' is not in the allowed list")
 
         # Check if approval is required
         if tool_name in self.require_approval:
@@ -151,7 +145,7 @@ class PermissionHook(BaseHook):
             # For now, we just add metadata to indicate approval is needed
             return HookResult(
                 action=HookAction.CONTINUE,
-                metadata={"requires_approval": True, "tool_name": tool_name}
+                metadata={"requires_approval": True, "tool_name": tool_name},
             )
 
         return HookResult.continue_execution()
@@ -170,18 +164,18 @@ class CommandBlockerHook(BaseHook):
 
     # Default dangerous patterns
     DEFAULT_BLOCKED_PATTERNS = [
-        r"rm\s+-rf\s+/",           # rm -rf /
-        r"rm\s+-rf\s+~",           # rm -rf ~
-        r"rm\s+-rf\s+\*",          # rm -rf *
-        r"sudo\s+rm",              # sudo rm
-        r"mkfs\.",                 # mkfs.* (format disk)
-        r"dd\s+if=.*of=/dev",      # dd to device
-        r">\s*/dev/sd[a-z]",       # Write to disk device
+        r"rm\s+-rf\s+/",  # rm -rf /
+        r"rm\s+-rf\s+~",  # rm -rf ~
+        r"rm\s+-rf\s+\*",  # rm -rf *
+        r"sudo\s+rm",  # sudo rm
+        r"mkfs\.",  # mkfs.* (format disk)
+        r"dd\s+if=.*of=/dev",  # dd to device
+        r">\s*/dev/sd[a-z]",  # Write to disk device
         r":\(\)\s*\{\s*:\|:&\s*\};:",  # Fork bomb
-        r"chmod\s+-R\s+777\s+/",   # Chmod 777 root
-        r"wget.*\|\s*sh",          # Download and execute
-        r"curl.*\|\s*sh",          # Download and execute
-        r"curl.*\|\s*bash",        # Download and execute
+        r"chmod\s+-R\s+777\s+/",  # Chmod 777 root
+        r"wget.*\|\s*sh",  # Download and execute
+        r"curl.*\|\s*sh",  # Download and execute
+        r"curl.*\|\s*bash",  # Download and execute
     ]
 
     def __init__(
@@ -224,9 +218,7 @@ class CommandBlockerHook(BaseHook):
 
         # Check exact matches
         if command in self.blocked_commands:
-            return HookResult.abort_operation(
-                f"Command '{command}' is blocked by security policy"
-            )
+            return HookResult.abort_operation(f"Command '{command}' is blocked by security policy")
 
         # Check patterns
         for pattern in self.patterns:
@@ -273,9 +265,7 @@ class IterationLimitHook(BaseHook):
 
         # Force stop if at max iterations
         if iteration >= self.max_iterations:
-            return HookResult.abort_operation(
-                f"Maximum iterations ({self.max_iterations}) reached"
-            )
+            return HookResult.abort_operation(f"Maximum iterations ({self.max_iterations}) reached")
 
         # Warn if approaching limit
         if iteration >= self.warn_at:
@@ -355,5 +345,7 @@ class MetricsHook(BaseHook):
             "tool_calls": dict(self.tool_calls),
             "tool_successes": dict(self.tool_successes),
             "tool_failures": dict(self.tool_failures),
-            "session_start": self.session_start_time.isoformat() if self.session_start_time else None,
+            "session_start": (
+                self.session_start_time.isoformat() if self.session_start_time else None
+            ),
         }

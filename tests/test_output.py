@@ -134,7 +134,9 @@ class TestJSONFormatter:
         stream = StringIO()
         formatter = JSONFormatter(stream=stream)
 
-        formatted = formatter.format_tool_call("write_file", {"path": "test.txt", "content": "test"})
+        formatted = formatter.format_tool_call(
+            "write_file", {"path": "test.txt", "content": "test"}
+        )
 
         data = json.loads(formatted)
         assert data["type"] == "tool_call"

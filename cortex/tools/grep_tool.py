@@ -83,9 +83,7 @@ class GrepTool(Tool):
 
         if not full_path.exists():
             return create_error_response(
-                f"Path not found: {path}",
-                ErrorType.NOT_FOUND,
-                {"path": path}
+                f"Path not found: {path}", ErrorType.NOT_FOUND, {"path": path}
             )
 
         # Validate output mode
@@ -94,7 +92,7 @@ class GrepTool(Tool):
             return create_error_response(
                 f"Invalid output_mode: {output_mode}. Must be one of: {valid_modes}",
                 ErrorType.VALIDATION,
-                {"output_mode": output_mode}
+                {"output_mode": output_mode},
             )
 
         # Use context if specified (overrides context_before/after)
@@ -105,15 +103,33 @@ class GrepTool(Tool):
         # Try ripgrep first, fall back to Python
         if self._has_ripgrep():
             result = self._search_with_ripgrep(
-                pattern, full_path, glob, file_type, output_mode,
-                case_insensitive, context_before, context_after,
-                multiline, head_limit, offset, show_line_numbers
+                pattern,
+                full_path,
+                glob,
+                file_type,
+                output_mode,
+                case_insensitive,
+                context_before,
+                context_after,
+                multiline,
+                head_limit,
+                offset,
+                show_line_numbers,
             )
         else:
             result = self._search_with_python(
-                pattern, full_path, glob, file_type, output_mode,
-                case_insensitive, multiline, head_limit, offset,
-                show_line_numbers, context_before, context_after
+                pattern,
+                full_path,
+                glob,
+                file_type,
+                output_mode,
+                case_insensitive,
+                multiline,
+                head_limit,
+                offset,
+                show_line_numbers,
+                context_before,
+                context_after,
             )
 
         # Display results
@@ -128,11 +144,7 @@ class GrepTool(Tool):
             return GrepTool._ripgrep_available
 
         try:
-            subprocess.run(
-                ["rg", "--version"],
-                capture_output=True,
-                timeout=5
-            )
+            subprocess.run(["rg", "--version"], capture_output=True, timeout=5)
             GrepTool._ripgrep_available = True
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
             GrepTool._ripgrep_available = False
@@ -197,20 +209,18 @@ class GrepTool(Tool):
                 capture_output=True,
                 text=True,
                 timeout=self.get_timeout(),
-                cwd=str(self.project_dir)
+                cwd=str(self.project_dir),
             )
 
             output = result.stdout
 
             if not output.strip():
-                return create_success_response({
-                    "results": [],
-                    "match_count": 0,
-                    "message": "No matches found"
-                })
+                return create_success_response(
+                    {"results": [], "match_count": 0, "message": "No matches found"}
+                )
 
             # Parse output
-            lines = output.strip().split('\n')
+            lines = output.strip().split("\n")
 
             # Apply offset and limit
             if offset > 0:
@@ -222,25 +232,36 @@ class GrepTool(Tool):
             else:
                 truncated = False
 
-            return create_success_response({
-                "results": lines,
-                "match_count": len(lines),
-                "truncated": truncated,
-                "engine": "ripgrep"
-            })
+            return create_success_response(
+                {
+                    "results": lines,
+                    "match_count": len(lines),
+                    "truncated": truncated,
+                    "engine": "ripgrep",
+                }
+            )
 
         except subprocess.TimeoutExpired:
             return create_error_response(
                 f"Search timed out after {self.get_timeout()} seconds",
                 ErrorType.TIMEOUT,
-                {"pattern": pattern, "path": str(path)}
+                {"pattern": pattern, "path": str(path)},
             )
         except Exception as e:
             # Fall back to Python on any ripgrep error
             return self._search_with_python(
-                pattern, path, glob, file_type, output_mode,
-                case_insensitive, multiline, head_limit, offset,
-                show_line_numbers, context_before, context_after
+                pattern,
+                path,
+                glob,
+                file_type,
+                output_mode,
+                case_insensitive,
+                multiline,
+                head_limit,
+                offset,
+                show_line_numbers,
+                context_before,
+                context_after,
             )
 
     def _search_with_python(
@@ -271,9 +292,7 @@ class GrepTool(Tool):
             regex = re.compile(pattern, flags)
         except re.error as e:
             return create_error_response(
-                f"Invalid regex pattern: {e}",
-                ErrorType.VALIDATION,
-                {"pattern": pattern}
+                f"Invalid regex pattern: {e}", ErrorType.VALIDATION, {"pattern": pattern}
             )
 
         # Find files to search
@@ -284,8 +303,8 @@ class GrepTool(Tool):
 
         for file_path in files:
             try:
-                content = file_path.read_text(errors='ignore')
-                lines = content.split('\n')
+                content = file_path.read_text(encoding="utf-8-sig", errors="ignore")
+                lines = content.split("\n")
 
                 if multiline:
                     # Multiline search - match across lines
@@ -299,7 +318,7 @@ class GrepTool(Tool):
                         elif output_mode == "content":
                             for match in matches:
                                 # Find line number
-                                line_num = content[:match.start()].count('\n') + 1
+                                line_num = content[: match.start()].count("\n") + 1
                                 matched_text = match.group()
                                 # Truncate long matches
                                 if len(matched_text) > 200:
@@ -330,9 +349,13 @@ class GrepTool(Tool):
                                     for ctx_line_num in range(start, end):
                                         prefix = "--" if ctx_line_num != line_num - 1 else ""
                                         if show_line_numbers:
-                                            results.append(f"{rel_path}:{ctx_line_num + 1}{prefix}: {lines[ctx_line_num]}")
+                                            results.append(
+                                                f"{rel_path}:{ctx_line_num + 1}{prefix}: {lines[ctx_line_num]}"
+                                            )
                                         else:
-                                            results.append(f"{rel_path}{prefix}: {lines[ctx_line_num]}")
+                                            results.append(
+                                                f"{rel_path}{prefix}: {lines[ctx_line_num]}"
+                                            )
                                 else:
                                     if show_line_numbers:
                                         results.append(f"{rel_path}:{line_num}: {line_content}")
@@ -358,25 +381,22 @@ class GrepTool(Tool):
             truncated = False
 
         if not results:
-            return create_success_response({
-                "results": [],
-                "match_count": 0,
-                "message": "No matches found"
-            })
+            return create_success_response(
+                {"results": [], "match_count": 0, "message": "No matches found"}
+            )
 
-        return create_success_response({
-            "results": results,
-            "match_count": len(results),
-            "total_matches": total_results,
-            "truncated": truncated,
-            "engine": "python"
-        })
+        return create_success_response(
+            {
+                "results": results,
+                "match_count": len(results),
+                "total_matches": total_results,
+                "truncated": truncated,
+                "engine": "python",
+            }
+        )
 
     def _find_files(
-        self,
-        path: Path,
-        glob_pattern: Optional[str],
-        file_type: Optional[str]
+        self, path: Path, glob_pattern: Optional[str], file_type: Optional[str]
     ) -> List[Path]:
         """Find files to search based on filters."""
 
@@ -440,15 +460,45 @@ class GrepTool(Tool):
                 continue
             # Skip hidden files and common binary/generated directories
             parts = f.relative_to(path).parts
-            skip_dirs = {'.git', '.svn', '.hg', 'node_modules', '__pycache__',
-                        '.venv', 'venv', '.tox', '.eggs', 'dist', 'build',
-                        '.mypy_cache', '.pytest_cache', '.coverage'}
-            if any(part.startswith('.') or part in skip_dirs for part in parts):
+            skip_dirs = {
+                ".git",
+                ".svn",
+                ".hg",
+                "node_modules",
+                "__pycache__",
+                ".venv",
+                "venv",
+                ".tox",
+                ".eggs",
+                "dist",
+                "build",
+                ".mypy_cache",
+                ".pytest_cache",
+                ".coverage",
+            }
+            if any(part.startswith(".") or part in skip_dirs for part in parts):
                 continue
             # Skip likely binary files
-            binary_extensions = {'.pyc', '.pyo', '.so', '.dll', '.exe', '.bin',
-                               '.png', '.jpg', '.jpeg', '.gif', '.ico', '.pdf',
-                               '.zip', '.tar', '.gz', '.7z', '.whl', '.egg'}
+            binary_extensions = {
+                ".pyc",
+                ".pyo",
+                ".so",
+                ".dll",
+                ".exe",
+                ".bin",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".ico",
+                ".pdf",
+                ".zip",
+                ".tar",
+                ".gz",
+                ".7z",
+                ".whl",
+                ".egg",
+            }
             if f.suffix.lower() in binary_extensions:
                 continue
             filtered.append(f)
@@ -466,28 +516,24 @@ class GrepTool(Tool):
         # Format output based on mode
         if output_mode == "files_with_matches":
             output = "\n".join(results)
-            self.console.print(Panel(
-                output,
-                title=f"Matching Files ({len(results)})",
-                border_style="cyan"
-            ))
+            self.console.print(
+                Panel(output, title=f"Matching Files ({len(results)})", border_style="cyan")
+            )
         elif output_mode == "count":
             output = "\n".join(results)
-            self.console.print(Panel(
-                output,
-                title="Match Counts",
-                border_style="cyan"
-            ))
+            self.console.print(Panel(output, title="Match Counts", border_style="cyan"))
         else:
             # Content mode - show with syntax highlighting hints
             output = "\n".join(results[:30])  # Limit display
             if len(results) > 30:
                 output += f"\n... and {len(results) - 30} more matches"
-            self.console.print(Panel(
-                output,
-                title=f"Search Results ({result.get('match_count', 0)} matches)",
-                border_style="cyan"
-            ))
+            self.console.print(
+                Panel(
+                    output,
+                    title=f"Search Results ({result.get('match_count', 0)} matches)",
+                    border_style="cyan",
+                )
+            )
 
         # Show if truncated
         if result.get("truncated"):

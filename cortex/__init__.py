@@ -6,10 +6,4 @@ from .agent import Cortex
 from .models import PermissionMode
 from .config import AgentConfig
 
-__all__ = [
-    "Cortex",
-    "PermissionMode",
-    "AgentConfig",
-    "__version__"
-]
-
+__all__ = ["Cortex", "PermissionMode", "AgentConfig", "__version__"]

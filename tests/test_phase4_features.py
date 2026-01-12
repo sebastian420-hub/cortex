@@ -25,11 +25,13 @@ class TestMemoryBank:
     def test_memory_bank_import(self):
         """Test that MemoryBank can be imported."""
         from cortex.core.memory import MemoryBank
+
         assert MemoryBank is not None
 
     def test_memory_bank_creation(self):
         """Test creating a memory bank."""
         from cortex.core.memory import MemoryBank, create_memory_bank
+
         bank = create_memory_bank(max_items=50)
         assert bank is not None
         assert bank.max_items == 50
@@ -235,6 +237,7 @@ class TestThinkingDisplay:
     def test_display_thinking_import(self):
         """Test that display_thinking can be imported."""
         from cortex.ui.display import display_thinking
+
         assert display_thinking is not None
 
     def test_display_thinking_empty(self):
@@ -245,7 +248,7 @@ class TestThinkingDisplay:
         display_thinking("")
         display_thinking(None)
 
-    @patch('cortex.ui.display.console')
+    @patch("cortex.ui.display.console")
     def test_display_thinking_collapsed(self, mock_console):
         """Test collapsed thinking display - shows minimal one-liner."""
         from cortex.ui.display import display_thinking
@@ -258,7 +261,7 @@ class TestThinkingDisplay:
         assert "💭" in call_args
         assert "dim" in call_args.lower()
 
-    @patch('cortex.ui.display.console')
+    @patch("cortex.ui.display.console")
     def test_display_thinking_expanded(self, mock_console):
         """Test expanded thinking display."""
         from cortex.ui.display import display_thinking
@@ -274,6 +277,7 @@ class TestProgressIndicators:
     def test_operation_tracker_import(self):
         """Test that OperationTracker can be imported."""
         from cortex.ui.progress import OperationTracker
+
         assert OperationTracker is not None
 
     def test_operation_tracker_creation(self):
@@ -286,19 +290,22 @@ class TestProgressIndicators:
     def test_track_files_import(self):
         """Test that track_files can be imported."""
         from cortex.ui.progress import track_files
+
         assert track_files is not None
 
     def test_track_search_import(self):
         """Test that track_search can be imported."""
         from cortex.ui.progress import track_search
+
         assert track_search is not None
 
     def test_show_operation_summary_import(self):
         """Test that show_operation_summary can be imported."""
         from cortex.ui.progress import show_operation_summary
+
         assert show_operation_summary is not None
 
-    @patch('cortex.ui.progress.console')
+    @patch("cortex.ui.progress.console")
     def test_show_operation_summary(self, mock_console):
         """Test showing operation summary."""
         from cortex.ui.progress import show_operation_summary
@@ -314,6 +321,7 @@ class TestEnhancedRecovery:
     def test_recovery_manager_import(self):
         """Test that RecoveryManager can be imported."""
         from cortex.core.recovery import RecoveryManager
+
         assert RecoveryManager is not None
 
     def test_not_found_recovery_enhanced(self):
@@ -326,13 +334,15 @@ class TestEnhancedRecovery:
             error_message="File not found: src/utils/helper.py",
             tool_name="read_file",
             arguments={"path": "src/utils/helper.py"},
-            attempt_count=1
+            attempt_count=1,
         )
 
         action = manager.determine_recovery_action(context)
 
         assert action.strategy == RecoveryStrategy.SUGGEST
-        assert "glob" in action.suggested_prompt.lower() or "search" in action.suggested_prompt.lower()
+        assert (
+            "glob" in action.suggested_prompt.lower() or "search" in action.suggested_prompt.lower()
+        )
         assert "DEBUG" in action.suggested_prompt
 
     def test_execution_recovery_command_not_found(self):
@@ -345,13 +355,16 @@ class TestEnhancedRecovery:
             error_message="'rg' is not recognized as an internal command",
             tool_name="execute_command",
             arguments={"command": "rg pattern"},
-            attempt_count=1
+            attempt_count=1,
         )
 
         action = manager.determine_recovery_action(context)
 
         assert action.strategy == RecoveryStrategy.SUGGEST
-        assert "command not found" in action.suggested_prompt.lower() or "not available" in action.suggested_prompt.lower()
+        assert (
+            "command not found" in action.suggested_prompt.lower()
+            or "not available" in action.suggested_prompt.lower()
+        )
 
     def test_execution_recovery_test_failure(self):
         """Test execution recovery for test failures."""
@@ -363,7 +376,7 @@ class TestEnhancedRecovery:
             error_message="FAILED test_auth.py::test_login - AssertionError",
             tool_name="run_tests",
             arguments={"pattern": "test_auth.py"},
-            attempt_count=1
+            attempt_count=1,
         )
 
         action = manager.determine_recovery_action(context)
@@ -385,7 +398,7 @@ class TestAgentMemoryIntegration:
             permission_mode=PermissionMode.NORMAL,
         )
 
-        assert hasattr(agent, 'memory_bank')
+        assert hasattr(agent, "memory_bank")
         assert agent.memory_bank is not None
 
     def test_agent_has_show_thinking(self, temp_project):
@@ -398,7 +411,7 @@ class TestAgentMemoryIntegration:
             permission_mode=PermissionMode.NORMAL,
         )
 
-        assert hasattr(agent, 'show_thinking')
+        assert hasattr(agent, "show_thinking")
         assert agent.show_thinking is False  # Default
 
     def test_system_prompt_contains_mental_model(self, temp_project):

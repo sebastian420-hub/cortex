@@ -14,7 +14,7 @@ class LoopGuard:
         max_repeats: int = 3,
         stuck_threshold: int = 5,
         buffer_size: int = 10,
-        recovery_manager: Optional["RecoveryManager"] = None
+        recovery_manager: Optional["RecoveryManager"] = None,
     ):
         """
         Initialize loop guard.
@@ -36,15 +36,15 @@ class LoopGuard:
         self.files_read: Set[str] = set()  # Track files read
         self.files_written: Set[str] = set()  # Track files written
         self.iteration_count: int = 0
-    
+
     def check_repeated_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
         """
         Check if same tool called too many times with same arguments.
-        
+
         Args:
             tool_name: Name of the tool
             arguments: Tool arguments (dict or JSON string)
-            
+
         Returns:
             True if tool called too many times, False otherwise
         """
@@ -52,48 +52,51 @@ class LoopGuard:
         if isinstance(arguments, str):
             try:
                 import json
+
                 arguments = json.loads(arguments)
             except (json.JSONDecodeError, TypeError):
                 arguments = {}  # Fallback to empty dict if parsing fails
-        
+
         # Check last N calls (where N = max_repeats)
         # Normalize arguments in history for comparison
         recent_calls = []
-        for name, args in self.tool_call_history[-self.max_repeats:]:
+        for name, args in self.tool_call_history[-self.max_repeats :]:
             # Normalize args if it's a string
             if isinstance(args, str):
                 try:
                     import json
+
                     args = json.loads(args)
                 except (json.JSONDecodeError, TypeError):
                     args = {}
-            
+
             if name == tool_name and args == arguments:
                 recent_calls.append((name, args))
-        
+
         return len(recent_calls) >= self.max_repeats
-    
+
     def check_repeated_error(self, error: Dict[str, Any]) -> bool:
         """
         Check if same error repeated too many times.
-        
+
         Args:
             error: Error dictionary from tool result
-            
+
         Returns:
             True if error repeated too many times, False otherwise
         """
         # Extract error message for comparison
         error_msg = error.get("error", "")
         error_type = error.get("error_type", "")
-        
+
         # Check last N errors
         recent_errors = [
-            e for e in self.error_history[-self.max_repeats:]
+            e
+            for e in self.error_history[-self.max_repeats :]
             if e.get("error") == error_msg and e.get("error_type") == error_type
         ]
         return len(recent_errors) >= self.max_repeats
-    
+
     def record_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """
         Record a tool call in history.
@@ -106,10 +109,11 @@ class LoopGuard:
         if isinstance(arguments, str):
             try:
                 import json
+
                 arguments = json.loads(arguments)
             except (json.JSONDecodeError, TypeError):
                 arguments = {}  # Fallback to empty dict if parsing fails
-        
+
         self.tool_call_history.append((tool_name, arguments))
         # Keep only last N calls to prevent memory growth
         if len(self.tool_call_history) > self.buffer_size:
@@ -139,11 +143,11 @@ class LoopGuard:
         if self.iteration_count > self.stuck_threshold and len(self.unique_operations) == 0:
             return True
         return False
-    
+
     def check_progress(self) -> bool:
         """
         Check if making progress toward goal.
-        
+
         Returns:
             True if making progress, False otherwise
         """
@@ -152,30 +156,31 @@ class LoopGuard:
         # - New unique operations
         # - Decreasing error rate
         return len(self.unique_operations) > 0
-    
+
     def record_operation(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Record a unique operation for progress tracking."""
         # Handle case where arguments might still be a string (defensive check)
         if isinstance(arguments, str):
             try:
                 import json
+
                 arguments = json.loads(arguments)
             except (json.JSONDecodeError, TypeError):
                 arguments = {}  # Fallback to empty dict if parsing fails
-        
+
         op_key = f"{tool_name}:{str(sorted(arguments.items()))}"
         self.unique_operations.add(op_key)
-        
+
         # Track file operations
         if tool_name == "read_file" and "path" in arguments:
             self.files_read.add(arguments["path"])
         elif tool_name == "write_file" and "path" in arguments:
             self.files_written.add(arguments["path"])
-    
+
     def increment_iteration(self) -> None:
         """Increment iteration counter."""
         self.iteration_count += 1
-    
+
     def reset(self) -> None:
         """Reset guard history (useful for testing or new conversation)"""
         self.tool_call_history.clear()
@@ -188,10 +193,7 @@ class LoopGuard:
             self.recovery_manager.reset()
 
     def get_recovery_action(
-        self,
-        error: Dict[str, Any],
-        tool_name: str,
-        arguments: Dict[str, Any]
+        self, error: Dict[str, Any], tool_name: str, arguments: Dict[str, Any]
     ) -> Optional["RecoveryAction"]:
         """
         Get recovery action for an error.
@@ -227,7 +229,8 @@ class LoopGuard:
         error_msg = error.get("error", "")
         error_type = error.get("error_type", "")
         return sum(
-            1 for e in self.error_history
+            1
+            for e in self.error_history
             if e.get("error") == error_msg and e.get("error_type") == error_type
         )
 
@@ -252,4 +255,3 @@ class LoopGuard:
         if self.recovery_manager:
             stats["recovery"] = self.recovery_manager.get_stats()
         return stats
-

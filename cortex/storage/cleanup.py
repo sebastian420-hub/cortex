@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class CleanupStats:
     """Statistics from cleanup operation."""
+
     sessions_removed: int = 0
     bytes_freed: int = 0
     sessions_kept: int = 0
@@ -71,7 +72,7 @@ class SessionCleanupManager:
         """
         try:
             stat = session_file.stat()
-            with open(session_file, 'r', encoding='utf-8') as f:
+            with open(session_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return {
                 "path": session_file,
@@ -243,14 +244,19 @@ class SessionCleanupManager:
             "limit_count": self.max_count,
             "limit_size_mb": self.max_total_size_bytes / (1024 * 1024),
             "limit_age_days": self.max_age_days,
-            "usage_percent_count": round((len(sessions) / self.max_count) * 100, 1) if self.max_count > 0 else 0,
-            "usage_percent_size": round((total_size / self.max_total_size_bytes) * 100, 1) if self.max_total_size_bytes > 0 else 0,
+            "usage_percent_count": (
+                round((len(sessions) / self.max_count) * 100, 1) if self.max_count > 0 else 0
+            ),
+            "usage_percent_size": (
+                round((total_size / self.max_total_size_bytes) * 100, 1)
+                if self.max_total_size_bytes > 0
+                else 0
+            ),
         }
 
 
 def create_cleanup_manager_from_config(
-    sessions_dir: Path,
-    config: Dict[str, Any]
+    sessions_dir: Path, config: Dict[str, Any]
 ) -> SessionCleanupManager:
     """
     Create a SessionCleanupManager from configuration dict.

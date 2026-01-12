@@ -24,7 +24,7 @@ class Tool(ABC):
         permission_mode: str = PermissionMode.NORMAL,
         console=None,
         timeout_config: Optional["TimeoutConfig"] = None,
-        transaction_manager: Optional["TransactionManager"] = None
+        transaction_manager: Optional["TransactionManager"] = None,
     ):
         self.project_dir = project_dir
         self.permission_mode = permission_mode
@@ -52,15 +52,16 @@ class Tool(ABC):
             tool_name = class_name.replace("Tool", "")
             # Convert CamelCase to snake_case
             import re
-            tool_name = re.sub(r'(?<!^)(?=[A-Z])', '_', tool_name).lower()
+
+            tool_name = re.sub(r"(?<!^)(?=[A-Z])", "_", tool_name).lower()
             return self._timeout_config.get_timeout(tool_name, operation)
         return self.default_timeout
-    
+
     @abstractmethod
     def execute(self, **kwargs: Any) -> Dict[str, Any]:
         """Execute the tool with given arguments"""
         pass
-    
+
     def check_permission(self, action: str) -> bool:
         """
         Check if action is allowed based on permission mode.
@@ -98,6 +99,7 @@ class Tool(ABC):
             # Transaction manager not available - log warning but don't block
             # This can happen in tests or if initialization is incomplete
             import logging
+
             logging.warning(
                 f"Transaction manager not available for {operation} on {path}. "
                 f"File modifications will not be backed up for recovery."
@@ -110,5 +112,6 @@ class Tool(ABC):
         except Exception as e:
             # Log the backup failure but don't block the operation
             import logging
+
             logging.warning(f"Backup failed for {path}: {e}")
             return False

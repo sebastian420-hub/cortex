@@ -19,13 +19,15 @@ class RunTestsTool(Tool):
     def _detect_test_framework(self) -> Optional[str]:
         """Detect which test framework is being used"""
         # Check for pytest
-        if (self.project_dir / "pytest.ini").exists() or \
-           (self.project_dir / "pyproject.toml").exists():
+        if (self.project_dir / "pytest.ini").exists() or (
+            self.project_dir / "pyproject.toml"
+        ).exists():
             # Check if pytest is mentioned in pyproject.toml
             try:
                 # Try tomllib (Python 3.11+)
                 try:
                     import tomllib
+
                     with open(self.project_dir / "pyproject.toml", "rb") as f:
                         config = tomllib.load(f)
                         if "tool" in config and "pytest" in config["tool"]:
@@ -34,6 +36,7 @@ class RunTestsTool(Tool):
                     # Fallback to tomli for older Python
                     try:
                         import tomli
+
                         with open(self.project_dir / "pyproject.toml", "rb") as f:
                             config = tomli.load(f)
                             if "tool" in config and "pytest" in config["tool"]:
@@ -42,43 +45,39 @@ class RunTestsTool(Tool):
                         pass
             except:
                 pass
-        
+
         # Check for unittest
-        if (self.project_dir / "tests").exists() or \
-           (self.project_dir / "test").exists():
+        if (self.project_dir / "tests").exists() or (self.project_dir / "test").exists():
             # Check for unittest-style files
-            test_dirs = [
-                self.project_dir / "tests",
-                self.project_dir / "test"
-            ]
+            test_dirs = [self.project_dir / "tests", self.project_dir / "test"]
             for test_dir in test_dirs:
                 if test_dir.exists():
                     for f in test_dir.rglob("test_*.py"):
                         return "unittest"  # Could be unittest or pytest
-        
+
         # Default to pytest if available
         try:
             subprocess.run(["pytest", "--version"], capture_output=True, timeout=2)
             return "pytest"
         except:
             pass
-        
+
         return None
-    
+
     def execute(self, pattern: Optional[str] = None, verbose: bool = False) -> Dict[str, Any]:
         """Run test suite"""
         framework = self._detect_test_framework()
-        
+
         if not framework:
             return create_error_response(
                 "Could not detect test framework. Install pytest or use unittest.",
                 ErrorType.VALIDATION,
-                {"pattern": pattern}
+                {"pattern": pattern},
             )
-        
+
         if self.console:
             self.console.print(f"[blue]🧪 Running tests with {framework}...[/blue]")
-        
+
         try:
             if framework == "pytest":
                 cmd = ["pytest"]
@@ -88,54 +87,51 @@ class RunTestsTool(Tool):
                     cmd.append("-v")
             else:  # unittest
                 import unittest
+
                 cmd = ["python", "-m", "unittest", "discover"]
                 if pattern:
                     cmd.extend(["-p", pattern])
                 if verbose:
                     cmd.append("-v")
-            
+
             timeout = self.get_timeout()
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir,
-                timeout=timeout  # Tests can take longer
+                timeout=timeout,  # Tests can take longer
             )
-            
+
             output = result.stdout + result.stderr
-            
+
             if self.console:
                 border_style = "green" if result.returncode == 0 else "red"
                 title = "✓ Tests Passed" if result.returncode == 0 else "✗ Tests Failed"
-                self.console.print(Panel(
-                    output,
-                    title=title,
-                    border_style=border_style
-                ))
-            
+                self.console.print(Panel(output, title=title, border_style=border_style))
+
             if result.returncode == 0:
-                return create_success_response({
-                    "output": output,
-                    "exit_code": result.returncode,
-                    "framework": framework
-                })
+                return create_success_response(
+                    {"output": output, "exit_code": result.returncode, "framework": framework}
+                )
             else:
                 return create_error_response(
                     f"Tests failed with exit code {result.returncode}",
                     ErrorType.EXECUTION,
-                    {"pattern": pattern, "framework": framework, "exit_code": result.returncode, "output": output}
+                    {
+                        "pattern": pattern,
+                        "framework": framework,
+                        "exit_code": result.returncode,
+                        "output": output,
+                    },
                 )
         except subprocess.TimeoutExpired:
             return create_error_response(
                 f"Tests timed out after {timeout} seconds",
                 ErrorType.TIMEOUT,
-                {"pattern": pattern, "framework": framework, "timeout": timeout}
+                {"pattern": pattern, "framework": framework, "timeout": timeout},
             )
         except Exception as e:
             return create_error_response(
-                str(e),
-                ErrorType.EXECUTION,
-                {"pattern": pattern, "framework": framework}
+                str(e), ErrorType.EXECUTION, {"pattern": pattern, "framework": framework}
             )
-

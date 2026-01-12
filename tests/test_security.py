@@ -9,10 +9,10 @@ def test_validate_path_within_project(tmp_path):
     """Test that valid paths within project are allowed"""
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    
+
     test_file = project_dir / "test.txt"
     test_file.write_text("test")
-    
+
     result = validate_path(project_dir, "test.txt")
     assert result == test_file.resolve()
 
@@ -21,10 +21,10 @@ def test_validate_path_outside_project(tmp_path):
     """Test that paths outside project are blocked"""
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    
+
     outside_file = tmp_path / "outside.txt"
     outside_file.write_text("test")
-    
+
     with pytest.raises(SecurityError):
         validate_path(project_dir, "../outside.txt")
 
@@ -33,7 +33,7 @@ def test_validate_path_directory_traversal(tmp_path):
     """Test that directory traversal attacks are blocked"""
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    
+
     with pytest.raises(SecurityError):
         validate_path(project_dir, "../../etc/passwd")
 
@@ -107,11 +107,11 @@ def test_dangerous_command_bypass_attempts():
     # Original patterns
     assert is_dangerous_command("rm -rf /") is True
     assert is_dangerous_command("rm -rf /*") is True
-    
+
     # Path variations
     assert is_dangerous_command("rm -rf /./") is True
     assert is_dangerous_command("rm -rf //") is True
-    
+
     # Note: Escaped commands may be safe depending on shell, but our parser should handle them
     # This test verifies the parser doesn't crash on edge cases
 
@@ -136,7 +136,9 @@ def test_fork_bomb_detection():
     """Test detection of fork bombs and shell exploits"""
     assert is_dangerous_command(":(){ :|:& };:") is True
     # Additional shell exploit patterns
-    assert is_dangerous_command("rm -rf / && echo done") is True  # Command chaining with dangerous command
+    assert (
+        is_dangerous_command("rm -rf / && echo done") is True
+    )  # Command chaining with dangerous command
 
 
 def test_chmod_chown_dangerous():
@@ -172,4 +174,3 @@ def test_partial_matches():
     assert is_dangerous_command("grep -rf pattern file.txt") is False  # Contains -rf but not rm
     assert is_dangerous_command("echo 'rm -rf /'") is False  # Quoted, not executed
     assert is_dangerous_command("cat /etc/passwd") is False  # Read-only, not destructive
-

@@ -117,10 +117,7 @@ class HookManager:
                 elif result.action == HookAction.MODIFY:
                     if result.modified_data:
                         current_data = result.modified_data
-                        final_result = HookResult.modify_data(
-                            current_data,
-                            result.message
-                        )
+                        final_result = HookResult.modify_data(current_data, result.message)
                         logger.debug(f"Hook {hook.name} modified data")
 
             except Exception as e:

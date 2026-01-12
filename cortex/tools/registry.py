@@ -30,7 +30,7 @@ class ToolRegistry:
         tool_class: Type[Tool],
         schema: Dict[str, Any],
         namespace: str = "builtin",
-        enabled: bool = True
+        enabled: bool = True,
     ) -> None:
         """
         Register a tool with the registry.
@@ -50,7 +50,7 @@ class ToolRegistry:
             "schema": schema,
             "namespace": namespace,
             "enabled": enabled,
-            "short_name": name
+            "short_name": name,
         }
 
         # Track namespace membership
@@ -119,11 +119,7 @@ class ToolRegistry:
         Returns:
             List of tool schemas for enabled tools
         """
-        return [
-            tool["schema"]
-            for tool in self._tools.values()
-            if tool["enabled"]
-        ]
+        return [tool["schema"] for tool in self._tools.values() if tool["enabled"]]
 
     def enable(self, name: str) -> bool:
         """
@@ -162,7 +158,9 @@ class ToolRegistry:
         tool_info = self._tools.get(name)
         return tool_info["enabled"] if tool_info else False
 
-    def list_tools(self, namespace: Optional[str] = None, include_disabled: bool = False) -> List[str]:
+    def list_tools(
+        self, namespace: Optional[str] = None, include_disabled: bool = False
+    ) -> List[str]:
         """
         List registered tools.
 
@@ -188,12 +186,7 @@ class ToolRegistry:
         return list(self._namespaces.keys())
 
     def create_instance(
-        self,
-        name: str,
-        project_dir: Path,
-        permission_mode: str,
-        console,
-        **extra_kwargs
+        self, name: str, project_dir: Path, permission_mode: str, console, **extra_kwargs
     ) -> Tool:
         """
         Create a tool instance.
@@ -228,10 +221,12 @@ class ToolRegistry:
         from .search_tools import ListFilesTool, SearchFilesTool
         from .git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GitLogTool
         from .test_tools import RunTestsTool
+
         # New Phase 1 tools
         from .grep_tool import GrepTool
         from .glob_tool import GlobTool
         from .edit_tool import EditTool
+
         # Phase 3 web tools
         from .web_tools import WebFetchTool, WebSearchTool
 
@@ -268,20 +263,20 @@ class ToolRegistry:
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Relative path to the file from project root"
+                                "description": "Relative path to the file from project root",
                             },
                             "offset": {
                                 "type": "integer",
-                                "description": "Line number to start reading from (0-indexed)"
+                                "description": "Line number to start reading from (0-indexed)",
                             },
                             "limit": {
                                 "type": "integer",
-                                "description": "Maximum number of lines to read"
-                            }
+                                "description": "Maximum number of lines to read",
+                            },
                         },
-                        "required": ["path"]
-                    }
-                }
+                        "required": ["path"],
+                    },
+                },
             },
             "write_file": {
                 "type": "function",
@@ -291,18 +286,15 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "path": {
-                                "type": "string",
-                                "description": "Relative path to the file"
-                            },
+                            "path": {"type": "string", "description": "Relative path to the file"},
                             "content": {
                                 "type": "string",
-                                "description": "Complete file content to write"
-                            }
+                                "description": "Complete file content to write",
+                            },
                         },
-                        "required": ["path", "content"]
-                    }
-                }
+                        "required": ["path", "content"],
+                    },
+                },
             },
             "execute_command": {
                 "type": "function",
@@ -314,16 +306,16 @@ class ToolRegistry:
                         "properties": {
                             "command": {
                                 "type": "string",
-                                "description": "The shell command to execute"
+                                "description": "The shell command to execute",
                             },
                             "reason": {
                                 "type": "string",
-                                "description": "Brief explanation of why this command is needed"
-                            }
+                                "description": "Brief explanation of why this command is needed",
+                            },
                         },
-                        "required": ["command", "reason"]
-                    }
-                }
+                        "required": ["command", "reason"],
+                    },
+                },
             },
             "list_files": {
                 "type": "function",
@@ -335,16 +327,16 @@ class ToolRegistry:
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Directory path to list (default: current directory)"
+                                "description": "Directory path to list (default: current directory)",
                             },
                             "pattern": {
                                 "type": "string",
-                                "description": "Optional glob pattern to filter files (e.g., '*.py')"
-                            }
+                                "description": "Optional glob pattern to filter files (e.g., '*.py')",
+                            },
                         },
-                        "required": []
-                    }
-                }
+                        "required": [],
+                    },
+                },
             },
             "search_files": {
                 "type": "function",
@@ -354,30 +346,23 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Text to search for"
-                            },
+                            "query": {"type": "string", "description": "Text to search for"},
                             "file_pattern": {
                                 "type": "string",
-                                "description": "Limit search to files matching pattern (e.g., '*.py')"
-                            }
+                                "description": "Limit search to files matching pattern (e.g., '*.py')",
+                            },
                         },
-                        "required": ["query"]
-                    }
-                }
+                        "required": ["query"],
+                    },
+                },
             },
             "git_status": {
                 "type": "function",
                 "function": {
                     "name": "git_status",
                     "description": "Show git status and uncommitted changes.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {},
-                        "required": []
-                    }
-                }
+                    "parameters": {"type": "object", "properties": {}, "required": []},
+                },
             },
             "git_diff": {
                 "type": "function",
@@ -389,12 +374,12 @@ class ToolRegistry:
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "File path (optional, shows all changes if omitted)"
+                                "description": "File path (optional, shows all changes if omitted)",
                             }
                         },
-                        "required": []
-                    }
-                }
+                        "required": [],
+                    },
+                },
             },
             "git_commit": {
                 "type": "function",
@@ -404,14 +389,11 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "message": {
-                                "type": "string",
-                                "description": "Commit message"
-                            }
+                            "message": {"type": "string", "description": "Commit message"}
                         },
-                        "required": ["message"]
-                    }
-                }
+                        "required": ["message"],
+                    },
+                },
             },
             "git_log": {
                 "type": "function",
@@ -423,12 +405,12 @@ class ToolRegistry:
                         "properties": {
                             "limit": {
                                 "type": "integer",
-                                "description": "Number of commits to show (default: 10)"
+                                "description": "Number of commits to show (default: 10)",
                             }
                         },
-                        "required": []
-                    }
-                }
+                        "required": [],
+                    },
+                },
             },
             "run_tests": {
                 "type": "function",
@@ -440,16 +422,13 @@ class ToolRegistry:
                         "properties": {
                             "pattern": {
                                 "type": "string",
-                                "description": "Test pattern (e.g., 'test_auth.py')"
+                                "description": "Test pattern (e.g., 'test_auth.py')",
                             },
-                            "verbose": {
-                                "type": "boolean",
-                                "description": "Verbose output"
-                            }
+                            "verbose": {"type": "boolean", "description": "Verbose output"},
                         },
-                        "required": []
-                    }
-                }
+                        "required": [],
+                    },
+                },
             },
             # New Phase 1 tools
             "grep": {
@@ -462,44 +441,41 @@ class ToolRegistry:
                         "properties": {
                             "pattern": {
                                 "type": "string",
-                                "description": "Regex pattern to search for"
+                                "description": "Regex pattern to search for",
                             },
                             "path": {
                                 "type": "string",
-                                "description": "Directory or file to search in"
+                                "description": "Directory or file to search in",
                             },
                             "glob": {
                                 "type": "string",
-                                "description": "Glob pattern to filter files"
+                                "description": "Glob pattern to filter files",
                             },
                             "file_type": {
                                 "type": "string",
-                                "description": "File type to search (e.g., 'py', 'js')"
+                                "description": "File type to search (e.g., 'py', 'js')",
                             },
                             "output_mode": {
                                 "type": "string",
-                                "description": "Output mode: files_with_matches, content, count"
+                                "description": "Output mode: files_with_matches, content, count",
                             },
                             "case_insensitive": {
                                 "type": "boolean",
-                                "description": "Case insensitive search"
+                                "description": "Case insensitive search",
                             },
-                            "context": {
-                                "type": "integer",
-                                "description": "Lines of context"
-                            },
+                            "context": {"type": "integer", "description": "Lines of context"},
                             "multiline": {
                                 "type": "boolean",
-                                "description": "Enable multiline matching"
+                                "description": "Enable multiline matching",
                             },
                             "head_limit": {
                                 "type": "integer",
-                                "description": "Limit number of results"
-                            }
+                                "description": "Limit number of results",
+                            },
                         },
-                        "required": ["pattern"]
-                    }
-                }
+                        "required": ["pattern"],
+                    },
+                },
             },
             "glob": {
                 "type": "function",
@@ -511,24 +487,24 @@ class ToolRegistry:
                         "properties": {
                             "pattern": {
                                 "type": "string",
-                                "description": "Glob pattern to match (e.g., '**/*.py')"
+                                "description": "Glob pattern to match (e.g., '**/*.py')",
                             },
                             "path": {
                                 "type": "string",
-                                "description": "Base directory to search from"
+                                "description": "Base directory to search from",
                             },
                             "include_hidden": {
                                 "type": "boolean",
-                                "description": "Include hidden files"
+                                "description": "Include hidden files",
                             },
                             "max_results": {
                                 "type": "integer",
-                                "description": "Maximum number of results"
-                            }
+                                "description": "Maximum number of results",
+                            },
                         },
-                        "required": ["pattern"]
-                    }
-                }
+                        "required": ["pattern"],
+                    },
+                },
             },
             "edit": {
                 "type": "function",
@@ -540,24 +516,24 @@ class ToolRegistry:
                         "properties": {
                             "file_path": {
                                 "type": "string",
-                                "description": "Path to the file to edit"
+                                "description": "Path to the file to edit",
                             },
                             "old_string": {
                                 "type": "string",
-                                "description": "Exact text to replace"
+                                "description": "Exact text to replace",
                             },
                             "new_string": {
                                 "type": "string",
-                                "description": "Text to replace it with"
+                                "description": "Text to replace it with",
                             },
                             "replace_all": {
                                 "type": "boolean",
-                                "description": "Replace all occurrences"
-                            }
+                                "description": "Replace all occurrences",
+                            },
                         },
-                        "required": ["file_path", "old_string", "new_string"]
-                    }
-                }
+                        "required": ["file_path", "old_string", "new_string"],
+                    },
+                },
             },
             # Phase 3 web tools
             "web_fetch": {
@@ -568,22 +544,19 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "url": {
-                                "type": "string",
-                                "description": "The URL to fetch"
-                            },
+                            "url": {"type": "string", "description": "The URL to fetch"},
                             "prompt": {
                                 "type": "string",
-                                "description": "What to extract/analyze from the content"
+                                "description": "What to extract/analyze from the content",
                             },
                             "max_content_length": {
                                 "type": "integer",
-                                "description": "Maximum content length (default: 50000)"
-                            }
+                                "description": "Maximum content length (default: 50000)",
+                            },
                         },
-                        "required": ["url"]
-                    }
-                }
+                        "required": ["url"],
+                    },
+                },
             },
             "web_search": {
                 "type": "function",
@@ -593,29 +566,26 @@ class ToolRegistry:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Search query"
-                            },
+                            "query": {"type": "string", "description": "Search query"},
                             "max_results": {
                                 "type": "integer",
-                                "description": "Maximum results (default: 10)"
+                                "description": "Maximum results (default: 10)",
                             },
                             "allowed_domains": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": "Only include results from these domains"
+                                "description": "Only include results from these domains",
                             },
                             "blocked_domains": {
                                 "type": "array",
                                 "items": {"type": "string"},
-                                "description": "Exclude results from these domains"
-                            }
+                                "description": "Exclude results from these domains",
+                            },
                         },
-                        "required": ["query"]
-                    }
-                }
-            }
+                        "required": ["query"],
+                    },
+                },
+            },
         }
 
         # Register all builtin tools
@@ -658,7 +628,7 @@ class ToolRegistry:
                         tool_class=tool_info["class"],
                         schema=tool_info["schema"],
                         namespace=tool_info.get("namespace", "plugin"),
-                        enabled=tool_info.get("enabled", True)
+                        enabled=tool_info.get("enabled", True),
                     )
                 logger.info(f"Loaded plugin: {plugin_path}")
                 return True

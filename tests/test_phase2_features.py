@@ -25,13 +25,15 @@ def temp_project():
     temp_dir = Path(tempfile.mkdtemp())
 
     # Create test files
-    (temp_dir / "main.py").write_text("""
+    (temp_dir / "main.py").write_text(
+        """
 def main():
     print("Hello, World!")
 
 if __name__ == "__main__":
     main()
-""")
+"""
+    )
 
     yield temp_dir
     shutil.rmtree(temp_dir)
@@ -46,9 +48,13 @@ class TestSimpleSummarizer:
 
         messages = [
             {"role": "user", "content": "Read the main.py file"},
-            {"role": "assistant", "content": "I'll read that file.", "tool_calls": [
-                {"function": {"name": "read_file", "arguments": {"path": "main.py"}}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "I'll read that file.",
+                "tool_calls": [
+                    {"function": {"name": "read_file", "arguments": {"path": "main.py"}}}
+                ],
+            },
             {"role": "tool", "tool_call_id": "1", "content": '{"success": true, "content": "..."}'},
             {"role": "assistant", "content": "Here's the file content..."},
         ]
@@ -65,9 +71,18 @@ class TestSimpleSummarizer:
 
         messages = [
             {"role": "user", "content": "Write a new file"},
-            {"role": "assistant", "content": "Creating file", "tool_calls": [
-                {"function": {"name": "write_file", "arguments": '{"path": "new.py", "content": "test"}'}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "Creating file",
+                "tool_calls": [
+                    {
+                        "function": {
+                            "name": "write_file",
+                            "arguments": '{"path": "new.py", "content": "test"}',
+                        }
+                    }
+                ],
+            },
         ]
 
         summary = summarizer.summarize(messages)
@@ -79,9 +94,13 @@ class TestSimpleSummarizer:
 
         messages = [
             {"role": "user", "content": "Run the tests"},
-            {"role": "assistant", "content": "Running", "tool_calls": [
-                {"function": {"name": "execute_command", "arguments": '{"command": "pytest"}'}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "Running",
+                "tool_calls": [
+                    {"function": {"name": "execute_command", "arguments": '{"command": "pytest"}'}}
+                ],
+            },
         ]
 
         summary = summarizer.summarize(messages)
@@ -92,7 +111,11 @@ class TestSimpleSummarizer:
         summarizer = SimpleSummarizer()
 
         messages = [
-            {"role": "tool", "tool_call_id": "1", "content": '{"success": false, "error": "File not found"}'},
+            {
+                "role": "tool",
+                "tool_call_id": "1",
+                "content": '{"success": false, "error": "File not found"}',
+            },
         ]
 
         summary = summarizer.summarize(messages)
@@ -256,7 +279,7 @@ class TestTaskToolAgentTypes:
         )
 
         # Should not raise
-        assert hasattr(tool, 'execute')
+        assert hasattr(tool, "execute")
 
     def test_get_subagent_prompt_explore(self, temp_project):
         """Test that explore agent gets specialized prompt."""

@@ -1,6 +1,6 @@
 # Default configuration for Cortex
 
-model: llama3.2
+model: deepseek-reasoner
 permission_mode: normal
 max_iterations: 15
 max_tokens: 100000
@@ -15,3 +15,8 @@ auto_save: false
 # - ANTHROPIC_API_KEY (for Anthropic/Claude models)
 # Ollama doesn't require API keys
 
+# Parallel execution settings
+parallel_execution:
+  enabled: true
+  max_workers: 4
+  batch_size: 10

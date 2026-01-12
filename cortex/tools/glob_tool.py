@@ -58,16 +58,12 @@ class GlobTool(Tool):
 
         if not full_path.exists():
             return create_error_response(
-                f"Path not found: {path}",
-                ErrorType.NOT_FOUND,
-                {"path": path}
+                f"Path not found: {path}", ErrorType.NOT_FOUND, {"path": path}
             )
 
         if not full_path.is_dir():
             return create_error_response(
-                f"Path is not a directory: {path}",
-                ErrorType.VALIDATION,
-                {"path": path}
+                f"Path is not a directory: {path}", ErrorType.VALIDATION, {"path": path}
             )
 
         try:
@@ -105,29 +101,42 @@ class GlobTool(Tool):
             if self.console:
                 self._display_results(relative_paths, total_count, truncated)
 
-            return create_success_response({
-                "files": relative_paths,
-                "count": len(relative_paths),
-                "total_count": total_count,
-                "truncated": truncated,
-                "pattern": pattern
-            })
+            return create_success_response(
+                {
+                    "files": relative_paths,
+                    "count": len(relative_paths),
+                    "total_count": total_count,
+                    "truncated": truncated,
+                    "pattern": pattern,
+                }
+            )
 
         except Exception as e:
             return create_error_response(
-                str(e),
-                ErrorType.EXECUTION,
-                {"pattern": pattern, "path": path}
+                str(e), ErrorType.EXECUTION, {"pattern": pattern, "path": path}
             )
 
     def _filter_hidden(self, files: List[Path], base_path: Path) -> List[Path]:
         """Filter out hidden files and common ignored directories."""
         ignored_dirs = {
-            '.git', '.svn', '.hg', '.bzr',
-            'node_modules', '__pycache__', '.venv', 'venv',
-            '.tox', '.eggs', 'dist', 'build',
-            '.mypy_cache', '.pytest_cache', '.coverage',
-            '.idea', '.vscode', '.vs',
+            ".git",
+            ".svn",
+            ".hg",
+            ".bzr",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            ".tox",
+            ".eggs",
+            "dist",
+            "build",
+            ".mypy_cache",
+            ".pytest_cache",
+            ".coverage",
+            ".idea",
+            ".vscode",
+            ".vs",
         }
 
         filtered = []
@@ -135,10 +144,7 @@ class GlobTool(Tool):
             try:
                 rel_parts = f.relative_to(base_path).parts
                 # Skip if any part is hidden or in ignored list
-                if any(
-                    part.startswith('.') or part in ignored_dirs
-                    for part in rel_parts
-                ):
+                if any(part.startswith(".") or part in ignored_dirs for part in rel_parts):
                     continue
                 filtered.append(f)
             except ValueError:
@@ -149,6 +155,7 @@ class GlobTool(Tool):
 
     def _sort_by_mtime(self, files: List[Path]) -> List[Path]:
         """Sort files by modification time (newest first)."""
+
         def get_mtime(f: Path) -> float:
             try:
                 return f.stat().st_mtime
@@ -157,12 +164,7 @@ class GlobTool(Tool):
 
         return sorted(files, key=get_mtime, reverse=True)
 
-    def _display_results(
-        self,
-        files: List[str],
-        total_count: int,
-        truncated: bool
-    ) -> None:
+    def _display_results(self, files: List[str], total_count: int, truncated: bool) -> None:
         """Display results in console."""
         if not files:
             self.console.print("[dim]No matching files found[/dim]")

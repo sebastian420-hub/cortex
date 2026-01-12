@@ -32,13 +32,7 @@ class PreToolUseEvent(HookEvent):
         permission_mode: Current permission mode
     """
 
-    def __init__(
-        self,
-        tool_name: str,
-        arguments: Dict[str, Any],
-        permission_mode: str,
-        **context
-    ):
+    def __init__(self, tool_name: str, arguments: Dict[str, Any], permission_mode: str, **context):
         super().__init__(
             event_type=EVENT_PRE_TOOL_USE,
             data={
@@ -46,7 +40,7 @@ class PreToolUseEvent(HookEvent):
                 "arguments": arguments,
                 "permission_mode": permission_mode,
             },
-            context=context
+            context=context,
         )
 
     @property
@@ -88,7 +82,7 @@ class PostToolUseEvent(HookEvent):
         result: Dict[str, Any],
         success: bool,
         duration_ms: Optional[float] = None,
-        **context
+        **context,
     ):
         super().__init__(
             event_type=EVENT_POST_TOOL_USE,
@@ -99,7 +93,7 @@ class PostToolUseEvent(HookEvent):
                 "success": success,
                 "duration_ms": duration_ms,
             },
-            context=context
+            context=context,
         )
 
     @property
@@ -146,7 +140,7 @@ class StopEvent(HookEvent):
         last_response: Dict[str, Any],
         has_tool_calls: bool,
         max_iterations: int,
-        **context
+        **context,
     ):
         super().__init__(
             event_type=EVENT_STOP,
@@ -156,7 +150,7 @@ class StopEvent(HookEvent):
                 "has_tool_calls": has_tool_calls,
                 "max_iterations": max_iterations,
             },
-            context=context
+            context=context,
         )
 
     @property
@@ -192,19 +186,14 @@ class UserPromptSubmitEvent(HookEvent):
         conversation_length: Current conversation history length
     """
 
-    def __init__(
-        self,
-        prompt: str,
-        conversation_length: int,
-        **context
-    ):
+    def __init__(self, prompt: str, conversation_length: int, **context):
         super().__init__(
             event_type=EVENT_USER_PROMPT_SUBMIT,
             data={
                 "prompt": prompt,
                 "conversation_length": conversation_length,
             },
-            context=context
+            context=context,
         )
 
     @property
@@ -239,7 +228,7 @@ class SessionStartEvent(HookEvent):
         project_dir: str,
         permission_mode: str,
         config: Optional[Dict[str, Any]] = None,
-        **context
+        **context,
     ):
         super().__init__(
             event_type=EVENT_SESSION_START,
@@ -249,7 +238,7 @@ class SessionStartEvent(HookEvent):
                 "permission_mode": permission_mode,
                 "config": config or {},
             },
-            context=context
+            context=context,
         )
 
     @property
@@ -292,7 +281,7 @@ class SessionEndEvent(HookEvent):
         project_dir: str,
         messages_count: int,
         tools_used: Optional[List[str]] = None,
-        **context
+        **context,
     ):
         super().__init__(
             event_type=EVENT_SESSION_END,
@@ -302,7 +291,7 @@ class SessionEndEvent(HookEvent):
                 "messages_count": messages_count,
                 "tools_used": tools_used or [],
             },
-            context=context
+            context=context,
         )
 
     @property

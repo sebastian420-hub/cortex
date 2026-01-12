@@ -11,28 +11,32 @@ class TimeoutConfig:
 
     All timeout values are in seconds.
     """
-    default: int = 30           # General command timeout
-    git: int = 10               # Git operations timeout
-    test: int = 120             # Test execution timeout
-    search: int = 60            # File search timeout
-    long_running: int = 300     # Long-running operations (5 min)
+
+    default: int = 30  # General command timeout
+    git: int = 10  # Git operations timeout
+    test: int = 120  # Test execution timeout
+    search: int = 60  # File search timeout
+    long_running: int = 300  # Long-running operations (5 min)
 
     # Per-tool overrides (tool_name -> timeout)
     tool_overrides: Dict[str, int] = field(default_factory=dict)
 
     # Tool name to category mapping
-    _tool_categories: Dict[str, str] = field(default_factory=lambda: {
-        "execute_command": "default",
-        "git_status": "git",
-        "git_diff": "git",
-        "git_commit": "git",
-        "git_log": "git",
-        "run_tests": "test",
-        "search_files": "search",
-        "list_files": "default",
-        "read_file": "default",
-        "write_file": "default",
-    }, repr=False)
+    _tool_categories: Dict[str, str] = field(
+        default_factory=lambda: {
+            "execute_command": "default",
+            "git_status": "git",
+            "git_diff": "git",
+            "git_commit": "git",
+            "git_log": "git",
+            "run_tests": "test",
+            "search_files": "search",
+            "list_files": "default",
+            "read_file": "default",
+            "write_file": "default",
+        },
+        repr=False,
+    )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TimeoutConfig":

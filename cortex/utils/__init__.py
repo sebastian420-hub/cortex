@@ -1,11 +1,6 @@
 """Utility modules for Cortex"""
 
-from .errors import (
-    AgentError,
-    ToolExecutionError,
-    ModelError,
-    retry_with_backoff
-)
+from .errors import AgentError, ToolExecutionError, ModelError, retry_with_backoff
 from .timeouts import TimeoutConfig, DEFAULT_TIMEOUT_CONFIG
 
 __all__ = [
@@ -16,4 +11,3 @@ __all__ = [
     "TimeoutConfig",
     "DEFAULT_TIMEOUT_CONFIG",
 ]
-

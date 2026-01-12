@@ -26,7 +26,7 @@ class TestToolRegistry:
         registry = ToolRegistry()
         schema = {
             "type": "function",
-            "function": {"name": "mock_tool", "description": "A mock tool"}
+            "function": {"name": "mock_tool", "description": "A mock tool"},
         }
 
         registry.register("mock_tool", MockTool, schema)
@@ -91,10 +91,7 @@ class TestToolRegistry:
         registry.register("mock_tool", MockTool, schema)
 
         tool = registry.create_instance(
-            "mock_tool",
-            project_dir=Path("."),
-            permission_mode="normal",
-            console=None
+            "mock_tool", project_dir=Path("."), permission_mode="normal", console=None
         )
 
         assert isinstance(tool, MockTool)
@@ -110,10 +107,7 @@ class TestToolRegistry:
 
         with pytest.raises(ValueError, match="Unknown or disabled tool"):
             registry.create_instance(
-                "mock_tool",
-                project_dir=Path("."),
-                permission_mode="normal",
-                console=None
+                "mock_tool", project_dir=Path("."), permission_mode="normal", console=None
             )
 
     def test_register_builtins(self):

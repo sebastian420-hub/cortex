@@ -9,4 +9,3 @@ def get_history_file(base_dir: Path) -> Path:
     history_dir = base_dir / ".cortex"
     history_dir.mkdir(parents=True, exist_ok=True)
     return history_dir / "history.txt"
-

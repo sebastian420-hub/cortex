@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Try to import optional dependencies
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -24,6 +25,7 @@ except ImportError:
 
 try:
     from bs4 import BeautifulSoup
+
     HAS_BS4 = True
 except ImportError:
     HAS_BS4 = False
@@ -31,6 +33,7 @@ except ImportError:
 
 try:
     import html2text
+
     HAS_HTML2TEXT = True
 except ImportError:
     HAS_HTML2TEXT = False
@@ -62,10 +65,7 @@ class WebFetchCache:
     def set(self, url: str, data: Dict[str, Any]) -> None:
         """Cache content with timestamp."""
         key = self._get_key(url)
-        self._cache[key] = {
-            "data": data,
-            "timestamp": datetime.now()
-        }
+        self._cache[key] = {"data": data, "timestamp": datetime.now()}
 
     def clear(self) -> None:
         """Clear all cached entries."""
@@ -121,28 +121,20 @@ class WebFetchTool(Tool):
             return create_error_response(
                 "requests library not installed. Run: pip install requests",
                 ErrorType.EXECUTION,
-                {"missing_dependency": "requests"}
+                {"missing_dependency": "requests"},
             )
 
         # Validate URL
         if not url:
-            return create_error_response(
-                "URL is required",
-                ErrorType.VALIDATION,
-                {"url": url}
-            )
+            return create_error_response("URL is required", ErrorType.VALIDATION, {"url": url})
 
         # Ensure URL has scheme
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
 
         parsed = urlparse(url)
         if not parsed.netloc:
-            return create_error_response(
-                f"Invalid URL: {url}",
-                ErrorType.VALIDATION,
-                {"url": url}
-            )
+            return create_error_response(f"Invalid URL: {url}", ErrorType.VALIDATION, {"url": url})
 
         if self.console:
             self.console.print(f"[cyan]Fetching:[/cyan] {url}")
@@ -153,13 +145,15 @@ class WebFetchTool(Tool):
             if cached:
                 if self.console:
                     self.console.print("[dim]Using cached content[/dim]")
-                return create_success_response({
-                    "url": url,
-                    "content": cached["content"][:max_content_length],
-                    "title": cached.get("title", ""),
-                    "cached": True,
-                    "content_type": cached.get("content_type", ""),
-                })
+                return create_success_response(
+                    {
+                        "url": url,
+                        "content": cached["content"][:max_content_length],
+                        "title": cached.get("title", ""),
+                        "cached": True,
+                        "content_type": cached.get("content_type", ""),
+                    }
+                )
 
         try:
             # Fetch URL
@@ -173,12 +167,14 @@ class WebFetchTool(Tool):
             # Check for redirect to different host
             final_url = response.url
             if urlparse(final_url).netloc != parsed.netloc:
-                return create_success_response({
-                    "url": url,
-                    "redirect_url": final_url,
-                    "redirected": True,
-                    "message": f"Redirected to different host: {final_url}. Make a new request with this URL.",
-                })
+                return create_success_response(
+                    {
+                        "url": url,
+                        "redirect_url": final_url,
+                        "redirected": True,
+                        "message": f"Redirected to different host: {final_url}. Make a new request with this URL.",
+                    }
+                )
 
             response.raise_for_status()
 
@@ -207,7 +203,7 @@ class WebFetchTool(Tool):
                     return create_error_response(
                         f"Cannot process content type: {content_type}",
                         ErrorType.VALIDATION,
-                        {"url": url, "content_type": content_type}
+                        {"url": url, "content_type": content_type},
                     )
 
             # Truncate if needed
@@ -249,33 +245,20 @@ class WebFetchTool(Tool):
                 f"Request timed out after {self.get_timeout()} seconds",
                 ErrorType.TIMEOUT,
                 {"url": url},
-                retryable=True
+                retryable=True,
             )
         except requests.exceptions.TooManyRedirects:
-            return create_error_response(
-                "Too many redirects",
-                ErrorType.EXECUTION,
-                {"url": url}
-            )
+            return create_error_response("Too many redirects", ErrorType.EXECUTION, {"url": url})
         except requests.exceptions.SSLError as e:
-            return create_error_response(
-                f"SSL error: {e}",
-                ErrorType.SECURITY,
-                {"url": url}
-            )
+            return create_error_response(f"SSL error: {e}", ErrorType.SECURITY, {"url": url})
         except requests.exceptions.RequestException as e:
             return create_error_response(
-                f"Request failed: {e}",
-                ErrorType.NETWORK,
-                {"url": url},
-                retryable=True
+                f"Request failed: {e}", ErrorType.NETWORK, {"url": url}, retryable=True
             )
         except Exception as e:
             logger.exception(f"WebFetch error for {url}")
             return create_error_response(
-                f"Failed to fetch URL: {e}",
-                ErrorType.EXECUTION,
-                {"url": url}
+                f"Failed to fetch URL: {e}", ErrorType.EXECUTION, {"url": url}
             )
 
     def _process_html(self, html: str, base_url: str) -> tuple:
@@ -331,7 +314,9 @@ class WebFetchTool(Tool):
         """Basic HTML to text conversion using BeautifulSoup."""
         lines = []
 
-        for element in soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "pre", "code"]):
+        for element in soup.find_all(
+            ["h1", "h2", "h3", "h4", "h5", "h6", "p", "li", "pre", "code"]
+        ):
             tag = element.name
             text = element.get_text(strip=True)
 
@@ -412,14 +397,12 @@ class WebSearchTool(Tool):
             return create_error_response(
                 "requests library not installed. Run: pip install requests",
                 ErrorType.EXECUTION,
-                {"missing_dependency": "requests"}
+                {"missing_dependency": "requests"},
             )
 
         if not query or len(query.strip()) < 2:
             return create_error_response(
-                "Search query must be at least 2 characters",
-                ErrorType.VALIDATION,
-                {"query": query}
+                "Search query must be at least 2 characters", ErrorType.VALIDATION, {"query": query}
             )
 
         if self.console:
@@ -440,51 +423,47 @@ class WebSearchTool(Tool):
 
             # Parse results
             results = self._parse_search_results(
-                response.text,
-                max_results,
-                allowed_domains,
-                blocked_domains
+                response.text, max_results, allowed_domains, blocked_domains
             )
 
             if not results:
-                return create_success_response({
-                    "query": query,
-                    "results": [],
-                    "result_count": 0,
-                    "message": "No results found"
-                })
+                return create_success_response(
+                    {
+                        "query": query,
+                        "results": [],
+                        "result_count": 0,
+                        "message": "No results found",
+                    }
+                )
 
             if self.console:
                 self.console.print(f"[green]Found {len(results)} results[/green]")
                 for r in results[:3]:
                     self.console.print(f"  [dim]- {r['title'][:50]}...[/dim]")
 
-            return create_success_response({
-                "query": query,
-                "results": results,
-                "result_count": len(results),
-            })
+            return create_success_response(
+                {
+                    "query": query,
+                    "results": results,
+                    "result_count": len(results),
+                }
+            )
 
         except requests.exceptions.Timeout:
             return create_error_response(
                 f"Search timed out after {self.get_timeout()} seconds",
                 ErrorType.TIMEOUT,
                 {"query": query},
-                retryable=True
+                retryable=True,
             )
         except requests.exceptions.RequestException as e:
             return create_error_response(
-                f"Search request failed: {e}",
-                ErrorType.NETWORK,
-                {"query": query},
-                retryable=True
+                f"Search request failed: {e}", ErrorType.NETWORK, {"query": query}, retryable=True
             )
         except Exception as e:
             logger.exception(f"WebSearch error for query: {query}")
             return create_error_response(
-                f"Search failed: {e}",
-                ErrorType.EXECUTION,
-                {"query": query}
+                f"Search failed: {e}", ErrorType.EXECUTION, {"query": query}
             )
 
     def _parse_search_results(
@@ -521,6 +500,7 @@ class WebSearchTool(Tool):
                 if "uddg=" in url:
                     # URL is encoded in uddg parameter
                     import urllib.parse
+
                     parsed = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
                     if "uddg" in parsed:
                         url = urllib.parse.unquote(parsed["uddg"][0])
@@ -537,11 +517,13 @@ class WebSearchTool(Tool):
                         if any(d.lower() in domain for d in blocked_domains):
                             continue
 
-                    results.append({
-                        "title": title,
-                        "url": url,
-                        "snippet": snippet,
-                    })
+                    results.append(
+                        {
+                            "title": title,
+                            "url": url,
+                            "snippet": snippet,
+                        }
+                    )
         else:
             # Fallback: regex-based extraction
             # This is less reliable but works without BeautifulSoup
@@ -552,6 +534,7 @@ class WebSearchTool(Tool):
                 # Try to decode DuckDuckGo URL wrapper
                 if "uddg=" in url:
                     import urllib.parse
+
                     try:
                         parsed = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
                         if "uddg" in parsed:
@@ -570,11 +553,13 @@ class WebSearchTool(Tool):
                         if any(d.lower() in domain for d in blocked_domains):
                             continue
 
-                    results.append({
-                        "title": title.strip(),
-                        "url": url,
-                        "snippet": "",
-                    })
+                    results.append(
+                        {
+                            "title": title.strip(),
+                            "url": url,
+                            "snippet": "",
+                        }
+                    )
 
         return results
 

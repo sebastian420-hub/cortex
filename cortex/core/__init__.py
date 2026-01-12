@@ -19,6 +19,14 @@ from .memory import (
     create_memory_bank,
     extract_memories_from_messages,
 )
+from .transaction import (
+    TransactionManager,
+    Transaction,
+    TransactionState,
+    FileBackup,
+    get_transaction_manager,
+    reset_transaction_manager,
+)
 
 __all__ = [
     # Security
@@ -41,5 +49,11 @@ __all__ = [
     "MemorySource",
     "create_memory_bank",
     "extract_memories_from_messages",
+    # Transactions
+    "TransactionManager",
+    "Transaction",
+    "TransactionState",
+    "FileBackup",
+    "get_transaction_manager",
+    "reset_transaction_manager",
 ]
-

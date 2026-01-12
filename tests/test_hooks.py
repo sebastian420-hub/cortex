@@ -18,6 +18,7 @@ from cortex.hooks import (
 
 class AllowHook(BaseHook):
     """Hook that allows everything"""
+
     handles = ["*"]
     name = "AllowHook"
 
@@ -27,6 +28,7 @@ class AllowHook(BaseHook):
 
 class BlockHook(BaseHook):
     """Hook that blocks everything"""
+
     handles = ["*"]
     name = "BlockHook"
 
@@ -36,6 +38,7 @@ class BlockHook(BaseHook):
 
 class ModifyHook(BaseHook):
     """Hook that modifies data"""
+
     handles = ["pre_tool_use"]
     name = "ModifyHook"
 
@@ -47,6 +50,7 @@ class ModifyHook(BaseHook):
 
 class CountingHook(BaseHook):
     """Hook that counts invocations"""
+
     handles = ["*"]
     name = "CountingHook"
 
@@ -64,11 +68,7 @@ class TestHookEvent:
 
     def test_create_event(self):
         """Test creating a hook event"""
-        event = HookEvent(
-            event_type="test_event",
-            data={"key": "value"},
-            context={"ctx": "data"}
-        )
+        event = HookEvent(event_type="test_event", data={"key": "value"}, context={"ctx": "data"})
 
         assert event.event_type == "test_event"
         assert event.data["key"] == "value"
@@ -198,9 +198,7 @@ class TestHookManager:
         manager.register(ModifyHook())
 
         event = PreToolUseEvent(
-            tool_name="test_tool",
-            arguments={"arg": "value"},
-            permission_mode="normal"
+            tool_name="test_tool", arguments={"arg": "value"}, permission_mode="normal"
         )
         result = manager.dispatch(event)
 
@@ -262,9 +260,7 @@ class TestPreToolUseEvent:
     def test_create_event(self):
         """Test creating pre tool use event"""
         event = PreToolUseEvent(
-            tool_name="read_file",
-            arguments={"path": "test.txt"},
-            permission_mode="normal"
+            tool_name="read_file", arguments={"path": "test.txt"}, permission_mode="normal"
         )
 
         assert event.event_type == "pre_tool_use"
@@ -283,7 +279,7 @@ class TestPostToolUseEvent:
             arguments={"path": "test.txt"},
             result={"success": True, "content": "test"},
             success=True,
-            duration_ms=100.5
+            duration_ms=100.5,
         )
 
         assert event.event_type == "post_tool_use"
@@ -299,11 +295,7 @@ class TestBuiltinHooks:
         """Test logging hook"""
         hook = LoggingHook()
 
-        event = PreToolUseEvent(
-            tool_name="test",
-            arguments={},
-            permission_mode="normal"
-        )
+        event = PreToolUseEvent(tool_name="test", arguments={}, permission_mode="normal")
         result = hook.execute(event)
 
         # Logging hook should always continue
@@ -311,54 +303,32 @@ class TestBuiltinHooks:
 
     def test_permission_hook_allowed(self):
         """Test permission hook allows tools"""
-        hook = PermissionHook(
-            allowed=["read_file", "list_files"]
-        )
+        hook = PermissionHook(allowed=["read_file", "list_files"])
 
-        event = PreToolUseEvent(
-            tool_name="read_file",
-            arguments={},
-            permission_mode="normal"
-        )
+        event = PreToolUseEvent(tool_name="read_file", arguments={}, permission_mode="normal")
         result = hook.execute(event)
 
         assert result.action == HookAction.CONTINUE
 
     def test_permission_hook_blocked(self):
         """Test permission hook blocks tools"""
-        hook = PermissionHook(
-            blocked=["execute_command"]
-        )
+        hook = PermissionHook(blocked=["execute_command"])
 
-        event = PreToolUseEvent(
-            tool_name="execute_command",
-            arguments={},
-            permission_mode="normal"
-        )
+        event = PreToolUseEvent(tool_name="execute_command", arguments={}, permission_mode="normal")
         result = hook.execute(event)
 
         assert result.action == HookAction.ABORT
 
     def test_permission_hook_whitelist(self):
         """Test permission hook whitelist mode"""
-        hook = PermissionHook(
-            allowed=["read_file"]  # Only read_file allowed
-        )
+        hook = PermissionHook(allowed=["read_file"])  # Only read_file allowed
 
         # Allowed tool
-        event1 = PreToolUseEvent(
-            tool_name="read_file",
-            arguments={},
-            permission_mode="normal"
-        )
+        event1 = PreToolUseEvent(tool_name="read_file", arguments={}, permission_mode="normal")
         assert hook.execute(event1).action == HookAction.CONTINUE
 
         # Not in allowed list
-        event2 = PreToolUseEvent(
-            tool_name="write_file",
-            arguments={},
-            permission_mode="normal"
-        )
+        event2 = PreToolUseEvent(tool_name="write_file", arguments={}, permission_mode="normal")
         assert hook.execute(event2).action == HookAction.ABORT
 
     def test_command_blocker_hook(self):
@@ -367,17 +337,13 @@ class TestBuiltinHooks:
 
         # Safe command
         safe_event = PreToolUseEvent(
-            tool_name="execute_command",
-            arguments={"command": "ls -la"},
-            permission_mode="normal"
+            tool_name="execute_command", arguments={"command": "ls -la"}, permission_mode="normal"
         )
         assert hook.execute(safe_event).action == HookAction.CONTINUE
 
         # Dangerous command
         dangerous_event = PreToolUseEvent(
-            tool_name="execute_command",
-            arguments={"command": "rm -rf /"},
-            permission_mode="normal"
+            tool_name="execute_command", arguments={"command": "rm -rf /"}, permission_mode="normal"
         )
         assert hook.execute(dangerous_event).action == HookAction.ABORT
 
@@ -388,7 +354,7 @@ class TestBuiltinHooks:
         event = PreToolUseEvent(
             tool_name="read_file",
             arguments={"path": "rm -rf /"},  # Even with dangerous content
-            permission_mode="normal"
+            permission_mode="normal",
         )
         result = hook.execute(event)
 

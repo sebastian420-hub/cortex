@@ -15,6 +15,7 @@ class HookAction(Enum):
     MODIFY: Use the modified data provided by the hook
     ABORT: Abort the operation entirely
     """
+
     CONTINUE = "continue"
     SKIP = "skip"
     MODIFY = "modify"
@@ -31,6 +32,7 @@ class HookEvent:
         data: Event-specific data dictionary
         context: Additional context information
     """
+
     event_type: str
     data: Dict[str, Any]
     context: Dict[str, Any] = field(default_factory=dict)
@@ -55,6 +57,7 @@ class HookResult:
         message: Optional message explaining the action
         metadata: Optional additional metadata from the hook
     """
+
     action: HookAction = HookAction.CONTINUE
     modified_data: Optional[Dict[str, Any]] = None
     message: Optional[str] = None

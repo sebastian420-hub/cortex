@@ -10,11 +10,9 @@ from cortex.config import AgentConfig
 def test_agent_initialization(tmp_path):
     """Test agent initialization"""
     agent = Cortex(
-        model="llama3.2",
-        project_dir=str(tmp_path),
-        permission_mode=PermissionMode.NORMAL
+        model="llama3.2", project_dir=str(tmp_path), permission_mode=PermissionMode.NORMAL
     )
-    
+
     assert agent.model == "llama3.2"
     assert agent.project_dir == tmp_path.resolve()
     assert agent.permission_mode == PermissionMode.NORMAL
@@ -24,13 +22,11 @@ def test_agent_load_project_context(tmp_path):
     """Test loading project context from AGENT.md"""
     agent_file = tmp_path / "AGENT.md"
     agent_file.write_text("# Project\n\nThis is a test project.")
-    
+
     agent = Cortex(
-        model="llama3.2",
-        project_dir=str(tmp_path),
-        permission_mode=PermissionMode.NORMAL
+        model="llama3.2", project_dir=str(tmp_path), permission_mode=PermissionMode.NORMAL
     )
-    
+
     assert "Project" in agent.project_context
     assert "test project" in agent.project_context
 
@@ -38,9 +34,7 @@ def test_agent_load_project_context(tmp_path):
 def test_agent_execute_tool_string_args(tmp_path):
     """Test that tool execution handles string JSON arguments"""
     agent = Cortex(
-        model="llama3.2",
-        project_dir=str(tmp_path),
-        permission_mode=PermissionMode.AUTO_APPROVE
+        model="llama3.2", project_dir=str(tmp_path), permission_mode=PermissionMode.AUTO_APPROVE
     )
 
     # Create a test file
@@ -49,6 +43,7 @@ def test_agent_execute_tool_string_args(tmp_path):
 
     # Test with string arguments (JSON)
     import json
+
     args_str = json.dumps({"path": "test.txt"})
     result = agent.execute_tool("read_file", args_str)
 
@@ -60,20 +55,17 @@ def test_agent_execute_tool_string_args(tmp_path):
 def test_agent_clear_conversation(tmp_path):
     """Test clearing conversation"""
     agent = Cortex(
-        model="llama3.2",
-        project_dir=str(tmp_path),
-        permission_mode=PermissionMode.NORMAL
+        model="llama3.2", project_dir=str(tmp_path), permission_mode=PermissionMode.NORMAL
     )
-    
+
     # Add some messages
     agent.conversation.add_user_message("Hello")
     agent.conversation.add_assistant_message("Hi")
-    
+
     # Clear
     agent.clear_conversation()
-    
+
     # Should only have system message
     history = agent.get_conversation_history()
     assert len(history) == 1
     assert history[0]["role"] == "system"
-

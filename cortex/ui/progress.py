@@ -37,10 +37,7 @@ class OperationTracker:
 
     @contextmanager
     def track_operation(
-        self,
-        description: str,
-        total: Optional[int] = None,
-        show_speed: bool = False
+        self, description: str, total: Optional[int] = None, show_speed: bool = False
     ) -> Generator["ProgressUpdater", None, None]:
         """
         Context manager for tracking an operation.
@@ -73,10 +70,7 @@ class OperationTracker:
                 yield updater
         else:
             # Indeterminate progress (spinner)
-            with self.console.status(
-                f"[cyan]{description}...[/cyan]",
-                spinner="dots"
-            ) as status:
+            with self.console.status(f"[cyan]{description}...[/cyan]", spinner="dots") as status:
                 updater = SpinnerUpdater(status, description, self._start_time)
                 yield updater
 
@@ -94,7 +88,7 @@ class OperationTracker:
         description: str,
         success: bool = True,
         summary: str = "",
-        duration: Optional[float] = None
+        duration: Optional[float] = None,
     ) -> None:
         """
         Display operation completion.
@@ -173,8 +167,7 @@ class SpinnerUpdater:
 
 @contextmanager
 def track_files(
-    description: str = "Processing files",
-    total: Optional[int] = None
+    description: str = "Processing files", total: Optional[int] = None
 ) -> Generator[ProgressUpdater, None, None]:
     """
     Convenience context manager for file operations.
@@ -193,8 +186,7 @@ def track_files(
 
 @contextmanager
 def track_search(
-    query: str,
-    total_files: Optional[int] = None
+    query: str, total_files: Optional[int] = None
 ) -> Generator[ProgressUpdater, None, None]:
     """
     Convenience context manager for search operations.
@@ -213,10 +205,7 @@ def track_search(
 
 
 def show_operation_summary(
-    operation: str,
-    results_count: int,
-    duration_ms: float,
-    details: str = ""
+    operation: str, results_count: int, duration_ms: float, details: str = ""
 ) -> None:
     """
     Display a summary of a completed operation.

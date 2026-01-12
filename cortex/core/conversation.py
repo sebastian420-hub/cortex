@@ -1,9 +1,12 @@
 """Conversation history management"""
 
 import logging
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 from datetime import datetime
 from .context import truncate_history, get_conversation_tokens
+
+if TYPE_CHECKING:
+    from .summarization import ConversationSummarizer, SummaryChunk
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,10 @@ class ConversationManager:
         keep_recent: int = 20,
         model: str = "gpt-4",
         warn_on_truncation: bool = True,
-        on_truncation: Optional[Callable[[int, int], None]] = None
+        on_truncation: Optional[Callable[[int, int], None]] = None,
+        summarizer: Optional["ConversationSummarizer"] = None,
+        enable_summarization: bool = True,
+        summarization_threshold: float = 0.8,
     ):
         """
         Initialize conversation manager.
@@ -30,6 +36,9 @@ class ConversationManager:
             model: Model name for token counting
             warn_on_truncation: Whether to log warnings on truncation
             on_truncation: Optional callback(messages_removed, new_count) on truncation
+            summarizer: Optional summarizer for intelligent context management
+            enable_summarization: Whether to use summarization (vs pure truncation)
+            summarization_threshold: Token threshold (0-1) to trigger summarization
         """
         self.system_prompt = system_prompt
         self.max_tokens = max_tokens
@@ -37,26 +46,25 @@ class ConversationManager:
         self.model = model
         self.warn_on_truncation = warn_on_truncation
         self._on_truncation = on_truncation
-        self.history: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt}
-        ]
+        self.summarizer = summarizer
+        self.enable_summarization = enable_summarization
+        self.summarization_threshold = summarization_threshold
+        self.history: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         self.created_at = datetime.now()
         self.truncation_count = 0
         self.total_messages_removed = 0
-    
+        self.summaries: List["SummaryChunk"] = []  # Track all summaries created
+
     def add_user_message(self, content: str) -> None:
         """Add a user message to the conversation"""
-        self.history.append({
-            "role": "user",
-            "content": content
-        })
+        self.history.append({"role": "user", "content": content})
         self._optimize()
-    
+
     def add_assistant_message(
         self,
         content: str = "",
         tool_calls: Optional[List[Dict[str, Any]]] = None,
-        reasoning_content: Optional[str] = None
+        reasoning_content: Optional[str] = None,
     ) -> None:
         """Add an assistant message to the conversation"""
         msg: Dict[str, Any] = {"role": "assistant"}
@@ -68,70 +76,126 @@ class ConversationManager:
             msg["reasoning_content"] = reasoning_content
         self.history.append(msg)
         self._optimize()
-    
+
     def add_tool_result(self, tool_call_id: str, result: Dict[str, Any]) -> None:
         """Add a tool result to the conversation"""
         import json
+
         # Ensure result has standard format before stringifying
         # This ensures consistent structure even if tools don't use helper functions
         if "success" not in result:
             result["success"] = "error" not in result
-        
-        self.history.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "content": json.dumps(result, ensure_ascii=False)  # Keep JSON but ensure format
-        })
+
+        self.history.append(
+            {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": json.dumps(result, ensure_ascii=False),  # Keep JSON but ensure format
+            }
+        )
         self._optimize()
-    
+
     def get_history(self) -> List[Dict[str, Any]]:
         """Get the current conversation history"""
         return self.history.copy()
-    
+
     def clear(self, keep_system: bool = True) -> None:
         """Clear conversation history"""
         if keep_system and self.history and self.history[0].get("role") == "system":
             self.history = [self.history[0]]
         else:
             self.history = []
-    
+
     def _optimize(self) -> None:
-        """Optimize conversation history if it exceeds token limit"""
+        """Optimize conversation history if it exceeds token limit."""
         current_tokens = get_conversation_tokens(self.history, self.model)
-        if current_tokens > self.max_tokens:
-            old_count = len(self.history)
-            self.history = truncate_history(
-                self.history,
-                max_tokens=self.max_tokens,
-                keep_system=True,
-                keep_recent=self.keep_recent,
-                model=self.model
-            )
-            new_count = len(self.history)
 
-            # Track and report truncation
-            if old_count != new_count:
-                messages_removed = old_count - new_count
-                self.truncation_count += 1
-                self.total_messages_removed += messages_removed
+        # Check if we need to optimize
+        if current_tokens <= self.max_tokens:
+            return
 
-                if self.warn_on_truncation:
-                    logger.warning(
-                        f"Context truncated: removed {messages_removed} old messages "
-                        f"(truncation #{self.truncation_count}, {new_count} messages remaining)"
-                    )
+        old_count = len(self.history)
 
-                # Call optional callback
-                if self._on_truncation:
+        # Try summarization first if enabled and we have a summarizer
+        if self.enable_summarization and self.summarizer:
+            if self.summarizer.should_summarize(
+                self.history, current_tokens, self.max_tokens, self.summarization_threshold
+            ):
+                # Get messages to summarize (skip system, keep recent)
+                # We need at least 5 messages to make summarization worthwhile
+                messages_to_summarize = self.history[1 : -self.keep_recent]
+
+                if len(messages_to_summarize) >= 5:
                     try:
-                        self._on_truncation(messages_removed, new_count)
+                        summary = self.summarizer.summarize(
+                            messages_to_summarize, max_summary_tokens=500
+                        )
+                        self.summaries.append(summary)
+
+                        # Create summary message
+                        summary_message = summary.to_message()
+
+                        # Rebuild history: system + summary + recent
+                        self.history = [
+                            self.history[0],  # System prompt
+                            summary_message,
+                            *self.history[-self.keep_recent :],  # Recent messages
+                        ]
+
+                        new_count = len(self.history)
+                        messages_removed = old_count - new_count
+
+                        if self.warn_on_truncation:
+                            logger.info(
+                                f"Context summarized: {messages_removed} messages -> summary "
+                                f"(summarization #{len(self.summaries)}, {new_count} messages remaining)"
+                            )
+
+                        # Call callback
+                        if self._on_truncation:
+                            try:
+                                self._on_truncation(messages_removed, new_count)
+                            except Exception as e:
+                                logger.error(f"Truncation callback error: {e}")
+
+                        return  # Done with summarization
+
                     except Exception as e:
-                        logger.error(f"Truncation callback error: {e}")
-    
+                        logger.warning(f"Summarization failed, falling back to truncation: {e}")
+
+        # Fallback to simple truncation
+        self.history = truncate_history(
+            self.history,
+            max_tokens=self.max_tokens,
+            keep_system=True,
+            keep_recent=self.keep_recent,
+            model=self.model,
+        )
+        new_count = len(self.history)
+
+        # Track and report truncation
+        if old_count != new_count:
+            messages_removed = old_count - new_count
+            self.truncation_count += 1
+            self.total_messages_removed += messages_removed
+
+            if self.warn_on_truncation:
+                logger.warning(
+                    f"Context truncated: removed {messages_removed} old messages "
+                    f"(truncation #{self.truncation_count}, {new_count} messages remaining)"
+                )
+
+            # Call optional callback
+            if self._on_truncation:
+                try:
+                    self._on_truncation(messages_removed, new_count)
+                except Exception as e:
+                    logger.error(f"Truncation callback error: {e}")
+
     def get_token_count(self) -> int:
         """Get current token count"""
         return get_conversation_tokens(self.history, self.model)
-    
+
     def update_model(self, new_model: str) -> None:
         """
         Update the model reference for token counting.
@@ -145,17 +209,22 @@ class ConversationManager:
 
     def get_truncation_stats(self) -> Dict[str, Any]:
         """
-        Get truncation statistics.
+        Get truncation and summarization statistics.
 
         Returns:
-            Dict with truncation metrics
+            Dict with truncation and summarization metrics
         """
         return {
             "truncation_count": self.truncation_count,
             "total_messages_removed": self.total_messages_removed,
+            "summarization_count": len(self.summaries),
             "current_message_count": len(self.history),
             "current_token_count": self.get_token_count(),
             "max_tokens": self.max_tokens,
             "keep_recent": self.keep_recent,
+            "summarization_enabled": self.enable_summarization,
         }
 
+    def get_summaries(self) -> List["SummaryChunk"]:
+        """Get all summaries created during this conversation."""
+        return self.summaries.copy()

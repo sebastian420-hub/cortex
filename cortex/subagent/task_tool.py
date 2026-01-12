@@ -55,7 +55,7 @@ TASK_TOOL_SCHEMA = {
             "properties": {
                 "description": {
                     "type": "string",
-                    "description": "Clear, specific description of the subtask to accomplish"
+                    "description": "Clear, specific description of the subtask to accomplish",
                 },
                 "agent_type": {
                     "type": "string",
@@ -64,7 +64,7 @@ TASK_TOOL_SCHEMA = {
                         "Type of agent: 'explore' for codebase understanding, "
                         "'search' for finding code, 'analyze' for code analysis, "
                         "'general' for other tasks. Default: 'general'"
-                    )
+                    ),
                 },
                 "allowed_tools": {
                     "type": "array",
@@ -72,20 +72,20 @@ TASK_TOOL_SCHEMA = {
                     "description": (
                         "Override default tools. If not specified, uses agent_type defaults. "
                         "Available: read_file, list_files, grep, glob, git_status, git_log"
-                    )
+                    ),
                 },
                 "max_iterations": {
                     "type": "integer",
-                    "description": "Maximum iterations (default varies by agent_type)"
+                    "description": "Maximum iterations (default varies by agent_type)",
                 },
                 "context": {
                     "type": "string",
-                    "description": "Additional context to provide to the subagent"
-                }
+                    "description": "Additional context to provide to the subagent",
+                },
             },
-            "required": ["description"]
-        }
-    }
+            "required": ["description"],
+        },
+    },
 }
 
 
@@ -157,7 +157,11 @@ class TaskTool(Tool):
 
         if self.console:
             self.console.print(f"[cyan]Starting {agent_type} task:[/cyan] {task_id}")
-            self.console.print(f"[dim]{description[:100]}...[/dim]" if len(description) > 100 else f"[dim]{description}[/dim]")
+            self.console.print(
+                f"[dim]{description[:100]}...[/dim]"
+                if len(description) > 100
+                else f"[dim]{description}[/dim]"
+            )
 
         # Use agent type defaults, allow overrides
         if allowed_tools is None:
@@ -196,13 +200,15 @@ class TaskTool(Tool):
             if self.console:
                 self.console.print(f"[green]Subtask {task_id} completed[/green]")
 
-            return create_success_response({
-                "task_id": task_id,
-                "result": result.get("final_response", ""),
-                "iterations_used": subagent_context.iterations_used,
-                "tools_called": subagent_context.tools_called,
-                "duration_seconds": subagent_context.duration_seconds,
-            })
+            return create_success_response(
+                {
+                    "task_id": task_id,
+                    "result": result.get("final_response", ""),
+                    "iterations_used": subagent_context.iterations_used,
+                    "tools_called": subagent_context.tools_called,
+                    "duration_seconds": subagent_context.duration_seconds,
+                }
+            )
 
         except Exception as e:
             logger.error(f"Subtask {task_id} failed: {e}")
@@ -212,9 +218,7 @@ class TaskTool(Tool):
                 self.console.print(f"[red]Subtask {task_id} failed:[/red] {e}")
 
             return create_error_response(
-                f"Subtask failed: {e}",
-                ErrorType.EXECUTION,
-                {"task_id": task_id}
+                f"Subtask failed: {e}", ErrorType.EXECUTION, {"task_id": task_id}
             )
 
         finally:
@@ -277,15 +281,15 @@ class TaskTool(Tool):
 
         # Collect results
         context.conversation_history = subagent.get_conversation_history()
-        context.iterations_used = len([
-            m for m in context.conversation_history
-            if m.get("role") == "assistant"
-        ])
+        context.iterations_used = len(
+            [m for m in context.conversation_history if m.get("role") == "assistant"]
+        )
         context.tools_called = subagent._tools_used.copy()
 
         # Extract final response
         final_messages = [
-            msg for msg in context.conversation_history
+            msg
+            for msg in context.conversation_history
             if msg.get("role") == "assistant" and msg.get("content")
         ]
 
@@ -326,7 +330,9 @@ class TaskTool(Tool):
 
         # Agent-type specific instructions
         if agent_type == "explore":
-            return base + """
+            return (
+                base
+                + """
 ## Exploration Strategy
 
 You are exploring a codebase to understand its structure and answer questions.
@@ -358,9 +364,12 @@ Provide a structured summary:
 4. **Findings**: Direct answers to any questions asked
 
 Be thorough but concise. Reference files with `file.py:line` format."""
+            )
 
         elif agent_type == "search":
-            return base + """
+            return (
+                base
+                + """
 ## Search Strategy
 
 You are searching for specific code patterns or definitions.
@@ -386,9 +395,12 @@ Report findings as:
 - **Found in**: file.py:42
 - **Context**: Brief description of what's there
 - List all relevant matches"""
+            )
 
         elif agent_type == "analyze":
-            return base + """
+            return (
+                base
+                + """
 ## Analysis Strategy
 
 You are analyzing code structure, relationships, and patterns.
@@ -415,9 +427,12 @@ Provide:
 2. **Dependencies**: Key imports and relationships
 3. **Patterns**: Design patterns used
 4. **Observations**: Notable findings or concerns"""
+            )
 
         else:  # general
-            return base + """
+            return (
+                base
+                + """
 ## Guidelines
 
 1. **Focus**: Work ONLY on the assigned task
@@ -430,6 +445,7 @@ Provide:
 1. Brief summary of what you found/accomplished
 2. Key findings or results
 3. Relevant code snippets or file references"""
+            )
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """

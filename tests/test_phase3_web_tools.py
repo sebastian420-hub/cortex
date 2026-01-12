@@ -24,6 +24,7 @@ class TestWebFetchToolBasics:
     def test_web_fetch_tool_import(self):
         """Test that WebFetchTool can be imported."""
         from cortex.tools.web_tools import WebFetchTool
+
         assert WebFetchTool is not None
 
     def test_web_fetch_tool_instantiation(self, temp_project):
@@ -106,7 +107,7 @@ class TestWebFetchCache:
 class TestWebFetchMocked:
     """Mocked tests for WebFetchTool (no actual network calls)."""
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_fetch_success(self, mock_requests, temp_project):
         """Test successful web fetch with mocked requests."""
         from cortex.tools.web_tools import WebFetchTool, HAS_REQUESTS
@@ -119,7 +120,9 @@ class TestWebFetchMocked:
         mock_response.status_code = 200
         mock_response.url = "https://example.com"
         mock_response.headers = {"Content-Type": "text/html"}
-        mock_response.text = "<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>"
+        mock_response.text = (
+            "<html><head><title>Test Page</title></head><body><p>Hello World</p></body></html>"
+        )
         mock_response.raise_for_status = Mock()
         mock_requests.get.return_value = mock_response
 
@@ -135,7 +138,7 @@ class TestWebFetchMocked:
         assert "content" in result
         assert result["url"] == "https://example.com"
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_fetch_json_content(self, mock_requests, temp_project):
         """Test fetching JSON content."""
         from cortex.tools.web_tools import WebFetchTool, HAS_REQUESTS
@@ -163,7 +166,7 @@ class TestWebFetchMocked:
         assert result["success"] is True
         assert "key" in result["content"]
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_fetch_timeout(self, mock_requests, temp_project):
         """Test handling of request timeout."""
         from cortex.tools.web_tools import WebFetchTool, HAS_REQUESTS
@@ -187,7 +190,7 @@ class TestWebFetchMocked:
         assert result["success"] is False
         assert "timeout" in result.get("error_type", "")
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_fetch_redirect_detection(self, mock_requests, temp_project):
         """Test detection of cross-host redirects."""
         from cortex.tools.web_tools import WebFetchTool, HAS_REQUESTS
@@ -222,6 +225,7 @@ class TestWebSearchToolBasics:
     def test_web_search_tool_import(self):
         """Test that WebSearchTool can be imported."""
         from cortex.tools.web_tools import WebSearchTool
+
         assert WebSearchTool is not None
 
     def test_web_search_tool_instantiation(self, temp_project):
@@ -266,7 +270,7 @@ class TestWebSearchToolBasics:
 class TestWebSearchMocked:
     """Mocked tests for WebSearchTool (no actual network calls)."""
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_search_success(self, mock_requests, temp_project):
         """Test successful web search with mocked requests."""
         from cortex.tools.web_tools import WebSearchTool, HAS_REQUESTS, HAS_BS4
@@ -303,7 +307,7 @@ class TestWebSearchMocked:
         assert result["success"] is True
         assert "results" in result
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_search_no_results(self, mock_requests, temp_project):
         """Test web search with no results."""
         from cortex.tools.web_tools import WebSearchTool, HAS_REQUESTS
@@ -329,7 +333,7 @@ class TestWebSearchMocked:
         assert result["success"] is True
         assert result["result_count"] == 0
 
-    @patch('cortex.tools.web_tools.requests')
+    @patch("cortex.tools.web_tools.requests")
     def test_web_search_domain_filter(self, mock_requests, temp_project):
         """Test web search with domain filtering."""
         from cortex.tools.web_tools import WebSearchTool, HAS_REQUESTS
@@ -360,10 +364,7 @@ class TestWebSearchMocked:
         )
 
         # Test with allowed_domains filter
-        result = tool.execute(
-            query="python documentation",
-            allowed_domains=["docs.python.org"]
-        )
+        result = tool.execute(query="python documentation", allowed_domains=["docs.python.org"])
 
         assert result["success"] is True
 
@@ -391,12 +392,7 @@ class TestToolRegistration:
         from cortex.tools.web_tools import WebFetchTool
 
         registry = get_registry()
-        tool = registry.create_instance(
-            "web_fetch",
-            temp_project,
-            PermissionMode.NORMAL,
-            None
-        )
+        tool = registry.create_instance("web_fetch", temp_project, PermissionMode.NORMAL, None)
         assert isinstance(tool, WebFetchTool)
 
     def test_can_create_web_search_instance(self, temp_project):
@@ -405,12 +401,7 @@ class TestToolRegistration:
         from cortex.tools.web_tools import WebSearchTool
 
         registry = get_registry()
-        tool = registry.create_instance(
-            "web_search",
-            temp_project,
-            PermissionMode.NORMAL,
-            None
-        )
+        tool = registry.create_instance("web_search", temp_project, PermissionMode.NORMAL, None)
         assert isinstance(tool, WebSearchTool)
 
 
@@ -427,7 +418,9 @@ class TestHTMLProcessing:
             console=None,
         )
 
-        html = "<html><head><title>Test</title></head><body><h1>Hello</h1><p>World</p></body></html>"
+        html = (
+            "<html><head><title>Test</title></head><body><h1>Hello</h1><p>World</p></body></html>"
+        )
         content, title = tool._process_html(html, "https://example.com")
 
         assert title == "Test"
