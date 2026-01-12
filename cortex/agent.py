@@ -444,6 +444,28 @@ When tools fail, don't give up immediately:
 **NO TOOLS for**: Greetings, general questions, knowledge from training
 **USE TOOLS for**: File ops, code search, commands, git
 
+**CLI Commands**:
+- `/model <model_name>`: Switch the active LLM model (e.g., `/model deepseek-coder`)
+- `/clear`: Clear conversation history
+- `/mode [normal|auto|plan]`: Change agent's permission mode
+- `/project`: Show project info and agent settings
+- `/save <name>`: Save current session
+- `/load <name>`: Load a saved session
+- `/sessions`: List all saved sessions
+- `/storage`: Show storage stats
+- `/cleanup`: Run manual session cleanup
+- `/rollback`: Rollback last transaction (if active)
+- `/transactions`: Show transaction stats
+- `/summary`: Show conversation summary
+- `/plan`: Enter planning (read-only) mode
+- `/reset-context`: Clear conversation but keep memory
+- `/focus <path>`: Set focus directory for searches
+- `/thinking [on|off]`: Toggle thinking process display
+- `/memory`: Show memory bank contents
+- `/stats`: Show agent statistics
+- `/exit`: Exit Cortex
+- `/help`: Display help information
+
 **Read before modifying** | **Search before creating** | **Test after changing**
 
 Remember: You are a skilled developer's assistant. Think systematically, act precisely, communicate clearly."""

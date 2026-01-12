@@ -6,6 +6,17 @@ import argparse
 import signal
 from pathlib import Path
 from typing import Optional
+import logging
+
+# Configure logging - only show WARNING and above by default
+logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(name)s:%(message)s')
+
+# Suppress noisy third-party loggers
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('cortex.tools.registry').setLevel(logging.WARNING)
+
+logger = logging.getLogger(__name__)
 
 from rich.console import Console
 from rich.panel import Panel
@@ -511,7 +522,11 @@ def handle_command(command: str, agent: Cortex, session_manager: SessionManager,
     """Handle special commands"""
     from datetime import datetime
 
+    logger = logging.getLogger(__name__) # Initialize logger here
+    logger.debug(f"Handling command: '{command}'")
+    
     cmd = command.lower().strip()
+    logger.debug(f"Processed cmd: '{cmd}'")
 
     if cmd.startswith("/help"):
         from .help import HelpSystem
@@ -524,6 +539,26 @@ def handle_command(command: str, agent: Cortex, session_manager: SessionManager,
     elif cmd == "/clear":
         agent.clear_conversation()
         console.print("[green]✓[/green] Conversation cleared")
+
+    elif cmd.startswith("/model"):
+        logger.debug(f"Matched /model handler, cmd='{cmd}'")
+        parts = cmd.split()
+        logger.debug(f"Split into parts: {parts}, len={len(parts)}")
+        if len(parts) > 1:
+            new_model = parts[1]
+            logger.debug(f"Calling agent.switch_model with model='{new_model}', provider='{agent.config.provider}'")
+            try:
+                agent.switch_model(new_model, agent.config.provider)
+                console.print(f"[green]✓[/green] Model switched to: {agent.model}")
+                # Update system prompt in case it contains model-specific instructions
+                agent.conversation.history[0]["content"] = agent._get_system_prompt()
+            except ProviderError as e:
+                console.print(f"[red]Error switching model:[/red] {e}")
+            except Exception as e:
+                console.print(f"[red]An unexpected error occurred:[/red] {e}")
+        else:
+            console.print(f"Current model: {agent.model}")
+            console.print("[dim]Usage: /model <model_name>[/dim]")
 
     elif cmd.startswith("/mode"):
         parts = cmd.split()
@@ -538,7 +573,7 @@ def handle_command(command: str, agent: Cortex, session_manager: SessionManager,
                 console.print("[red]Invalid mode. Use: normal, auto, or plan[/red]")
         else:
             console.print(f"Current mode: {agent.permission_mode}")
-
+            
     elif cmd == "/project":
         info = f"""
 [bold]Project Information[/bold]
@@ -810,6 +845,7 @@ Items: {len(agent.memory_bank.items) if agent.memory_bank else 0}
         console.print(Panel(stats_text, title="Stats", border_style="cyan"))
 
     else:
+        logger.debug(f"No handler matched for cmd='{cmd}'")
         console.print(f"[red]Unknown command: {command}[/red]")
         console.print("[dim]Type /help for available commands[/dim]")
 
