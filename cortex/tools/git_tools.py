@@ -141,7 +141,7 @@ class GitCommitTool(Tool):
             self.console.print(f"[blue]🔧 Git Commit:[/blue] {message}")
 
         # Ask for approval
-        if self.permission_mode == PermissionMode.NORMAL and self.console:
+        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(f"[bold]Commit with message: '{message}'?[/bold]"):
                 if self.console:
                     self.console.print("[red]✗[/red] Cancelled by user")
@@ -274,7 +274,7 @@ class GitAddTool(Tool):
             action_desc = ", ".join(files)
 
         # Ask for approval
-        if self.permission_mode == PermissionMode.NORMAL and self.console:
+        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(f"[bold]Stage {action_desc} for commit?[/bold]"):
                 if self.console:
                     self.console.print("[red]✗[/red] Cancelled by user")
@@ -378,7 +378,7 @@ class GitBranchTool(Tool):
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would create branch '{branch_name}'")
             return create_permission_denial("Plan mode - no branch creation", "git_branch_create")
 
-        if self.permission_mode == PermissionMode.NORMAL and self.console:
+        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(f"[bold]Create new branch '{branch_name}'?[/bold]"):
                 return create_permission_denial("User cancelled branch creation.", "git_branch_create")
 
@@ -411,7 +411,7 @@ class GitBranchTool(Tool):
         delete_flag = "-D" if force else "-d"
         confirm_msg = f"[bold red]Permanently delete branch '{branch_name}'? This cannot be undone.[/bold red]" if force else f"[bold]Delete branch '{branch_name}'?[/bold]"
         
-        if self.permission_mode == PermissionMode.NORMAL and self.console:
+        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(confirm_msg):
                 return create_permission_denial("User cancelled branch deletion.", "git_branch_delete")
 
@@ -429,6 +429,7 @@ class GitBranchTool(Tool):
 
             if self.console:
                 self.console.print(Panel(result.stdout, title="✓ Branch Deleted", border_style="green"))
+            return create_success_response({"branch_name": branch_name, "action": "delete"})
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION)
 
@@ -460,8 +461,12 @@ class GitPushTool(Tool):
                 expand=False,
             )
             self.console.print(warning_panel)
+            if self.permission_mode == PermissionMode.NORMAL and not Confirm.ask(f"[bold]Are you sure you want to {action_desc}?[/bold]"):
+                return create_permission_denial("User cancelled push.", "git_push")
+        elif self.permission_mode == PermissionMode.NORMAL and self.console:
             if not Confirm.ask(f"[bold]Are you sure you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled push.", "git_push")
+
 
         cmd = ["git", "push", remote]
         if branch:
@@ -531,6 +536,7 @@ class GitRemoteTool(Tool):
             output = result.stdout
             if self.console:
                 self.console.print(Panel(output or "[dim]No remotes configured.[/dim]", title="📡 Git Remotes", border_style="cyan"))
+            return create_success_response({"output": output, "remotes": output.strip().split("\n") if output.strip() else []})
             
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION)
@@ -564,6 +570,7 @@ class GitShowTool(Tool):
             output = result.stdout
             if self.console:
                 self.console.print(Panel(output, title=f"📄 Git Show: {ref}", border_style="cyan"))
+            return create_success_response({"output": output})
             
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION)
@@ -589,7 +596,7 @@ class GitCheckoutTool(Tool):
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would {action_desc}")
             return create_permission_denial("Plan mode - no checkout allowed", "git_checkout")
 
-        if self.permission_mode == PermissionMode.NORMAL and self.console:
+        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled checkout.", "git_checkout")
 
@@ -640,7 +647,7 @@ class GitResetTool(Tool):
             return create_permission_denial("Plan mode - no reset allowed", "git_reset")
 
         if self.permission_mode == PermissionMode.NORMAL and self.console:
-            if not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
+            if self.permission_mode != PermissionMode.AUTO_APPROVE and not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled reset.", "git_reset")
 
         cmd = ["git", "reset", "--"] + files
@@ -688,7 +695,7 @@ class GitFetchTool(Tool):
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would {action_desc}")
             return create_permission_denial("Plan mode - no fetch allowed", "git_fetch")
 
-        if self.permission_mode == PermissionMode.NORMAL and self.console:
+        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled fetch.", "git_fetch")
 
@@ -746,15 +753,7 @@ class GitPullTool(Tool):
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would {action_desc}")
             return create_permission_denial("Plan mode - no pull allowed", "git_pull")
 
-        if self.console:
-            warning_panel = Panel(
-                f"[bold]You are about to pull changes from the remote repository '{remote}' and merge them into your current branch.[/bold]\n"
-                "This can create merge conflicts or overwrite local changes.",
-                title="🚨 [bold red]High-Risk Action[/bold red] 🚨",
-                border_style="red",
-                expand=False,
-            )
-            self.console.print(warning_panel)
+        if self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
             if not Confirm.ask(f"[bold]Are you sure you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled pull.", "git_pull")
 
