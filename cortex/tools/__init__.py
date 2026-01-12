@@ -7,7 +7,20 @@ from .base import Tool
 from .file_tools import ReadFileTool, WriteFileTool
 from .command_tools import ExecuteCommandTool
 from .search_tools import ListFilesTool, SearchFilesTool
-from .git_tools import GitStatusTool, GitDiffTool, GitCommitTool, GitLogTool
+from .git_tools import (
+    GitStatusTool,
+    GitDiffTool,
+    GitCommitTool,
+    GitLogTool,
+    GitAddTool,
+    GitBranchTool,
+    GitPushTool,
+    GitShowTool,
+    GitCheckoutTool,
+    GitResetTool,
+    GitFetchTool,
+    GitPullTool,
+)
 from .test_tools import RunTestsTool
 
 # New Phase 1 tools
@@ -304,6 +317,186 @@ TOOLS: List[Dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "git_branch",
+            "description": "List, create, or delete branches. Default action is 'list'.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "create", "delete"],
+                        "description": "The action to perform: 'list', 'create', or 'delete'. Defaults to 'list'.",
+                    },
+                    "branch_name": {
+                        "type": "string",
+                        "description": "The name of the branch for 'create' or 'delete' actions.",
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Force deletion of the branch. Use with caution. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_push",
+            "description": "Push commits to a remote repository. This is a high-risk operation.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "remote": {
+                        "type": "string",
+                        "description": "The name of the remote to push to. Defaults to 'origin'.",
+                    },
+                    "branch": {
+                        "type": "string",
+                        "description": "The local branch to push. If not specified, Git's default behavior is used.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_remote",
+            "description": "List git remotes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "verbose": {
+                        "type": "boolean",
+                        "description": "Show remote URLs. Defaults to false.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_show",
+            "description": "Show details of a git object (commit, tag, etc.).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "description": "The git reference to show. Defaults to 'HEAD'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_checkout",
+            "description": "Switch branches or create a new one.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "branch": {
+                        "type": "string",
+                        "description": "The name of the branch to checkout or create.",
+                    },
+                    "new_branch": {
+                        "type": "boolean",
+                        "description": "If true, creates a new branch. Defaults to false.",
+                    },
+                },
+                "required": ["branch"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_reset",
+            "description": "Unstage files from the index (the opposite of 'git add').",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "A list of specific file paths to unstage.",
+                    },
+                },
+                "required": ["files"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_fetch",
+            "description": "Fetch changes from a remote repository.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "remote": {
+                        "type": "string",
+                        "description": "The name of the remote to fetch from. Defaults to 'origin'.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_pull",
+            "description": "Fetch from and integrate with another repository or a local branch.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "remote": {
+                        "type": "string",
+                        "description": "The name of the remote to pull from. Defaults to 'origin'.",
+                    },
+                    "branch": {
+                        "type": "string",
+                        "description": "The remote branch to pull. If not specified, Git's default behavior is used.",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_add",
+            "description": "Stage changes for the next commit. Use to add specific files or all changes.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "A list of specific file paths to stage.",
+                    },
+                    "add_all": {
+                        "type": "boolean",
+                        "description": "Stage all changes in the repository (equivalent to 'git add --all').",
+                    },
+                },
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "run_tests",
             "description": "Run test suite or specific tests. Auto-detects pytest or unittest. Use this when the user explicitly requests running tests. Do NOT use this for greetings, general questions, or casual conversation.",
             "parameters": {
@@ -471,6 +664,15 @@ __all__ = [
     "GitDiffTool",
     "GitCommitTool",
     "GitLogTool",
+    "GitAddTool",
+    "GitBranchTool",
+    "GitPushTool",
+    "GitRemoteTool",
+    "GitShowTool",
+    "GitCheckoutTool",
+    "GitResetTool",
+    "GitFetchTool",
+    "GitPullTool",
     "RunTestsTool",
     "TaskTool",
     "TodoWriteTool",

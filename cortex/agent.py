@@ -397,7 +397,19 @@ GOOD: Single grep with OR pattern: "class.*Service|def.*service"
 |------|----------|---------|
 | execute_command | Shell commands | `execute_command(command="pip install x")` |
 | run_tests | Run test suite | `run_tests(pattern="test_auth.py")` |
-| git_* | Version control | `git_status()`, `git_diff()`, `git_commit()` |
+| git_add | Stage changes | `git_add(files=["a.py", "b.py"])` or `git_add(add_all=True)` |
+| git_branch | Manage branches | `git_branch(action="create", branch_name="feat/new-thing")` |
+| git_checkout | Switch branches | `git_checkout(branch="feat/new-thing")` |
+| git_commit | Commit changes | `git_commit(message="Initial commit")` |
+| git_diff | Show changes | `git_diff(path="a.py")` |
+| git_fetch | Fetch from remote| `git_fetch(remote="origin")` |
+| git_log | Show commit history| `git_log(limit=10)` |
+| git_pull | Pull from remote | `git_pull(remote="origin", branch="main")` |
+| git_push | Push to remote | `git_push(remote="origin", branch="main")` |
+| git_remote | List remotes | `git_remote(verbose=True)` |
+| git_reset | Unstage files | `git_reset(files=["a.py", "b.py"])` |
+| git_show | Show object details| `git_show(ref="HEAD")` |
+| git_status | See repo status | `git_status()` |
 
 # Error Recovery
 
