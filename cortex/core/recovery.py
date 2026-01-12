@@ -10,14 +10,16 @@ logger = logging.getLogger(__name__)
 
 class RecoveryStrategy(Enum):
     """Available recovery strategies."""
-    SUGGEST = "suggest"           # Inject guidance for model to try alternative
-    ESCALATE = "escalate"         # Stop and ask user
-    CONTINUE = "continue"         # Continue with warning
+
+    SUGGEST = "suggest"  # Inject guidance for model to try alternative
+    ESCALATE = "escalate"  # Stop and ask user
+    CONTINUE = "continue"  # Continue with warning
 
 
 @dataclass
 class RecoveryContext:
     """Context for recovery decision."""
+
     error_type: str
     error_message: str
     tool_name: str
@@ -29,6 +31,7 @@ class RecoveryContext:
 @dataclass
 class RecoveryAction:
     """Action to take for recovery."""
+
     strategy: RecoveryStrategy
     message: str
     suggested_prompt: Optional[str] = None
@@ -128,11 +131,11 @@ class RecoveryManager:
                     f"DEBUG: File '{path}' was not found.\n\n"
                     f"**Self-Debugging Steps:**\n"
                     f"1. Search for similar filenames:\n"
-                    f"   glob(pattern=\"**/*{filename_base}*\")\n\n"
+                    f'   glob(pattern="**/*{filename_base}*")\n\n'
                     f"2. List the parent directory to check path:\n"
                     f"   list_files(path=\"{'/'.join(path.split('/')[:-1]) or '.'}\")\n\n"
                     f"3. Search for related content:\n"
-                    f"   grep(pattern=\"{filename_base}\", output_mode=\"files_with_matches\")\n\n"
+                    f'   grep(pattern="{filename_base}", output_mode="files_with_matches")\n\n'
                     f"4. Check case sensitivity - the file might exist with different casing.\n\n"
                     f"**Before asking user:** Try at least one of these searches first."
                 ),
@@ -145,11 +148,11 @@ class RecoveryManager:
                     f"DEBUG: Search path '{path}' not found.\n\n"
                     f"**Self-Debugging Steps:**\n"
                     f"1. Verify the directory exists:\n"
-                    f"   list_files(path=\".\")\n\n"
+                    f'   list_files(path=".")\n\n'
                     f"2. Search from project root instead:\n"
                     f"   grep(pattern=\"{context.arguments.get('pattern', '')}\", path=\".\")\n\n"
                     f"3. Use glob to find relevant directories:\n"
-                    f"   glob(pattern=\"**/\")\n"
+                    f'   glob(pattern="**/")\n'
                 ),
             )
         return self._default_recovery(context)
@@ -187,7 +190,7 @@ class RecoveryManager:
             suggested_prompt=suggestions.get(
                 tool_name,
                 f"The {tool_name} operation timed out. Consider breaking it into smaller "
-                "operations or using more specific parameters to reduce scope."
+                "operations or using more specific parameters to reduce scope.",
             ),
         )
 
@@ -235,7 +238,11 @@ class RecoveryManager:
         specific_guidance = ""
 
         if "command not found" in error_msg or "not recognized" in error_msg:
-            cmd = context.arguments.get("command", "").split()[0] if context.arguments.get("command") else ""
+            cmd = (
+                context.arguments.get("command", "").split()[0]
+                if context.arguments.get("command")
+                else ""
+            )
             specific_guidance = (
                 f"**Command Not Found Debug:**\n"
                 f"The command '{cmd}' is not available.\n"
