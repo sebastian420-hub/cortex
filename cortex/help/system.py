@@ -1,4 +1,4 @@
-"""Interactive help system for Cortex."""
+﻿"""Interactive help system for Cortex."""
 
 from pathlib import Path
 from typing import Optional, List
@@ -38,7 +38,7 @@ class HelpSystem:
             project_dir: Project directory for type detection
             console: Rich console for output
         """
-        self.project_dir = project_dir or Path.cwd()
+        self.project_dir = Path(project_dir) if project_dir else Path.cwd()
         self.console = console or Console()
         self.project_type = self._detect_project_type()
 

@@ -1,0 +1,17 @@
+System Prompt Analysis Report
+============================================================
+
+Total lines: 113
+Total characters: 3976
+Estimated tokens: 994
+
+Section Breakdown:
+- Identity & Context: 9 lines, 82 tokens
+- Mental Model: 28 lines, 234 tokens
+- Self-Awareness: 21 lines, 191 tokens
+- Efficiency Patterns: 19 lines, 156 tokens
+- Proactive Behavior: 40 lines, 328 tokens
+- Response Style: 13 lines, 121 tokens
+- Final Reminder: 1 lines, 27 tokens
+
+Optimization potential: 0 lines, 0 tokens (0.0% reduction)

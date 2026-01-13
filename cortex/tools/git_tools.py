@@ -1,4 +1,4 @@
-"""Git integration tools"""
+﻿"""Git integration tools"""
 
 import subprocess
 from typing import Dict, Any, Optional
@@ -130,7 +130,7 @@ class GitCommitTool(Tool):
 
         if self.permission_mode == PermissionMode.PLAN:
             if self.console:
-                self.console.print(f"[yellow]⏸  PLAN MODE:[/yellow] Would commit: {message}")
+                self.console.print(f"[yellow]PLAN MODE:[/yellow] Would commit: {message}")
             return create_permission_denial(
                 "Plan mode - no commits allowed",
                 "git_commit",
@@ -259,7 +259,7 @@ class GitAddTool(Tool):
             else:
                 action_desc = ", ".join(files)
             if self.console:
-                self.console.print(f"[yellow]⏸  PLAN MODE:[/yellow] Would stage {action_desc}")
+                self.console.print(f"[yellow]PLAN MODE:[/yellow] Would stage {action_desc}")
             return create_permission_denial(
                 "Plan mode - no staging allowed", "git_add", {"files": files, "add_all": add_all}
             )

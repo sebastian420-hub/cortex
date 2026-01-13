@@ -1,4 +1,4 @@
-"""Surgical file editing tool"""
+﻿"""Surgical file editing tool"""
 
 import difflib
 from pathlib import Path
@@ -94,7 +94,7 @@ class EditTool(Tool):
 
         # Read file content
         try:
-            content = full_path.read_text(encoding="utf-8-sig")
+            content = full_path.read_text(encoding="utf-8")
         except Exception as e:
             return create_error_response(
                 f"Failed to read file: {e}", ErrorType.EXECUTION, {"file_path": file_path}
@@ -166,7 +166,7 @@ class EditTool(Tool):
 
         # Write file
         try:
-            full_path.write_text(new_content, encoding="utf-8-sig")
+            full_path.write_text(new_content, encoding="utf-8")
             # Invalidate cache for this file
             invalidate_file(full_path)
         except Exception as e:

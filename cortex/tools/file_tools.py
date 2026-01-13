@@ -1,4 +1,4 @@
-"""File I/O tools"""
+﻿"""File I/O tools"""
 
 from pathlib import Path
 from typing import Dict, Any
@@ -183,7 +183,7 @@ class WriteFileTool(Tool):
 
         if self.permission_mode == PermissionMode.PLAN:
             if self.console:
-                self.console.print(f"[yellow]⏸  PLAN MODE:[/yellow] Would write to {path}")
+                self.console.print(f"[yellow]PLAN MODE:[/yellow] Would write to {path}")
             return create_permission_denial(
                 "Plan mode - no writes allowed",
                 "write_file",
@@ -210,7 +210,7 @@ class WriteFileTool(Tool):
 
             # Show diff if file exists
             if full_path.exists():
-                old_content = full_path.read_text(encoding="utf-8-sig")
+                old_content = full_path.read_text(encoding="utf-8")
                 if self.console:
                     self.console.print(
                         Panel(
@@ -253,7 +253,7 @@ class WriteFileTool(Tool):
 
             # Verify written content matches (checksum validation to detect corruption)
             try:
-                written_content = full_path.read_text(encoding="utf-8-sig")
+                written_content = full_path.read_text(encoding="utf-8")
                 if written_content != content:
                     return create_error_response(
                         "Content verification failed - written content does not match intended content",

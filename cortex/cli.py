@@ -1,4 +1,4 @@
-"""Command-line interface for Cortex"""
+﻿"""Command-line interface for Cortex"""
 
 import sys
 import os
@@ -458,8 +458,9 @@ def run_interactive(agent: Cortex, session_manager: SessionManager, use_streamin
         sys.exit(0)
 
     # Register handlers (Unix/Linux)
-    if hasattr(signal, "SIGINT"):
-        signal.signal(signal.SIGINT, signal_handler)
+    # SIGINT is handled by KeyboardInterrupt catch block
+    # if hasattr(signal, "SIGINT"):
+    #     signal.signal(signal.SIGINT, signal_handler)
     if hasattr(signal, "SIGTERM"):
         signal.signal(signal.SIGTERM, signal_handler)
 

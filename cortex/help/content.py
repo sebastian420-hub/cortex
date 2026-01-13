@@ -1,4 +1,4 @@
-"""Help content definitions for Cortex."""
+﻿"""Help content definitions for Cortex."""
 
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -371,6 +371,142 @@ HELP_ENTRIES: List[HelpEntry] = [
             "Look up FastAPI tutorial",
         ],
         keywords=["web", "search", "google", "duckduckgo", "internet"],
+        beginner_friendly=True,
+    ),
+    # Tool Reference Help
+    HelpEntry(
+        command="tool reference",
+        short_desc="Complete tool reference guide",
+        long_desc="""Detailed reference for all available tools in Cortex:
+
+## File Discovery Tools
+- `glob(pattern="**/*.py")` - Find files by glob pattern
+- `list_files(path="src")` - Browse directory contents
+
+## Content Search (grep)
+- `grep(pattern="class.*Tool")` - Find which files match pattern (files_with_matches mode)
+- `grep(pattern="def main", output_mode="content")` - Show matching lines
+- `grep(pattern="TODO", output_mode="count")` - Count occurrences
+
+## File Operations
+- `read_file(path="main.py")` - Read and understand file contents
+- `edit(file_path="x.py", old_string="a", new_string="b")` - Surgical string replacement
+- `write_file(path="new.py", content="...")` - Create new file or full rewrite
+
+## Execution Tools
+- `execute_command(command="pip install x")` - Run shell commands
+- `run_tests(pattern="test_auth.py")` - Run test suite
+
+## Git Operations
+- `git_add(files=["a.py", "b.py"])` - Stage changes for commit
+- `git_commit(message="Initial commit")` - Commit staged changes
+- `git_status()` - Show git status
+- `git_diff(path="a.py")` - Show changes
+- `git_log(limit=10)` - Show commit history
+- `git_branch(action="create", branch_name="feat/new-thing")` - Manage branches
+- `git_checkout(branch="feat/new-thing")` - Switch branches
+- `git_push(remote="origin", branch="main")` - Push to remote
+
+Use tools efficiently: Start with search (glob/grep) before reading, use edit for small changes, write_file for large changes.""",
+        category=HelpCategory.ADVANCED,
+        examples=[
+            "What tools are available?",
+            "How do I search for files?",
+            "Show me all git commands",
+        ],
+        keywords=["tools", "reference", "commands", "git", "files", "search", "glob", "grep"],
+        beginner_friendly=False,
+    ),
+    # Error Recovery Help
+    HelpEntry(
+        command="error recovery",
+        short_desc="Error handling and recovery guidance",
+        long_desc="""Guidance for handling tool errors and recovery strategies:
+
+## When Tools Fail
+- Check the `error_type` and `retryable` fields in error responses
+- Permission errors (retryable: false) - Do NOT retry, permission denied
+- Validation errors (retryable: true) - Fix input and retry
+- Execution/timeout errors (retryable: true) - May retry once
+- Not found errors (retryable: false) - Resource doesn't exist
+- Security errors (retryable: false) - Safety violation, do NOT retry
+
+## Common Error Scenarios
+### File Not Found
+1. Check exact spelling and case
+2. Search for similar: `glob(pattern="**/*partial_name*")`
+3. List parent directory: `list_files(path="parent_dir")`
+
+### Command Failed
+1. Read the exact error message
+2. Check if dependencies are installed
+3. Try a simpler version of the command
+4. Consider platform differences (Windows vs Unix)
+
+### Edit Failed (string not unique)
+1. Include more context in old_string
+2. Use `replace_all=True` if appropriate
+3. Fall back to `write_file` for complex changes
+
+## Recovery Patterns
+- If stuck in a loop, try a different approach
+- Ask user for clarification if requirements are ambiguous
+- Use `/clear` to reset conversation if needed""",
+        category=HelpCategory.ADVANCED,
+        examples=[
+            "How do I handle file not found errors?",
+            "What does 'retryable: true' mean?",
+            "The edit tool failed, what should I do?",
+        ],
+        keywords=["error", "recovery", "handling", "debug", "troubleshoot", "retry", "permission"],
+        beginner_friendly=False,
+    ),
+    # CLI Commands Reference
+    HelpEntry(
+        command="cli commands",
+        short_desc="Complete CLI command reference",
+        long_desc="""All available CLI commands for Cortex:
+
+## Session Management
+- `/help` - Show available commands
+- `/clear` - Clear conversation history
+- `/mode [normal|auto|plan]` - Change permission mode
+- `/project` - Show project info and settings
+- `/save <name>` - Save current session
+- `/load <name>` - Load saved session
+- `/sessions` - List saved sessions
+- `/exit` - Exit Cortex
+
+## Context & Memory
+- `/summary` - Show conversation summary
+- `/plan` - Enter planning (read-only) mode
+- `/reset-context` - Clear history, keep memory
+- `/focus <path>` - Set focus directory
+- `/memory` - Show memory bank contents
+- `/stats` - Show session statistics
+
+## Display & Configuration
+- `/thinking [on|off]` - Toggle thinking process display
+- `/storage` - Show storage statistics
+- `/cleanup` - Clean up old sessions
+- `/cache` - Show or clear file cache
+
+## Advanced Features
+- `/rollback` - Rollback file changes
+- `/transactions` - Show transaction info
+- `/model <model_name>` - Switch LLM model
+
+## Usage Tips
+- Use `/help <topic>` for detailed help on any topic
+- Use `/help search <query>` to search all help content
+- Use `/help categories` to browse by category""",
+        category=HelpCategory.ADVANCED,
+        examples=[
+            "What commands are available?",
+            "How do I save my session?",
+            "Show me all session commands",
+        ],
+        keywords=["cli", "commands", "reference", "session", "context", "mode", "save", "load"],
         beginner_friendly=True,
     ),
 ]

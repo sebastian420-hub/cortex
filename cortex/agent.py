@@ -168,6 +168,10 @@ class Cortex:
         # Shutdown flag for graceful termination
         self._shutdown_requested = False
         self._session_dirty = False  # Track if session needs saving
+        
+        # Interrupt handling
+        self._is_processing = False
+        self._interrupt_requested = False
 
         # Display settings
         self.show_thinking = False  # Toggle for reasoning display
@@ -240,11 +244,11 @@ class Cortex:
             new_provider_name = ProviderFactory.get_provider_name(new_model)
             if old_provider_name != new_provider_name:
                 console.print(
-                    f"[cyan]🔄 Switched model:[/cyan] {old_model} ({old_provider_name}) → "
+                    f"[cyan]Switched model:[/cyan] {old_model} ({old_provider_name}) -> "
                     f"{new_model} ({new_provider_name})"
                 )
             else:
-                console.print(f"[cyan]🔄 Switched model:[/cyan] {old_model} → {new_model}")
+                console.print(f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}")
 
         except ProviderError as e:
             # Keep old model on error
@@ -260,7 +264,7 @@ class Cortex:
             if filepath.exists():
                 try:
                     content = filepath.read_text(encoding="utf-8-sig")
-                    console.print(f"[dim]📋 Loaded project context from {filename}[/dim]")
+                    console.print(f"[dim]Loaded project context from {filename}[/dim]")
                     return content[:2000]  # Limit context size
                 except:
                     pass
@@ -307,7 +311,7 @@ grep(pattern="^class ", file_type="py")           # Find all classes
 grep(pattern="^def |^async def ", file_type="py") # Find top-level functions
 ```
 Build a mental map:
-- Entry points → Core logic → Utilities → Data models
+- Entry points -> Core logic -> Utilities -> Data models
 
 ## Phase 3: Targeted Deep Dives
 Only read files when you have a specific reason. Track what you've read to avoid re-reading.
@@ -338,7 +342,7 @@ Only read files when you have a specific reason. Track what you've read to avoid
 
 ## Minimize Tool Calls
 BAD: Read every file to find a function
-GOOD: grep(pattern="def target_function") → read only the matching file
+GOOD: grep(pattern="def target_function") -> read only the matching file
 
 BAD: Multiple greps for related things
 GOOD: Single grep with OR pattern: "class.*Service|def.*service"
@@ -370,66 +374,14 @@ GOOD: Single grep with OR pattern: "class.*Service|def.*service"
 - "Improve performance" (need to profile first)
 - "Add feature X" (need to understand existing patterns)
 
-# Tool Reference
+# Help System Reference
 
-## File Discovery
-| Tool | Use Case | Example |
-|------|----------|---------|
-| glob | Find files by pattern | `glob(pattern="**/*.py")` |
-| list_files | Browse directory | `list_files(path="src")` |
+For detailed reference information, use the `/help` command:
+- Use `/help tool reference` for complete tool reference with examples
+- Use `/help error recovery` for error handling and troubleshooting guidance
+- Use `/help cli commands` for all CLI command reference
 
-## Content Search (grep)
-| Mode | Use Case | Example |
-|------|----------|---------|
-| files_with_matches | Find which files | `grep(pattern="class.*Tool")` |
-| content | See matching lines | `grep(pattern="def main", output_mode="content")` |
-| count | Frequency analysis | `grep(pattern="TODO", output_mode="count")` |
 
-## File Operations
-| Tool | Use Case | Example |
-|------|----------|---------|
-| read_file | Understand code | `read_file(path="main.py")` |
-| edit | Surgical changes | `edit(file_path="x.py", old_string="a", new_string="b")` |
-| write_file | New/full rewrite | `write_file(path="new.py", content="...")` |
-
-## Execution
-| Tool | Use Case | Example |
-|------|----------|---------|
-| execute_command | Shell commands | `execute_command(command="pip install x")` |
-| run_tests | Run test suite | `run_tests(pattern="test_auth.py")` |
-| git_add | Stage changes | `git_add(files=["a.py", "b.py"])` or `git_add(add_all=True)` |
-| git_branch | Manage branches | `git_branch(action="create", branch_name="feat/new-thing")` |
-| git_checkout | Switch branches | `git_checkout(branch="feat/new-thing")` |
-| git_commit | Commit changes | `git_commit(message="Initial commit")` |
-| git_diff | Show changes | `git_diff(path="a.py")` |
-| git_fetch | Fetch from remote| `git_fetch(remote="origin")` |
-| git_log | Show commit history| `git_log(limit=10)` |
-| git_pull | Pull from remote | `git_pull(remote="origin", branch="main")` |
-| git_push | Push to remote | `git_push(remote="origin", branch="main")` |
-| git_remote | List remotes | `git_remote(verbose=True)` |
-| git_reset | Unstage files | `git_reset(files=["a.py", "b.py"])` |
-| git_show | Show object details| `git_show(ref="HEAD")` |
-| git_status | See repo status | `git_status()` |
-
-# Error Recovery
-
-When tools fail, don't give up immediately:
-
-## File Not Found
-1. Check exact spelling and case
-2. Search for similar: `glob(pattern="**/*partial_name*")`
-3. List parent directory to verify path
-
-## Command Failed
-1. Read the exact error message
-2. Check if dependencies are installed
-3. Try a simpler version of the command
-4. Consider platform differences (Windows vs Unix)
-
-## Edit Failed (string not unique)
-1. Include more context in old_string
-2. Use replace_all=True if appropriate
-3. Fall back to write_file for complex changes
 
 # Response Style
 
@@ -439,32 +391,7 @@ When tools fail, don't give up immediately:
 - **Be honest**: Say "I don't know" rather than guess
 - **Be efficient**: Minimize unnecessary tool calls
 
-# Quick Reference
 
-**NO TOOLS for**: Greetings, general questions, knowledge from training
-**USE TOOLS for**: File ops, code search, commands, git
-
-**CLI Commands**:
-- `/model <model_name>`: Switch the active LLM model (e.g., `/model deepseek-coder`)
-- `/clear`: Clear conversation history
-- `/mode [normal|auto|plan]`: Change agent's permission mode
-- `/project`: Show project info and agent settings
-- `/save <name>`: Save current session
-- `/load <name>`: Load a saved session
-- `/sessions`: List all saved sessions
-- `/storage`: Show storage stats
-- `/cleanup`: Run manual session cleanup
-- `/rollback`: Rollback last transaction (if active)
-- `/transactions`: Show transaction stats
-- `/summary`: Show conversation summary
-- `/plan`: Enter planning (read-only) mode
-- `/reset-context`: Clear conversation but keep memory
-- `/focus <path>`: Set focus directory for searches
-- `/thinking [on|off]`: Toggle thinking process display
-- `/memory`: Show memory bank contents
-- `/stats`: Show agent statistics
-- `/exit`: Exit Cortex
-- `/help`: Display help information
 
 **Read before modifying** | **Search before creating** | **Test after changing**
 
@@ -705,208 +632,220 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         self.conversation.add_user_message(user_message)
         self._session_dirty = True
 
+        # Set processing flag
+        self._is_processing = True
         # Agent loop - use while True with explicit break for dynamic iteration extension
         max_iterations = self.config.max_iterations
         iteration = 0
 
-        while True:
-            iteration += 1
+        try:
+            while True:
+                iteration += 1
 
-            # Check for shutdown request
-            if self._shutdown_requested:
-                self._output_warning("Shutdown requested. Cleaning up...")
-                self._cleanup()
-                return
-
-            # Check if we've exceeded max iterations (before processing)
-            if iteration > max_iterations:
-                # Check if callback is set
-                if self._on_max_iterations_reached:
-                    additional = self._on_max_iterations_reached(iteration, max_iterations)
-                    if additional is not None and additional > 0:
-                        # Extend max_iterations and continue
-                        max_iterations += additional
-                        console.print(
-                            f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})"
-                        )
-                        continue  # Continue the loop with extended limit
-                    else:
-                        # Callback returned 0 or None - stop
-                        self._output_warning("Reached maximum iterations")
-                        return
-                else:
-                    # No callback - default behavior (stop)
-                    self._output_warning("Reached maximum iterations")
+                # Check for shutdown request
+                if self._shutdown_requested:
+                    self._output_warning("Shutdown requested. Cleaning up...")
+                    self._cleanup()
+                    self._is_processing = False
                     return
 
-            self.loop_guard.increment_iteration()
-            console.print(f"[dim]{'─' * 60}[/dim]")
-
-            try:
-                # Get conversation history
-                messages = self.conversation.get_history()
-
-                # Show thinking indicator
-                with console.status("[cyan]🤔 Thinking...[/cyan]", spinner="dots"):
-                    if (
-                        use_streaming
-                        and stream_model_response
-                        and self.provider.supports_streaming()
-                    ):
-                        # Streaming mode
-                        normalized_model = self.provider.normalize_model_name(self.model)
-                        stream = stream_model_response(
-                            self.provider, normalized_model, messages, TOOLS
-                        )
-                        response_message = display_streaming_response(stream)
-                    else:
-                        # Non-streaming mode
-                        response = self._call_model(messages, TOOLS)
-                        response_message = response["message"]
-
-                # Add assistant response
-                self.conversation.add_assistant_message(
-                    content=response_message.get("content", ""),
-                    tool_calls=response_message.get("tool_calls"),
-                    reasoning_content=response_message.get("reasoning_content"),
-                )
-
-                # Display thinking/reasoning if enabled and present
-                reasoning_content = response_message.get("reasoning_content")
-                if reasoning_content and self._is_text_output():
-                    from .ui.display import display_thinking
-
-                    display_thinking(reasoning_content, expanded=self.show_thinking)
-
-                # Check if using tools
-                if response_message.get("tool_calls"):
-                    # Don't display content here if tools are present - wait for final response
-                    # Create ToolCall objects for batch execution
-                    tool_calls_to_run = []
-                    for i, tool_call_data in enumerate(response_message["tool_calls"]):
-                        tool_calls_to_run.append(
-                            ToolCall(
-                                id=tool_call_data.get("id", f"call_{iteration}_{i}"),
-                                name=tool_call_data["function"]["name"],
-                                arguments=tool_call_data["function"]["arguments"],
-                                index=i,
+                # Check if we've exceeded max iterations (before processing)
+                if iteration > max_iterations:
+                    # Check if callback is set
+                    if self._on_max_iterations_reached:
+                        additional = self._on_max_iterations_reached(iteration, max_iterations)
+                        if additional is not None and additional > 0:
+                            # Extend max_iterations and continue
+                            max_iterations += additional
+                            console.print(
+                                f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})"
                             )
-                        )
-
-                    # Execute tools in batch
-                    batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
-
-                    # Process results
-                    for tool_result in batch_result.results:
-                        # Check for shutdown request before each tool
-                        if self._shutdown_requested:
-                            self._output_warning("Shutdown requested. Stopping tool execution...")
-                            self._cleanup()
+                            continue  # Continue the loop with extended limit
+                        else:
+                            # Callback returned 0 or None - stop
+                            self._output_warning("Reached maximum iterations")
+                            self._is_processing = False
                             return
+                    else:
+                        # No callback - default behavior (stop)
+                        self._output_warning("Reached maximum iterations")
+                        self._is_processing = False
+                        return
 
-                        tool_name = tool_result.name
-                        arguments = next(
-                            (
-                                tc.arguments
-                                for tc in tool_calls_to_run
-                                if tc.id == tool_result.id
-                            ),
-                            {},
-                        )
-                        result = tool_result.result
-
-                        # Output tool result (for JSON modes)
-                        self._output_tool_result(tool_name, result)
-
-                        # Validate result
-                        if not self._validate_tool_result(tool_name, result):
-                            self._output_warning(f"Invalid tool result format from {tool_name}")
-                            result = create_error_response(
-                                "Tool returned invalid result format",
-                                ErrorType.EXECUTION,
-                                {"tool_name": tool_name},
+                self.loop_guard.increment_iteration()
+                console.print(f"[dim]{'-' * 60}[/dim]")
+    
+                try:
+                    # Get conversation history
+                    messages = self.conversation.get_history()
+    
+                    # Show thinking indicator
+                    with console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                        if (
+                            use_streaming
+                            and stream_model_response
+                            and self.provider.supports_streaming()
+                        ):
+                            # Streaming mode
+                            normalized_model = self.provider.normalize_model_name(self.model)
+                            stream = stream_model_response(
+                                self.provider, normalized_model, messages, TOOLS
                             )
-
-                        # Add result to conversation
-                        self.conversation.add_tool_result(tool_result.id, result)
-
-                        # Parse arguments for loop guards
-                        parsed_arguments = arguments
-                        if isinstance(arguments, str):
-                            try:
-                                parsed_arguments = json.loads(arguments)
-                            except json.JSONDecodeError:
-                                parsed_arguments = {}
-
-                        # Check loop guards
-                        if not self._is_tool_result_success(result):
-                            self.loop_guard.record_error(result)
-                            if self.loop_guard.check_repeated_error(result):
-                                recovery_action = self.loop_guard.get_recovery_action(
-                                    result, tool_name, parsed_arguments
+                            response_message = display_streaming_response(stream)
+                        else:
+                            # Non-streaming mode
+                            response = self._call_model(messages, TOOLS)
+                            response_message = response["message"]
+    
+                    # Add assistant response
+                    self.conversation.add_assistant_message(
+                        content=response_message.get("content", ""),
+                        tool_calls=response_message.get("tool_calls"),
+                        reasoning_content=response_message.get("reasoning_content"),
+                    )
+    
+                    # Display thinking/reasoning if enabled and present
+                    reasoning_content = response_message.get("reasoning_content")
+                    if reasoning_content and self._is_text_output():
+                        from .ui.display import display_thinking
+    
+                        display_thinking(reasoning_content, expanded=self.show_thinking)
+    
+                    # Check if using tools
+                    if response_message.get("tool_calls"):
+                        # Don't display content here if tools are present - wait for final response
+                        # Create ToolCall objects for batch execution
+                        tool_calls_to_run = []
+                        for i, tool_call_data in enumerate(response_message["tool_calls"]):
+                            tool_calls_to_run.append(
+                                ToolCall(
+                                    id=tool_call_data.get("id", f"call_{iteration}_{i}"),
+                                    name=tool_call_data["function"]["name"],
+                                    arguments=tool_call_data["function"]["arguments"],
+                                    index=i,
                                 )
-                                if recovery_action:
-                                    from .core.recovery import RecoveryStrategy
-
-                                    if recovery_action.strategy != RecoveryStrategy.ESCALATE:
-                                        self._output_warning(
-                                            f"Recovery triggered: {recovery_action.message}"
-                                        )
-                                        if recovery_action.suggested_prompt:
-                                            self.conversation.add_user_message(
-                                                f"[Recovery Guidance] {recovery_action.suggested_prompt}"
+                            )
+    
+                        # Execute tools in batch
+                        batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
+    
+                        # Process results
+                        for tool_result in batch_result.results:
+                            # Check for shutdown request before each tool
+                            if self._shutdown_requested:
+                                self._output_warning("Shutdown requested. Stopping tool execution...")
+                                self._cleanup()
+                                return
+    
+                            tool_name = tool_result.name
+                            arguments = next(
+                                (
+                                    tc.arguments
+                                    for tc in tool_calls_to_run
+                                    if tc.id == tool_result.id
+                                ),
+                                {},
+                            )
+                            result = tool_result.result
+    
+                            # Output tool result (for JSON modes)
+                            self._output_tool_result(tool_name, result)
+    
+                            # Validate result
+                            if not self._validate_tool_result(tool_name, result):
+                                self._output_warning(f"Invalid tool result format from {tool_name}")
+                                result = create_error_response(
+                                    "Tool returned invalid result format",
+                                    ErrorType.EXECUTION,
+                                    {"tool_name": tool_name},
+                                )
+    
+                            # Add result to conversation
+                            self.conversation.add_tool_result(tool_result.id, result)
+    
+                            # Parse arguments for loop guards
+                            parsed_arguments = arguments
+                            if isinstance(arguments, str):
+                                try:
+                                    parsed_arguments = json.loads(arguments)
+                                except json.JSONDecodeError:
+                                    parsed_arguments = {}
+    
+                            # Check loop guards
+                            if not self._is_tool_result_success(result):
+                                self.loop_guard.record_error(result)
+                                if self.loop_guard.check_repeated_error(result):
+                                    recovery_action = self.loop_guard.get_recovery_action(
+                                        result, tool_name, parsed_arguments
+                                    )
+                                    if recovery_action:
+                                        from .core.recovery import RecoveryStrategy
+    
+                                        if recovery_action.strategy != RecoveryStrategy.ESCALATE:
+                                            self._output_warning(
+                                                f"Recovery triggered: {recovery_action.message}"
                                             )
-                                        continue
+                                            if recovery_action.suggested_prompt:
+                                                self.conversation.add_user_message(
+                                                    f"[Recovery Guidance] {recovery_action.suggested_prompt}"
+                                                )
+                                            continue
+                                    self._output_error(
+                                        "Repeated error detected. Stopping to prevent infinite loop.",
+                                        "loop_guard",
+                                    )
+                                    return
+    
+                            self.loop_guard.record_tool_call(tool_name, parsed_arguments)
+                            self.loop_guard.record_operation(tool_name, parsed_arguments)
+    
+                            if self.loop_guard.check_stuck_state():
                                 self._output_error(
-                                    "Repeated error detected. Stopping to prevent infinite loop.",
+                                    "Agent appears stuck. Stopping to prevent infinite loop.",
                                     "loop_guard",
                                 )
                                 return
-
-                        self.loop_guard.record_tool_call(tool_name, parsed_arguments)
-                        self.loop_guard.record_operation(tool_name, parsed_arguments)
-
-                        if self.loop_guard.check_stuck_state():
-                            self._output_error(
-                                "Agent appears stuck. Stopping to prevent infinite loop.",
-                                "loop_guard",
-                            )
-                            return
-
-                        if self.loop_guard.check_repeated_tool_call(tool_name, parsed_arguments):
-                            self._output_error(
-                                "Same tool called repeatedly. Stopping to prevent infinite loop.",
-                                "loop_guard",
-                            )
-                            return
-
-                else:
-                    # No more tools - final response
-                    final_text = response_message.get("content", "")
-                    reasoning = response_message.get("reasoning_content", "")
-
-                    if final_text:
-                        self._output_response({"content": final_text}, is_final=True)
-                        return
-                    elif reasoning:
-                        # Model had reasoning but no content - this can happen with some models
-                        # The thinking was already displayed above, so just exit cleanly
-                        return
+    
+                            if self.loop_guard.check_repeated_tool_call(tool_name, parsed_arguments):
+                                self._output_error(
+                                    "Same tool called repeatedly. Stopping to prevent infinite loop.",
+                                    "loop_guard",
+                                )
+                                return
+    
                     else:
-                        # Truly empty response - this shouldn't happen
-                        self._output_warning("Model returned empty response. Exiting.")
-                        return
-
-            except (ModelError, ProviderError) as e:
-                import traceback
-
-                self._output_error(str(e), "model_error", {"traceback": traceback.format_exc()})
-                return
-            except Exception as e:
-                import traceback
-
-                self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
-                return
+                        # No more tools - final response
+                        final_text = response_message.get("content", "")
+                        reasoning = response_message.get("reasoning_content", "")
+    
+                        if final_text:
+                            self._output_response({"content": final_text}, is_final=True)
+                            return
+                        elif reasoning:
+                            # Model had reasoning but no content - this can happen with some models
+                            # The thinking was already displayed above, so just exit cleanly
+                            return
+                        else:
+                            # Truly empty response - this shouldn't happen
+                            self._output_warning("Model returned empty response. Exiting.")
+                            return
+    
+                except KeyboardInterrupt:
+                    # User interrupted the current operation
+                    self._output_warning("Interrupted by user")
+                    return
+                except (ModelError, ProviderError) as e:
+                    import traceback
+    
+                    self._output_error(str(e), "model_error", {"traceback": traceback.format_exc()})
+                    return
+                except Exception as e:
+                    import traceback
+    
+                    self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
+                    return
+        finally:
+            self._is_processing = False
 
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get current conversation history"""

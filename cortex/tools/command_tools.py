@@ -1,4 +1,4 @@
-"""Command execution tools"""
+﻿"""Command execution tools"""
 
 import subprocess
 from typing import Dict, Any
@@ -62,7 +62,7 @@ class ExecuteCommandTool(Tool):
 
         if self.permission_mode == PermissionMode.PLAN:
             if self.console:
-                self.console.print(f"[yellow]⏸  PLAN MODE:[/yellow] Would execute: {command}")
+                self.console.print(f"[yellow]PLAN MODE:[/yellow] Would execute: {command}")
             return create_permission_denial(
                 "Plan mode - no commands allowed",
                 "execute_command",
@@ -70,7 +70,7 @@ class ExecuteCommandTool(Tool):
             )
 
         if self.console:
-            self.console.print(f"[blue]🔧 Command:[/blue] {command}")
+            self.console.print(f"[blue]Command:[/blue] {command}")
             if reason:
                 self.console.print(f"[dim]Reason: {reason}[/dim]")
 
@@ -78,7 +78,7 @@ class ExecuteCommandTool(Tool):
         is_safe, error_msg = self._validate_python_command(command)
         if not is_safe:
             if self.console:
-                self.console.print(f"[red]🛑 BLOCKED:[/red] {error_msg}")
+                self.console.print(f"[red]BLOCKED:[/red] {error_msg}")
             return create_error_response(
                 error_msg,
                 ErrorType.SECURITY,
@@ -88,7 +88,7 @@ class ExecuteCommandTool(Tool):
         # Safety check - general dangerous commands
         if is_dangerous_command(command):
             if self.console:
-                self.console.print("[red]🛑 BLOCKED:[/red] Dangerous command detected")
+                self.console.print("[red]BLOCKED:[/red] Dangerous command detected")
             return create_error_response(
                 "Dangerous command blocked for safety", ErrorType.SECURITY, {"command": command}
             )
