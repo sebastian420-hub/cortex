@@ -1,4 +1,4 @@
-"""Todo tracking tool for task management during sessions."""
+﻿"""Todo tracking tool for task management during sessions."""
 
 import logging
 from typing import List, Dict, Any, Optional, Callable
@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .base import Tool
 from ..models import PermissionMode
+from ..utils.errors import ErrorType, create_error_response, create_success_response
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,8 @@ class TodoManager:
         """Set callback for displaying todo updates."""
         self._display_callback = callback
 
+
+
     def update(self, todos_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Update the entire todo list.
@@ -83,22 +86,22 @@ class TodoManager:
         # Validate: only one in_progress at a time
         in_progress_count = sum(1 for t in todos_data if t.get("status") == "in_progress")
         if in_progress_count > 1:
-            return {
-                "success": False,
-                "error": "Only one task can be in_progress at a time",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                "Only one task can be in_progress at a time",
+                ErrorType.VALIDATION,
+                context={"in_progress_count": in_progress_count},
+            )
 
         new_todos = []
         for item in todos_data:
             try:
                 status = TodoStatus(item["status"])
             except (ValueError, KeyError):
-                return {
-                    "success": False,
-                    "error": f"Invalid status: {item.get('status')}. Must be pending, in_progress, or completed",
-                    "error_type": "validation",
-                }
+                return create_error_response(
+                    f"Invalid status: {item.get('status')}. Must be pending, in_progress, or completed",
+                    ErrorType.VALIDATION,
+                    context={"invalid_status": item.get('status')},
+                )
 
             # Find existing item to preserve timestamps
             existing = self._find_by_content(item["content"])
@@ -129,7 +132,7 @@ class TodoManager:
         self.todos = new_todos
         self._display()
 
-        return {"success": True}
+        return create_success_response({})
 
     def _find_by_content(self, content: str) -> Optional[TodoItem]:
         """Find existing todo by content."""
@@ -248,12 +251,11 @@ class TodoWriteTool(Tool):
         progress = self.todo_manager.get_progress()
         current = self.todo_manager.get_current_task()
 
-        return {
-            "success": True,
+        return create_success_response({
             "progress": progress,
             "current_task": current.active_form if current else None,
             "message": f"Todo list updated: {progress['completed']}/{progress['total']} completed",
-        }
+        })
 
 
 def display_todos(todos: List[TodoItem], console) -> None:

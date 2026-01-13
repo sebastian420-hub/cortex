@@ -1,4 +1,4 @@
-"""Main Cortex class"""
+﻿"""Main Cortex class"""
 
 import json
 import logging
@@ -33,7 +33,7 @@ from .core.memory import (
 )
 from .tools import TOOLS, create_tool_instance
 from .ui.console import console
-from .utils.errors import retry_with_backoff, ModelError, create_error_response, ErrorType
+from .utils.errors import retry_with_backoff, ModelError, create_error_response, create_success_response, ErrorType
 
 # Hook system imports
 from .hooks import (
@@ -578,11 +578,10 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                 {"tool_name": tool_name, "blocked_by": "hook"},
             )
         elif pre_result.action == HookAction.SKIP:
-            return {
-                "success": True,
+            return create_success_response({
                 "skipped": True,
                 "reason": pre_result.message or "Skipped by hook",
-            }
+            })
         elif pre_result.action == HookAction.MODIFY and pre_result.modified_data:
             # Use modified arguments from hook
             tool_name = pre_result.modified_data.get("tool_name", tool_name)

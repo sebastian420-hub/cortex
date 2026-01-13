@@ -1,4 +1,4 @@
-"""Planning engine for structured task planning and execution."""
+﻿"""Planning engine for structured task planning and execution."""
 
 import json
 import logging
@@ -7,6 +7,8 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional, Union, Callable
 from pathlib import Path
+
+from ..utils.errors import create_error_response, create_success_response, ErrorType
 
 logger = logging.getLogger(__name__)
 
@@ -410,7 +412,7 @@ class PlanningEngine:
             plan = self.active_plan
         
         if plan is None:
-            return {"success": False, "error": "No plan to execute"}
+            return create_error_response("No plan to execute", ErrorType.VALIDATION)
         
         plan.mark_started()
         steps_executed = 0
@@ -433,22 +435,23 @@ class PlanningEngine:
                 )
                 if all_completed:
                     plan.mark_completed()
-                    return {
-                        "success": True,
+                    return create_success_response({
                         "message": "Plan execution completed",
                         "plan_id": plan.id,
                         "progress": plan.get_progress(),
-                    }
+                    })
                 else:
                     # Some steps are still pending but dependencies not met
                     # This shouldn't happen if dependency graph is correct
                     logger.warning(f"Plan {plan.id} has pending steps but none are ready")
-                    return {
-                        "success": False,
-                        "error": "Plan stuck: pending steps but dependencies not satisfied",
-                        "plan_id": plan.id,
-                        "progress": plan.get_progress(),
-                    }
+                    return create_error_response(
+                        "Plan stuck: pending steps but dependencies not satisfied",
+                        ErrorType.EXECUTION,
+                        context={
+                            "plan_id": plan.id,
+                            "progress": plan.get_progress(),
+                        }
+                    )
             
             # Execute the first ready step
             step = ready_steps[0]
@@ -466,13 +469,15 @@ class PlanningEngine:
                     
                     if stop_on_failure:
                         plan.mark_failed()
-                        return {
-                            "success": False,
-                            "error": f"Step {step.id} failed: {result.get('error')}",
-                            "plan_id": plan.id,
-                            "failed_step": step.id,
-                            "progress": plan.get_progress(),
-                        }
+                        return create_error_response(
+                            f"Step {step.id} failed: {result.get('error')}",
+                            ErrorType.EXECUTION,
+                            context={
+                                "plan_id": plan.id,
+                                "failed_step": step.id,
+                                "progress": plan.get_progress(),
+                            }
+                        )
             
             except Exception as e:
                 step.mark_failed(str(e))
@@ -480,22 +485,23 @@ class PlanningEngine:
                 
                 if stop_on_failure:
                     plan.mark_failed()
-                    return {
-                        "success": False,
-                        "error": f"Exception executing step {step.id}: {str(e)}",
-                        "plan_id": plan.id,
-                        "failed_step": step.id,
-                        "progress": plan.get_progress(),
-                    }
+                    return create_error_response(
+                        f"Exception executing step {step.id}: {str(e)}",
+                        ErrorType.EXECUTION,
+                        context={
+                            "plan_id": plan.id,
+                            "failed_step": step.id,
+                            "progress": plan.get_progress(),
+                        }
+                    )
             
             steps_executed += 1
         
-        return {
-            "success": True,
+        return create_success_response({
             "message": f"Plan execution paused after {steps_executed} steps",
             "plan_id": plan.id,
             "progress": plan.get_progress(),
-        }
+        })
     
     def _execute_step(self, step: PlanStep, plan: Plan) -> Dict[str, Any]:
         """Execute a single plan step."""
@@ -508,58 +514,53 @@ class PlanningEngine:
             # Apply a skill
             skill = self.skill_loader(step.skill_name)
             if not skill:
-                return {"success": False, "error": f"Skill not found: {step.skill_name}"}
+                return create_error_response(f"Skill not found: {step.skill_name}", ErrorType.NOT_FOUND)
             
             # For now, just return success
             # In a real implementation, this would execute the skill workflow
-            return {
-                "success": True,
+            return create_success_response({
                 "outcome": f"Applied skill: {step.skill_name}",
                 "skill": step.skill_name,
-            }
+            })
         
         elif step.step_type == PlanStepType.SUBTASK:
             # For subtask steps, we need to generate a sub-plan
             # This is a placeholder for now
-            return {
-                "success": True,
+            return create_success_response({
                 "outcome": f"Analyzed: {step.description}",
                 "subtask": step.description,
-            }
+            })
         
         elif step.step_type == PlanStepType.CHECKPOINT:
             # Checkpoint steps verify progress
-            return {
-                "success": True,
+            return create_success_response({
                 "outcome": f"Checkpoint '{step.checkpoint_name}' reached",
                 "checkpoint": step.checkpoint_name,
-            }
+            })
         
         elif step.step_type == PlanStepType.DECISION:
             # Decision points require user input or rule-based decision
             # This is a placeholder
-            return {
-                "success": True,
+            return create_success_response({
                 "outcome": f"Decision made at: {step.decision_point}",
                 "decision": step.decision_point,
-            }
+            })
         
         elif step.step_type == PlanStepType.REFLECTION:
             # Trigger reflection
             if self.reflection_callback:
                 self.reflection_callback(plan, step.description)
-            return {
-                "success": True,
+            return create_success_response({
                 "outcome": "Reflection completed",
                 "reflection": step.description,
-            }
+            })
         
         else:
             # Unknown step type or missing executor
-            return {
-                "success": False,
-                "error": f"Cannot execute step type: {step.step_type}",
-            }
+            return create_error_response(
+                f"Cannot execute step type: {step.step_type}",
+                ErrorType.EXECUTION,
+            )
     
     def reflect_on_progress(
         self,
@@ -580,7 +581,7 @@ class PlanningEngine:
             plan = self.active_plan
         
         if plan is None:
-            return {"success": False, "error": "No plan to reflect on"}
+            return create_error_response("No plan to reflect on", ErrorType.VALIDATION)
         
         progress = plan.get_progress()
         
@@ -612,8 +613,7 @@ class PlanningEngine:
         # Generate reflection result
         reflection_id = f"reflect_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        result = {
-            "success": True,
+        result = create_success_response({
             "reflection_id": reflection_id,
             "plan_id": plan.id,
             "progress_summary": progress,
@@ -621,7 +621,7 @@ class PlanningEngine:
             "suggestions": suggestions,
             "focus_areas": focus_areas or [],
             "timestamp": datetime.now().isoformat(),
-        }
+        })
         
         logger.info(f"Reflection {reflection_id} completed for plan {plan.id}")
         return result

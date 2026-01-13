@@ -1,4 +1,4 @@
-"""Base class for tools"""
+﻿"""Base class for tools"""
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, TYPE_CHECKING
@@ -115,3 +115,85 @@ class Tool(ABC):
 
             logging.warning(f"Backup failed for {path}: {e}")
             return False
+    
+    def _create_error(self, message: str, error_type: str, **context) -> Dict[str, Any]:
+        """
+        Create standardized error response.
+        
+        This helper method ensures consistent error formatting across all tools.
+        
+        Args:
+            message: Human-readable error message
+            error_type: Type of error (e.g., "validation", "security", "execution")
+            **context: Additional context about the error
+        
+        Returns:
+            Standardized error response dictionary
+        """
+        from ..utils.errors import create_error_response
+        
+        # Add tool-specific context
+        tool_context = {
+            "tool_name": self.__class__.__name__,
+            "permission_mode": self.permission_mode,
+            **context
+        }
+        
+        return create_error_response(message, error_type, tool_context)
+    
+    def _create_permission_denial(self, reason: str, action: str, **context) -> Dict[str, Any]:
+        """
+        Create standardized permission denial response.
+        
+        Args:
+            reason: Why permission was denied
+            action: What action was attempted
+            **context: Additional context
+        
+        Returns:
+            Standardized permission denial response
+        """
+        from ..utils.errors import create_permission_denial
+        
+        denial_context = {
+            "tool_name": self.__class__.__name__,
+            "permission_mode": self.permission_mode,
+            **context
+        }
+        
+        return create_permission_denial(reason, action, denial_context)
+    
+    def _create_success(self, **data) -> Dict[str, Any]:
+        """
+        Create standardized success response.
+        
+        Args:
+            **data: Additional data to include in success response
+        
+        Returns:
+            Standardized success response dictionary
+        """
+        from ..utils.errors import create_success_response
+        
+        return create_success_response(data)
+    
+    def _validate_arguments(self, required_args: list, **kwargs) -> Optional[Dict[str, Any]]:
+        """
+        Validate required arguments for tool execution.
+        
+        Args:
+            required_args: List of required argument names
+            **kwargs: Arguments to validate
+        
+        Returns:
+            Error dict if validation fails, None if validation passes
+        """
+        missing = [arg for arg in required_args if arg not in kwargs]
+        if missing:
+            return self._create_error(
+                f"Missing required arguments: {', '.join(missing)}",
+                "validation",
+                missing_arguments=missing,
+                provided_arguments=list(kwargs.keys())
+            )
+        return None

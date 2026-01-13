@@ -1,4 +1,4 @@
-"""Ask User Questions tool for structured user input during tasks."""
+﻿"""Ask User Questions tool for structured user input during tasks."""
 
 import logging
 from typing import List, Dict, Any, Optional
@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .base import Tool
 from ..models import PermissionMode
+from ..utils.errors import ErrorType, create_error_response, create_success_response
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +74,14 @@ class AskUserQuestionTool(Tool):
             Dict with success and answers list
         """
         if not questions:
-            return {"success": False, "error": "No questions provided", "error_type": "validation"}
+            return create_error_response("No questions provided", ErrorType.VALIDATION)
 
         if len(questions) > 4:
-            return {
-                "success": False,
-                "error": "Maximum 4 questions allowed at once",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                "Maximum 4 questions allowed at once", 
+                ErrorType.VALIDATION,
+                context={"max_allowed": 4, "provided": len(questions)}
+            )
 
         answers = []
 
@@ -112,53 +113,53 @@ class AskUserQuestionTool(Tool):
                 }
             )
 
-        return {"success": True, "answers": answers}
+        return create_success_response({"answers": answers})
 
     def _validate_question(self, q_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Validate question structure, return error dict if invalid."""
         if "question" not in q_data:
-            return {
-                "success": False,
-                "error": "Question must have 'question' field",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                "Question must have 'question' field",
+                ErrorType.VALIDATION,
+                context={"missing_field": "question"}
+            )
 
         if "header" not in q_data:
-            return {
-                "success": False,
-                "error": "Question must have 'header' field",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                "Question must have 'header' field",
+                ErrorType.VALIDATION,
+                context={"missing_field": "header"}
+            )
 
         if len(q_data.get("header", "")) > 12:
-            return {
-                "success": False,
-                "error": f"Header too long: '{q_data['header']}' (max 12 chars)",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                f"Header too long: '{q_data['header']}' (max 12 chars)",
+                ErrorType.VALIDATION,
+                context={"header_length": len(q_data.get("header", "")), "max_length": 12}
+            )
 
         options = q_data.get("options", [])
         if len(options) < 2:
-            return {
-                "success": False,
-                "error": "Question must have at least 2 options",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                "Question must have at least 2 options",
+                ErrorType.VALIDATION,
+                context={"options_count": len(options), "min_required": 2}
+            )
 
         if len(options) > 4:
-            return {
-                "success": False,
-                "error": "Question can have maximum 4 options",
-                "error_type": "validation",
-            }
+            return create_error_response(
+                "Question can have maximum 4 options",
+                ErrorType.VALIDATION,
+                context={"options_count": len(options), "max_allowed": 4}
+            )
 
         for i, opt in enumerate(options):
             if "label" not in opt:
-                return {
-                    "success": False,
-                    "error": f"Option {i+1} missing 'label' field",
-                    "error_type": "validation",
-                }
+                return create_error_response(
+                    f"Option {i+1} missing 'label' field",
+                    ErrorType.VALIDATION,
+                    context={"option_index": i, "missing_field": "label"}
+                )
 
         return None
 
