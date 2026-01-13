@@ -30,6 +30,8 @@ from .edit_tool import EditTool
 
 # Phase 3 web tools
 from .web_tools import WebFetchTool, WebSearchTool, clear_fetch_cache
+# Skill tools
+from .skill_tools import SkillLoaderTool
 from .todo_tool import (
     TodoWriteTool,
     TodoManager,
@@ -569,6 +571,36 @@ TOOLS: List[Dict[str, Any]] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "skill_loader",
+            "description": "Load and manage development skills for common tasks like TDD, refactoring, debugging, etc.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": ["list", "load", "suggest", "get"],
+                        "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)"
+                    },
+                    "skill_name": {
+                        "type": "string",
+                        "description": "Name of skill (for load/get actions)"
+                    },
+                    "task_description": {
+                        "type": "string",
+                        "description": "Task description (for suggest action)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of skills to return (for list/suggest)"
+                    }
+                },
+                "required": ["action"],
+            },
+        },
+    },
     # Task tool for subagent delegation
     TASK_TOOL_SCHEMA,
     # Todo tracking tool
@@ -685,6 +717,8 @@ __all__ = [
     "WebFetchTool",
     "WebSearchTool",
     "clear_fetch_cache",
+    # Skill tools
+    "SkillLoaderTool",
     # Todo management
     "TodoManager",
     "TodoItem",

@@ -119,7 +119,7 @@ class TransactionManager:
         # Context manager usage (recommended)
         with tm.transaction():
             tm.backup_file(path, "edit")
-            path.write_text(new_content)
+            path.write_text(new_content, encoding="utf-8")
         # Auto-commits on success, auto-rollback on exception
 
         # Manual usage
@@ -340,7 +340,7 @@ class TransactionManager:
         Example:
             with tm.transaction():
                 tm.backup_file(path, "edit")
-                path.write_text(new_content)
+                path.write_text(new_content, encoding="utf-8")
             # Auto-commits on success
         """
         tx = self.begin(metadata)

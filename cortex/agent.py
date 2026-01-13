@@ -259,7 +259,7 @@ class Cortex:
             filepath = self.project_dir / filename
             if filepath.exists():
                 try:
-                    content = filepath.read_text()
+                    content = filepath.read_text(encoding="utf-8-sig")
                     console.print(f"[dim]📋 Loaded project context from {filename}[/dim]")
                     return content[:2000]  # Limit context size
                 except:

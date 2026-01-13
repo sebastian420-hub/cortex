@@ -249,7 +249,7 @@ class WriteFileTool(Tool):
 
             # Write file
             full_path.parent.mkdir(parents=True, exist_ok=True)
-            full_path.write_text(content)
+            full_path.write_text(content, encoding="utf-8")
 
             # Verify written content matches (checksum validation to detect corruption)
             try:

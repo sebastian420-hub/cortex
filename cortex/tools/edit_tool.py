@@ -166,7 +166,7 @@ class EditTool(Tool):
 
         # Write file
         try:
-            full_path.write_text(new_content)
+            full_path.write_text(new_content, encoding="utf-8-sig")
             # Invalidate cache for this file
             invalidate_file(full_path)
         except Exception as e:

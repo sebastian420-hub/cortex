@@ -228,23 +228,20 @@ class SkillLoaderTool(Tool):
             self.skills_loaded = True
             return
         
-        print(f"DEBUG: Looking for skills in: {self.skills_dir}")
-        print(f"DEBUG: Skills dir exists: {self.skills_dir.exists()}")
+        logger.debug(f"Looking for skills in: {self.skills_dir}")
+        logger.debug(f"Skills dir exists: {self.skills_dir.exists()}")
         
         for skill_file in self.skills_dir.glob("*.md"):
-            print(f"DEBUG: Found skill file: {skill_file}")
+            logger.debug(f"Found skill file: {skill_file}")
             try:
                 skill = self._parse_skill_file(skill_file)
                 self.skills[skill.name] = skill
                 logger.debug(f"Loaded skill: {skill.name}")
-                print(f"DEBUG: Parsed skill: {skill.name}")
             except Exception as e:
                 logger.error(f"Failed to parse skill file {skill_file}: {e}")
-                print(f"DEBUG: Failed to parse {skill_file}: {e}")
         
         self.skills_loaded = True
         logger.info(f"Loaded {len(self.skills)} skills from {self.skills_dir}")
-        print(f"DEBUG: Total skills loaded: {len(self.skills)}")
     
     def _parse_skill_file(self, file_path: Path) -> Skill:
         """Parse a markdown skill file into a Skill object."""
@@ -321,10 +318,10 @@ class SkillLoaderTool(Tool):
                         prereq_text = line.split(':', 1)[1].strip()
                         prerequisites = [p.strip() for p in prereq_text.split(',')]
         
-        print(f"DEBUG: Final skill name: '{skill_name}'")
-        print(f"DEBUG: Description: '{description}'")
-        print(f"DEBUG: Category: {category}")
-        print(f"DEBUG: Tags: {tags}")
+        logger.debug(f"Final skill name: '{skill_name}'")
+        logger.debug(f"Description: '{description}'")
+        logger.debug(f"Category: {category}")
+        logger.debug(f"Tags: {tags}")
         
         return Skill(
             name=skill_name,
