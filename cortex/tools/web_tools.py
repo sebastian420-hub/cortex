@@ -39,6 +39,14 @@ except ImportError:
     HAS_HTML2TEXT = False
     html2text = None
 
+try:
+    from ddgs import DDGS
+
+    HAS_DUCKDUCKGO_SEARCH = True
+except ImportError:
+    HAS_DUCKDUCKGO_SEARCH = False
+    DDGS = None
+
 
 class WebFetchCache:
     """Simple in-memory cache for web fetches with TTL."""
@@ -361,18 +369,11 @@ class WebSearchTool(Tool):
     """
     Search the web for information.
 
-    Uses DuckDuckGo HTML search (no API key required).
+    Uses DuckDuckGo Search API (no API key required).
     """
 
     timeout_category = "network"
     default_timeout = 30
-
-    USER_AGENT = (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    )
-
-    SEARCH_URL = "https://html.duckduckgo.com/html/"
 
     def execute(
         self,
@@ -393,11 +394,11 @@ class WebSearchTool(Tool):
         Returns:
             Standardized response with search results
         """
-        if not HAS_REQUESTS:
+        if not HAS_DUCKDUCKGO_SEARCH:
             return create_error_response(
-                "requests library not installed. Run: pip install requests",
+                "duckduckgo-search library not installed. Run: pip install duckduckgo-search",
                 ErrorType.EXECUTION,
-                {"missing_dependency": "requests"},
+                {"missing_dependency": "duckduckgo-search"},
             )
 
         if not query or len(query.strip()) < 2:
@@ -409,24 +410,38 @@ class WebSearchTool(Tool):
             self.console.print(f"[cyan]Searching:[/cyan] {query}")
 
         try:
-            # Make search request
-            response = requests.post(
-                self.SEARCH_URL,
-                data={"q": query, "b": ""},
-                headers={
-                    "User-Agent": self.USER_AGENT,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                timeout=self.get_timeout(),
-            )
-            response.raise_for_status()
+            # Use DDGS API for search
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=max_results))
 
-            # Parse results
-            results = self._parse_search_results(
-                response.text, max_results, allowed_domains, blocked_domains
-            )
+            # Convert results to expected format
+            formatted_results = []
+            for result in results:
+                url = result.get("href", "")
+                title = result.get("title", "")
+                snippet = result.get("body", "")
 
-            if not results:
+                # Filter by domain if specified
+                if url:
+                    domain = urlparse(url).netloc.lower()
+
+                    if allowed_domains:
+                        if not any(d.lower() in domain for d in allowed_domains):
+                            continue
+
+                    if blocked_domains:
+                        if any(d.lower() in domain for d in blocked_domains):
+                            continue
+
+                    formatted_results.append(
+                        {
+                            "title": title,
+                            "url": url,
+                            "snippet": snippet,
+                        }
+                    )
+
+            if not formatted_results:
                 return create_success_response(
                     {
                         "query": query,
@@ -437,131 +452,25 @@ class WebSearchTool(Tool):
                 )
 
             if self.console:
-                self.console.print(f"[green]Found {len(results)} results[/green]")
-                for r in results[:3]:
+                self.console.print(f"[green]Found {len(formatted_results)} results[/green]")
+                for r in formatted_results[:3]:
                     self.console.print(f"  [dim]- {r['title'][:50]}...[/dim]")
 
             return create_success_response(
                 {
                     "query": query,
-                    "results": results,
-                    "result_count": len(results),
+                    "results": formatted_results,
+                    "result_count": len(formatted_results),
                 }
             )
 
-        except requests.exceptions.Timeout:
-            return create_error_response(
-                f"Search timed out after {self.get_timeout()} seconds",
-                ErrorType.TIMEOUT,
-                {"query": query},
-                retryable=True,
-            )
-        except requests.exceptions.RequestException as e:
-            return create_error_response(
-                f"Search request failed: {e}", ErrorType.NETWORK, {"query": query}, retryable=True
-            )
         except Exception as e:
             logger.exception(f"WebSearch error for query: {query}")
             return create_error_response(
                 f"Search failed: {e}", ErrorType.EXECUTION, {"query": query}
             )
 
-    def _parse_search_results(
-        self,
-        html: str,
-        max_results: int,
-        allowed_domains: Optional[List[str]],
-        blocked_domains: Optional[List[str]],
-    ) -> List[Dict[str, str]]:
-        """Parse DuckDuckGo HTML search results."""
-        results = []
 
-        if HAS_BS4:
-            soup = BeautifulSoup(html, "html.parser")
-
-            # DuckDuckGo HTML results are in divs with class "result"
-            for result_div in soup.select(".result"):
-                if len(results) >= max_results:
-                    break
-
-                # Extract link
-                link_tag = result_div.select_one(".result__a")
-                if not link_tag:
-                    continue
-
-                url = link_tag.get("href", "")
-                title = link_tag.get_text(strip=True)
-
-                # Extract snippet
-                snippet_tag = result_div.select_one(".result__snippet")
-                snippet = snippet_tag.get_text(strip=True) if snippet_tag else ""
-
-                # DuckDuckGo wraps URLs, try to extract actual URL
-                if "uddg=" in url:
-                    # URL is encoded in uddg parameter
-                    import urllib.parse
-
-                    parsed = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
-                    if "uddg" in parsed:
-                        url = urllib.parse.unquote(parsed["uddg"][0])
-
-                # Filter by domain
-                if url:
-                    domain = urlparse(url).netloc.lower()
-
-                    if allowed_domains:
-                        if not any(d.lower() in domain for d in allowed_domains):
-                            continue
-
-                    if blocked_domains:
-                        if any(d.lower() in domain for d in blocked_domains):
-                            continue
-
-                    results.append(
-                        {
-                            "title": title,
-                            "url": url,
-                            "snippet": snippet,
-                        }
-                    )
-        else:
-            # Fallback: regex-based extraction
-            # This is less reliable but works without BeautifulSoup
-            pattern = r'class="result__a"[^>]*href="([^"]+)"[^>]*>([^<]+)</a>'
-            matches = re.findall(pattern, html)
-
-            for url, title in matches[:max_results]:
-                # Try to decode DuckDuckGo URL wrapper
-                if "uddg=" in url:
-                    import urllib.parse
-
-                    try:
-                        parsed = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
-                        if "uddg" in parsed:
-                            url = urllib.parse.unquote(parsed["uddg"][0])
-                    except:
-                        pass
-
-                if url:
-                    domain = urlparse(url).netloc.lower()
-
-                    if allowed_domains:
-                        if not any(d.lower() in domain for d in allowed_domains):
-                            continue
-
-                    if blocked_domains:
-                        if any(d.lower() in domain for d in blocked_domains):
-                            continue
-
-                    results.append(
-                        {
-                            "title": title.strip(),
-                            "url": url,
-                            "snippet": "",
-                        }
-                    )
-
-        return results
 
 
 def clear_fetch_cache() -> None:

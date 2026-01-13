@@ -307,20 +307,19 @@ class TestWebSearchMocked:
         assert result["success"] is True
         assert "results" in result
 
-    @patch("cortex.tools.web_tools.requests")
-    def test_web_search_no_results(self, mock_requests, temp_project):
+    @patch("cortex.tools.web_tools.DDGS")
+    def test_web_search_no_results(self, mock_ddgs, temp_project):
         """Test web search with no results."""
-        from cortex.tools.web_tools import WebSearchTool, HAS_REQUESTS
+        from cortex.tools.web_tools import WebSearchTool, HAS_DUCKDUCKGO_SEARCH
 
-        if not HAS_REQUESTS:
-            pytest.skip("requests not installed")
+        if not HAS_DUCKDUCKGO_SEARCH:
+            pytest.skip("ddgs not installed")
 
-        # Mock empty response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = "<html><body>No results found</body></html>"
-        mock_response.raise_for_status = Mock()
-        mock_requests.post.return_value = mock_response
+        # Mock DDGS to return empty results
+        mock_ddgs_instance = Mock()
+        mock_ddgs_instance.text.return_value = []
+        mock_ddgs.return_value.__enter__.return_value = mock_ddgs_instance
+        mock_ddgs.return_value.__exit__.return_value = None
 
         tool = WebSearchTool(
             project_dir=temp_project,
