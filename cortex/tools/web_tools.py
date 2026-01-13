@@ -3,6 +3,7 @@
 import re
 import logging
 import hashlib
+import html
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from pathlib import Path
@@ -151,8 +152,6 @@ class WebFetchTool(Tool):
         if use_cache:
             cached = _fetch_cache.get(url)
             if cached:
-                if self.console:
-                    self.console.print("[dim]Using cached content[/dim]")
                 return create_success_response(
                     {
                         "url": url,
@@ -227,10 +226,7 @@ class WebFetchTool(Tool):
             }
             _fetch_cache.set(url, cache_data)
 
-            if self.console:
-                preview = content[:200] + "..." if len(content) > 200 else content
-                self.console.print(f"[green]Fetched:[/green] {title}")
-                self.console.print(f"[dim]{preview}[/dim]")
+            # Removed console output for fetched content to reduce clutter
 
             result = {
                 "url": final_url,
@@ -288,7 +284,7 @@ class WebFetchTool(Tool):
             # Extract title
             title_tag = soup.find("title")
             if title_tag:
-                title = title_tag.get_text(strip=True)
+                title = html.unescape(title_tag.get_text(strip=True))
 
             # Remove script and style elements
             for element in soup(["script", "style", "nav", "footer", "header", "aside"]):
@@ -418,8 +414,8 @@ class WebSearchTool(Tool):
             formatted_results = []
             for result in results:
                 url = result.get("href", "")
-                title = result.get("title", "")
-                snippet = result.get("body", "")
+                title = html.unescape(result.get("title", ""))
+                snippet = html.unescape(result.get("body", ""))
 
                 # Filter by domain if specified
                 if url:
@@ -454,7 +450,8 @@ class WebSearchTool(Tool):
             if self.console:
                 self.console.print(f"[green]Found {len(formatted_results)} results[/green]")
                 for r in formatted_results[:3]:
-                    self.console.print(f"  [dim]- {r['title'][:50]}...[/dim]")
+                    title_display = html.unescape(r['title'][:50])
+                    self.console.print(f"  [dim]- {title_display}...[/dim]")
 
             return create_success_response(
                 {
