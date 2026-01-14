@@ -832,6 +832,17 @@ class ToolRegistry:
             if schema:
                 self.register(name, tool_class, schema, namespace="builtin")
 
+        # Register AST tools if available
+        try:
+            from .ast.integration import register_ast_tools, is_ast_available
+            if is_ast_available():
+                register_ast_tools(self)
+                logger.info("AST tools registered successfully")
+            else:
+                logger.info("AST parsing not available, skipping AST tools")
+        except ImportError as e:
+            logger.warning(f"Failed to import AST tools: {e}")
+
         self._initialized = True
         logger.info(f"Registered {len(builtin_tools)} built-in tools")
 
