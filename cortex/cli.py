@@ -23,6 +23,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .agent import Cortex
+from .agent_enhanced import EnhancedCortex
 from .models import PermissionMode
 from .config import AgentConfig
 from .core.providers import ProviderFactory, ProviderError
@@ -188,6 +189,8 @@ Examples:
 
     parser.add_argument("--plan-mode", action="store_true", help="Start in plan mode (read-only)")
 
+    parser.add_argument("--enhanced", action="store_true", help="Use enhanced agent with planning and layered memory")
+
     parser.add_argument("--prompt", "-p", help="One-shot prompt (exit after completion)")
 
     parser.add_argument("--config", "-c", type=str, help="Path to configuration file (YAML)")
@@ -326,14 +329,27 @@ Examples:
         hook_manager.disable()
 
     # Create agent
-    agent = Cortex(
-        model=config.model,
-        project_dir=project_dir,
-        permission_mode=permission_mode,
-        config=config,
-        hook_manager=hook_manager,
-        output_format=output_format,
-    )
+    if args.enhanced:
+        console.print("[cyan]Using enhanced agent with planning and layered memory[/cyan]")
+        agent = EnhancedCortex(
+            model=config.model,
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            config=config,
+            hook_manager=hook_manager,
+            output_format=output_format,
+            enable_planning=True,
+            enable_layered_memory=True,
+        )
+    else:
+        agent = Cortex(
+            model=config.model,
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            config=config,
+            hook_manager=hook_manager,
+            output_format=output_format,
+        )
 
     # Load session if requested
     if args.load_session:
@@ -382,7 +398,11 @@ Examples:
     if args.prompt:
         # One-shot mode
         console.print(Panel(f"[cyan]Task:[/cyan] {args.prompt}", title="One-shot Mode"))
-        agent._process_message(args.prompt, use_streaming=args.streaming)
+        # Use enhanced processing if available
+        if hasattr(agent, 'process_with_planning'):
+            agent.process_with_planning(args.prompt, use_streaming=args.streaming)
+        else:
+            agent._process_message(args.prompt, use_streaming=args.streaming)
 
         # Save session if requested
         if args.save_session:
@@ -483,7 +503,11 @@ def run_interactive(agent: Cortex, session_manager: SessionManager, use_streamin
                 continue
 
             # Process with agent
-            agent._process_message(user_input, use_streaming=use_streaming)
+            # Use enhanced processing if available
+            if hasattr(agent, 'process_with_planning'):
+                agent.process_with_planning(user_input, use_streaming=use_streaming)
+            else:
+                agent._process_message(user_input, use_streaming=use_streaming)
 
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully
@@ -844,6 +868,133 @@ Files Written: {loop_stats.get('files_written_count', 0)}
 Items: {len(agent.memory_bank.items) if agent.memory_bank else 0}
 """
         console.print(Panel(stats_text, title="Stats", border_style="cyan"))
+
+    # Session Recovery Commands
+    elif cmd.startswith("/session"):
+        parts = cmd.split()
+        subcommand = parts[1] if len(parts) > 1 else "help"
+
+        if subcommand == "validate":
+            # Validate current session health
+            console.print("[cyan]🔍 Validating session health...[/cyan]")
+            health_report = agent.validate_session_health()
+
+            if health_report["healthy"]:
+                console.print("[green]✅ Session is healthy[/green]")
+            else:
+                console.print("[red]❌ Session has issues[/red]")
+
+            # Display issues
+            if health_report.get("issues"):
+                console.print("\n[bold]Issues Found:[/bold]")
+                for issue in health_report["issues"]:
+                    severity_color = {
+                        "critical": "red",
+                        "warning": "yellow",
+                        "info": "blue"
+                    }.get(issue.get("severity", "info"), "white")
+                    console.print(f"  [{severity_color}]• {issue['message']}[/{severity_color}]")
+
+            # Display recommendations
+            if health_report.get("recommendations"):
+                console.print("\n[bold]Recommendations:[/bold]")
+                for rec in health_report["recommendations"]:
+                    console.print(f"  [cyan]• {rec}[/cyan]")
+
+        elif subcommand == "repair":
+            # Trigger recovery repair
+            strategy = parts[2] if len(parts) > 2 else None
+
+            console.print("[cyan]🔧 Attempting to repair session...[/cyan]")
+
+            # Get session health first
+            health_report = agent.validate_session_health()
+
+            if health_report["healthy"]:
+                console.print("[green]✅ Session is already healthy - no repair needed[/green]")
+                return
+
+            # Analyze and recommend recovery
+            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            action = agent.recovery_orchestrator.analyze_and_recommend(
+                session_id, agent.get_conversation_history()
+            )
+
+            console.print(f"[cyan]Recommended strategy: {action.strategy.value}[/cyan]")
+
+            # Execute recovery
+            result = agent.recovery_orchestrator.execute_recovery(
+                action, agent.get_conversation_history(), session_id
+            )
+
+            if result["success"]:
+                console.print("[green]✅ Session repair completed successfully[/green]")
+                console.print(f"[dim]Strategy used: {result['strategy']}[/dim]")
+            else:
+                console.print("[red]❌ Session repair failed[/red]")
+                console.print("[dim]Consider using /clear to start fresh[/dim]")
+
+        elif subcommand == "rollback":
+            # Rollback to checkpoint
+            checkpoint_id = parts[2] if len(parts) > 2 else None
+
+            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            checkpoints = agent.checkpoint_manager.list_checkpoints(session_id)
+
+            if not checkpoints:
+                console.print("[yellow]❌ No checkpoints available for rollback[/yellow]")
+                console.print("[dim]Checkpoints are created automatically during sessions[/dim]")
+                return
+
+            if checkpoint_id:
+                # Specific checkpoint requested
+                checkpoint = next((cp for cp in checkpoints if cp.id == checkpoint_id), None)
+                if not checkpoint:
+                    console.print(f"[red]❌ Checkpoint '{checkpoint_id}' not found[/red]")
+                    console.print("[dim]Available checkpoints:[/dim]")
+                    for cp in checkpoints[:5]:  # Show first 5
+                        console.print(f"  [dim]- {cp.id} ({cp.timestamp})[/dim]")
+                    return
+            else:
+                # Use most recent checkpoint
+                checkpoint = checkpoints[0]  # Already sorted by timestamp desc
+                console.print(f"[cyan]Using latest checkpoint: {checkpoint.id}[/cyan]")
+
+            console.print("[cyan]🔄 Rolling back to checkpoint...[/cyan]")
+
+            # Restore checkpoint
+            restored_history = agent.checkpoint_manager.restore_checkpoint(checkpoint)
+
+            if restored_history:
+                agent.conversation.history = restored_history
+                console.print("[green]✅ Session rolled back successfully[/green]")
+                console.print(f"[dim]Restored {len(restored_history)} messages[/dim]")
+            else:
+                console.print("[red]❌ Failed to restore checkpoint[/red]")
+
+        elif subcommand == "checkpoint":
+            # Create manual checkpoint
+            console.print("[cyan]📝 Creating checkpoint...[/cyan]")
+
+            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            health_report = agent.health_monitor.analyze_health(agent.get_conversation_history())
+
+            checkpoint = agent.checkpoint_manager.create_checkpoint(
+                session_id,
+                agent.get_conversation_history(),
+                health_score=health_report.overall_score
+            )
+
+            console.print("[green]✅ Checkpoint created[/green]")
+            console.print(f"[dim]ID: {checkpoint.id}[/dim]")
+            console.print(f"[dim]Messages: {checkpoint.message_count}[/dim]")
+            console.print(f"[dim]Health Score: {health_report.overall_score:.1f}[/dim]")
+        else:
+            console.print("[dim]Session recovery commands:[/dim]")
+            console.print("  [cyan]/session validate[/cyan]  - Check session health")
+            console.print("  [cyan]/session repair[/cyan]    - Attempt automatic repair")
+            console.print("  [cyan]/session rollback[/cyan]  - Rollback to checkpoint")
+            console.print("  [cyan]/session checkpoint[/cyan] - Create manual checkpoint")
 
     else:
         logger.debug(f"No handler matched for cmd='{cmd}'")
