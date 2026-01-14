@@ -1,0 +1,22 @@
+[run]
+source = cortex
+omit =
+    */tests/*
+    */__pycache__/*
+    */migrations/*
+    setup.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    if settings.DEBUG
+    raise AssertionError
+    raise NotImplementedError
+    if 0:
+    if __name__ == .__main__.:
+    class .*Mock.:
+    @abc.abstractmethod
+
+fail_under = 80
