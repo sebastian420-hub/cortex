@@ -68,6 +68,18 @@ class ConversationManager:
         reasoning_content: Optional[str] = None,
     ) -> None:
         """Add an assistant message to the conversation"""
+        # Validate that assistant messages have at least content or tool_calls
+        # This prevents "Invalid assistant message" API errors
+        if not content and not tool_calls:
+            logger.warning("Attempted to add invalid assistant message (no content or tool_calls). "
+                          "Converting reasoning_content to content if available.")
+            # If we have reasoning_content, convert it to content
+            if reasoning_content:
+                content = f"[Reasoning: {reasoning_content[:200]}{'...' if len(reasoning_content) > 200 else ''}]"
+            else:
+                # Fallback: create minimal content to prevent API errors
+                content = "[Empty assistant response]"
+
         msg: Dict[str, Any] = {"role": "assistant"}
         if content:
             msg["content"] = content
@@ -77,6 +89,9 @@ class ConversationManager:
             msg["reasoning_content"] = reasoning_content
         self.history.append(msg)
         self._optimize()
+
+        # Trigger checkpoint creation if available (called from agent)
+        # This is a hook for the agent to create checkpoints after assistant messages
 
     def add_tool_result(self, tool_call_id: str, result: Dict[str, Any]) -> None:
         """Add a tool result to the conversation"""
@@ -229,3 +244,47 @@ class ConversationManager:
     def get_summaries(self) -> List["SummaryChunk"]:
         """Get all summaries created during this conversation."""
         return self.summaries.copy()
+
+    def validate_history(self) -> Dict[str, Any]:
+        """
+        Validate the entire conversation history for API compliance.
+
+        Returns:
+            Dict with validation results including any issues found.
+        """
+        issues = []
+
+        for i, msg in enumerate(self.history):
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            tool_calls = msg.get("tool_calls")
+
+            # Validate assistant messages
+            if role == "assistant":
+                if not content and not tool_calls:
+                    issues.append({
+                        "index": i,
+                        "type": "invalid_assistant_message",
+                        "message": f"Assistant message at index {i} has no content or tool_calls",
+                        "severity": "critical"  # Will cause API errors
+                    })
+
+            # Validate tool results
+            elif role == "tool":
+                if not isinstance(msg.get("content", ""), str):
+                    issues.append({
+                        "index": i,
+                        "type": "invalid_tool_result",
+                        "message": f"Tool result at index {i} has non-string content",
+                        "severity": "warning"
+                    })
+
+        return {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "message_count": len(self.history),
+            "severity_levels": {
+                "critical": len([i for i in issues if i["severity"] == "critical"]),
+                "warning": len([i for i in issues if i["severity"] == "warning"])
+            }
+        }

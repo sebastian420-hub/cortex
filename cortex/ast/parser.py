@@ -5,15 +5,13 @@ Handles language detection, parser initialization, and AST creation.
 """
 
 import logging
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, TYPE_CHECKING
 from pathlib import Path
 
-# Type hints for tree-sitter
-try:
-    from tree_sitter import Parser as TreeSitterParser, Language as TreeSitterLanguage
-    Parser = TreeSitterParser
-    Language = TreeSitterLanguage
-except ImportError:
+# Type hints for tree-sitter (only for type checking)
+if TYPE_CHECKING:
+    from tree_sitter import Parser, Language
+else:
     Parser = Any
     Language = Any
 
@@ -75,6 +73,9 @@ class ASTParser:
                         # For TypeScript, we have two language objects
                         # Use the one for TypeScript (not TSX) by default
                         lang_capsule = language_module.language_typescript()
+                    elif lang_name == 'php':
+                        # PHP module has language_php and language_php_only
+                        lang_capsule = language_module.language_php()
                     else:
                         # For other languages, call the language function
                         lang_capsule = language_module.language()

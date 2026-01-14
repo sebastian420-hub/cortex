@@ -25,195 +25,244 @@ def register_ast_tools(registry: ToolRegistry) -> None:
     """
     logger.info("Registering AST tools...")
     
+    # Helper function to convert parameter list to schema
+    def build_schema(tool_name: str, description: str, parameters: list) -> dict:
+        properties = {}
+        required = []
+        for param in parameters:
+            param_name = param["name"]
+            param_type = param["type"]
+            param_desc = param.get("description", "")
+            param_required = param.get("required", False)
+            param_default = param.get("default")
+            param_enum = param.get("enum")
+            
+            # Build property schema
+            prop_schema = {"type": param_type, "description": param_desc}
+            if param_enum is not None:
+                prop_schema["enum"] = param_enum
+            if param_default is not None:
+                prop_schema["default"] = param_default
+            
+            properties[param_name] = prop_schema
+            
+            if param_required:
+                required.append(param_name)
+        
+        return {
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "description": description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            },
+        }
+    
     # Register AST Search Tool
-    registry.register_tool(
+    registry.register(
         name="ast_search",
         tool_class=ASTSearchTool,
-        description="Enhanced search with AST understanding. Combines traditional text search with AST-based structural search for smarter code understanding.",
-        parameters=[
-            {
-                "name": "pattern",
-                "type": "string",
-                "description": "Pattern to search for",
-                "required": True,
-            },
-            {
-                "name": "path",
-                "type": "string",
-                "description": "Directory or file to search in",
-                "default": ".",
-            },
-            {
-                "name": "search_type",
-                "type": "string",
-                "description": "Search type: 'text', 'structure', 'smart', 'function', 'class', 'import'",
-                "default": "smart",
-                "enum": ["text", "structure", "smart", "function", "class", "import"],
-            },
-            {
-                "name": "file_type",
-                "type": "string",
-                "description": "File type to search (e.g., 'py', 'js')",
-            },
-            {
-                "name": "output_mode",
-                "type": "string",
-                "description": "Output mode: 'files_with_matches', 'content', or 'count'",
-                "default": "files_with_matches",
-                "enum": ["files_with_matches", "content", "count"],
-            },
-            {
-                "name": "case_insensitive",
-                "type": "boolean",
-                "description": "Case insensitive search",
-                "default": False,
-            },
-            {
-                "name": "context",
-                "type": "integer",
-                "description": "Lines to show before and after match",
-                "default": 0,
-            },
-            {
-                "name": "multiline",
-                "type": "boolean",
-                "description": "Enable multiline matching",
-                "default": False,
-            },
-            {
-                "name": "head_limit",
-                "type": "integer",
-                "description": "Limit results (0 for unlimited)",
-                "default": 50,
-            },
-            {
-                "name": "offset",
-                "type": "integer",
-                "description": "Skip first N results",
-                "default": 0,
-            },
-            {
-                "name": "show_line_numbers",
-                "type": "boolean",
-                "description": "Show line numbers in content mode",
-                "default": True,
-            },
-        ],
+        schema=build_schema(
+            tool_name="ast_search",
+            description="Enhanced search with AST understanding. Combines traditional text search with AST-based structural search for smarter code understanding.",
+            parameters=[
+                {
+                    "name": "pattern",
+                    "type": "string",
+                    "description": "Pattern to search for",
+                    "required": True,
+                },
+                {
+                    "name": "path",
+                    "type": "string",
+                    "description": "Directory or file to search in",
+                    "default": ".",
+                },
+                {
+                    "name": "search_type",
+                    "type": "string",
+                    "description": "Search type: 'text', 'structure', 'smart', 'function', 'class', 'import'",
+                    "default": "smart",
+                    "enum": ["text", "structure", "smart", "function", "class", "import"],
+                },
+                {
+                    "name": "file_type",
+                    "type": "string",
+                    "description": "File type to search (e.g., 'py', 'js')",
+                },
+                {
+                    "name": "output_mode",
+                    "type": "string",
+                    "description": "Output mode: 'files_with_matches', 'content', or 'count'",
+                    "default": "files_with_matches",
+                    "enum": ["files_with_matches", "content", "count"],
+                },
+                {
+                    "name": "case_insensitive",
+                    "type": "boolean",
+                    "description": "Case insensitive search",
+                    "default": False,
+                },
+                {
+                    "name": "context",
+                    "type": "integer",
+                    "description": "Lines to show before and after match",
+                    "default": 0,
+                },
+                {
+                    "name": "multiline",
+                    "type": "boolean",
+                    "description": "Enable multiline matching",
+                    "default": False,
+                },
+                {
+                    "name": "head_limit",
+                    "type": "integer",
+                    "description": "Limit results (0 for unlimited)",
+                    "default": 50,
+                },
+                {
+                    "name": "offset",
+                    "type": "integer",
+                    "description": "Skip first N results",
+                    "default": 0,
+                },
+                {
+                    "name": "show_line_numbers",
+                    "type": "boolean",
+                    "description": "Show line numbers in content mode",
+                    "default": True,
+                },
+            ],
+        ),
+        namespace="builtin",
     )
     
     # Register AST Extract Tool
-    registry.register_tool(
+    registry.register(
         name="ast_extract",
         tool_class=ASTExtractTool,
-        description="Extract code structures using AST parsing. Provides semantic extraction of functions, classes, imports, and other code structures.",
-        parameters=[
-            {
-                "name": "path",
-                "type": "string",
-                "description": "Directory or file to extract from",
-                "required": True,
-            },
-            {
-                "name": "extract_type",
-                "type": "string",
-                "description": "Type of extraction: 'function', 'class', 'import', or 'all'",
-                "default": "all",
-                "enum": ["function", "class", "import", "all"],
-            },
-            {
-                "name": "pattern",
-                "type": "string",
-                "description": "Optional pattern to filter results",
-            },
-            {
-                "name": "include_docstrings",
-                "type": "boolean",
-                "description": "Include docstrings in results",
-                "default": True,
-            },
-            {
-                "name": "include_decorators",
-                "type": "boolean",
-                "description": "Include decorators in results",
-                "default": True,
-            },
-            {
-                "name": "include_parameters",
-                "type": "boolean",
-                "description": "Include function parameters",
-                "default": True,
-            },
-            {
-                "name": "include_return_types",
-                "type": "boolean",
-                "description": "Include return types",
-                "default": True,
-            },
-            {
-                "name": "include_bases",
-                "type": "boolean",
-                "description": "Include class bases",
-                "default": True,
-            },
-            {
-                "name": "include_methods",
-                "type": "boolean",
-                "description": "Include class methods",
-                "default": True,
-            },
-            {
-                "name": "include_aliases",
-                "type": "boolean",
-                "description": "Include import aliases",
-                "default": True,
-            },
-        ],
+        schema=build_schema(
+            tool_name="ast_extract",
+            description="Extract code structures using AST parsing. Provides semantic extraction of functions, classes, imports, and other code structures.",
+            parameters=[
+                {
+                    "name": "path",
+                    "type": "string",
+                    "description": "Directory or file to extract from",
+                    "required": True,
+                },
+                {
+                    "name": "extract_type",
+                    "type": "string",
+                    "description": "Type of extraction: 'function', 'class', 'import', or 'all'",
+                    "default": "all",
+                    "enum": ["function", "class", "import", "all"],
+                },
+                {
+                    "name": "pattern",
+                    "type": "string",
+                    "description": "Optional pattern to filter results",
+                },
+                {
+                    "name": "include_docstrings",
+                    "type": "boolean",
+                    "description": "Include docstrings in results",
+                    "default": True,
+                },
+                {
+                    "name": "include_decorators",
+                    "type": "boolean",
+                    "description": "Include decorators in results",
+                    "default": True,
+                },
+                {
+                    "name": "include_parameters",
+                    "type": "boolean",
+                    "description": "Include function parameters",
+                    "default": True,
+                },
+                {
+                    "name": "include_return_types",
+                    "type": "boolean",
+                    "description": "Include return types",
+                    "default": True,
+                },
+                {
+                    "name": "include_bases",
+                    "type": "boolean",
+                    "description": "Include class bases",
+                    "default": True,
+                },
+                {
+                    "name": "include_methods",
+                    "type": "boolean",
+                    "description": "Include class methods",
+                    "default": True,
+                },
+                {
+                    "name": "include_aliases",
+                    "type": "boolean",
+                    "description": "Include import aliases",
+                    "default": True,
+                },
+            ],
+        ),
+        namespace="builtin",
     )
     
     # Register AST Analyze Tool
-    registry.register_tool(
+    registry.register(
         name="ast_analyze",
         tool_class=ASTAnalyzeTool,
-        description="Code analysis using AST parsing. Provides metrics for code complexity, dependencies, and quality.",
-        parameters=[
-            {
-                "name": "path",
-                "type": "string",
-                "description": "Directory or file to analyze",
-                "required": True,
-            },
-            {
-                "name": "analysis_type",
-                "type": "string",
-                "description": "Analysis type: 'complexity', 'dependencies', 'issues', or 'all'",
-                "default": "complexity",
-                "enum": ["complexity", "dependencies", "issues", "all"],
-            },
-            {
-                "name": "max_depth",
-                "type": "integer",
-                "description": "Maximum depth for dependency analysis",
-                "default": 3,
-            },
-            {
-                "name": "include_metrics",
-                "type": "boolean",
-                "description": "Include code metrics",
-                "default": True,
-            },
-            {
-                "name": "include_dependencies",
-                "type": "boolean",
-                "description": "Include dependency analysis",
-                "default": True,
-            },
-            {
-                "name": "include_issues",
-                "type": "boolean",
-                "description": "Include potential issues",
-                "default": True,
-            },
-        ],
+        schema=build_schema(
+            tool_name="ast_analyze",
+            description="Code analysis using AST parsing. Provides metrics for code complexity, dependencies, and quality.",
+            parameters=[
+                {
+                    "name": "path",
+                    "type": "string",
+                    "description": "Directory or file to analyze",
+                    "required": True,
+                },
+                {
+                    "name": "analysis_type",
+                    "type": "string",
+                    "description": "Analysis type: 'complexity', 'dependencies', 'issues', or 'all'",
+                    "default": "complexity",
+                    "enum": ["complexity", "dependencies", "issues", "all"],
+                },
+                {
+                    "name": "max_depth",
+                    "type": "integer",
+                    "description": "Maximum depth for dependency analysis",
+                    "default": 3,
+                },
+                {
+                    "name": "include_metrics",
+                    "type": "boolean",
+                    "description": "Include code metrics",
+                    "default": True,
+                },
+                {
+                    "name": "include_dependencies",
+                    "type": "boolean",
+                    "description": "Include dependency analysis",
+                    "default": True,
+                },
+                {
+                    "name": "include_issues",
+                    "type": "boolean",
+                    "description": "Include potential issues",
+                    "default": True,
+                },
+            ],
+        ),
+        namespace="builtin",
     )
     
     logger.info("AST tools registered successfully")

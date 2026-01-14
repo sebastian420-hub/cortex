@@ -21,6 +21,11 @@ from .core.streaming import stream_model_response, display_streaming_response
 from .core.providers import ProviderFactory, ProviderError
 from .core.security import SecurityError
 from .core.loop_guards import LoopGuard
+from .core.recovery import (
+    CheckpointManager,
+    SessionHealthMonitor,
+    RecoveryOrchestrator,
+)
 from .core.summarization import (
     create_summarizer,
     SummarizationStrategy,
@@ -122,6 +127,24 @@ class Cortex:
             summarizer=summarizer,
             enable_summarization=enable_summarization,
             summarization_threshold=summarization_config.get("threshold", 0.8),
+        )
+
+        # Initialize session recovery system
+        recovery_config = getattr(self.config, "recovery", {})
+        checkpoint_dir = self.history_dir / "checkpoints"
+        checkpoint_dir.mkdir(exist_ok=True)
+
+        self.checkpoint_manager = CheckpointManager(
+            checkpoint_dir=checkpoint_dir,
+            max_checkpoints=recovery_config.get("max_checkpoints", 10),
+            auto_checkpoint_interval=recovery_config.get("auto_checkpoint_interval", 50),
+            compression_enabled=recovery_config.get("compression_enabled", True),
+            retention_days=recovery_config.get("retention_days", 7),
+        )
+
+        self.health_monitor = SessionHealthMonitor()
+        self.recovery_orchestrator = RecoveryOrchestrator(
+            self.checkpoint_manager, self.health_monitor
         )
 
         # Initialize loop guard with recovery manager if enabled
@@ -469,6 +492,15 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
     ) -> Dict[str, Any]:
         """Call model via provider with retry logic"""
         try:
+            # Pre-flight validation: Check message structure to prevent API errors
+            validation = self._validate_messages_for_api(messages)
+            if not validation["valid"]:
+                critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
+                if critical_issues:
+                    # Try to repair critical issues automatically
+                    messages = self._repair_messages_for_api(messages, critical_issues)
+                    logger.warning(f"Repaired {len(critical_issues)} critical message validation issues before API call")
+
             # Normalize model name for provider
             normalized_model = self.provider.normalize_model_name(self.model)
             return self.provider.chat(model=normalized_model, messages=messages, tools=tools)
@@ -703,6 +735,16 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                         tool_calls=response_message.get("tool_calls"),
                         reasoning_content=response_message.get("reasoning_content"),
                     )
+
+                    # Create automatic checkpoint if needed
+                    session_id = f"session_{self.session_start.strftime('%Y%m%d_%H%M%S')}"
+                    if self.checkpoint_manager.should_checkpoint(session_id, len(self.conversation.get_history())):
+                        health_report = self.health_monitor.analyze_health(self.conversation.get_history())
+                        self.checkpoint_manager.create_checkpoint(
+                            session_id,
+                            self.conversation.get_history(),
+                            health_score=health_report.overall_score
+                        )
     
                     # Display thinking/reasoning if enabled and present
                     reasoning_content = response_message.get("reasoning_content")
@@ -836,8 +878,24 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     return
                 except (ModelError, ProviderError) as e:
                     import traceback
-    
-                    self._output_error(str(e), "model_error", {"traceback": traceback.format_exc()})
+
+                    error_msg = str(e)
+                    error_context = {"traceback": traceback.format_exc()}
+
+                    # Check for specific error types and provide recovery hints
+                    if "Invalid assistant message" in error_msg:
+                        # This is the specific error we're trying to prevent
+                        error_msg += "\n\n[Recovery Hint] This error indicates corrupted conversation history. " \
+                                   "Try clearing the session with '/clear' or starting a new session."
+                        error_context["recovery_suggestion"] = "clear_session"
+                    elif "rate limit" in error_msg.lower():
+                        error_msg += "\n\n[Recovery Hint] Rate limit exceeded. Wait a moment and try again."
+                        error_context["recovery_suggestion"] = "wait_and_retry"
+                    elif "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+                        error_msg += "\n\n[Recovery Hint] Check your API key configuration."
+                        error_context["recovery_suggestion"] = "check_api_key"
+
+                    self._output_error(error_msg, "model_error", error_context)
                     return
                 except Exception as e:
                     import traceback
@@ -856,3 +914,133 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         self.conversation.clear(keep_system=True)
         # Update system prompt
         self.conversation.history[0]["content"] = self._get_system_prompt()
+
+    def _validate_messages_for_api(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Validate messages for API compliance to prevent "Invalid assistant message" errors.
+
+        Returns:
+            Dict with validation results and issues found.
+        """
+        issues = []
+
+        for i, msg in enumerate(messages):
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            tool_calls = msg.get("tool_calls")
+
+            # Validate assistant messages - must have content or tool_calls
+            if role == "assistant":
+                if not content and not tool_calls:
+                    issues.append({
+                        "index": i,
+                        "type": "invalid_assistant_message",
+                        "message": f"Assistant message at index {i} has no content or tool_calls",
+                        "severity": "critical"  # Will cause API errors
+                    })
+
+            # Validate tool messages - content must be string
+            elif role == "tool":
+                if not isinstance(msg.get("content", ""), str):
+                    issues.append({
+                        "index": i,
+                        "type": "invalid_tool_result",
+                        "message": f"Tool result at index {i} has non-string content",
+                        "severity": "warning"
+                    })
+
+        return {
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "message_count": len(messages),
+            "severity_levels": {
+                "critical": len([i for i in issues if i["severity"] == "critical"]),
+                "warning": len([i for i in issues if i["severity"] == "warning"])
+            }
+        }
+
+    def _repair_messages_for_api(self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Attempt to automatically repair critical message validation issues.
+
+        Args:
+            messages: Original message list
+            issues: List of validation issues (only critical ones should be passed)
+
+        Returns:
+            Repaired message list
+        """
+        repaired_messages = messages.copy()
+
+        for issue in issues:
+            if issue["type"] == "invalid_assistant_message":
+                idx = issue["index"]
+                msg = repaired_messages[idx]
+
+                # Try to fix by converting reasoning_content to content
+                if msg.get("reasoning_content"):
+                    content = f"[Reasoning: {msg['reasoning_content'][:200]}{'...' if len(msg['reasoning_content']) > 200 else ''}]"
+                    repaired_messages[idx]["content"] = content
+                    logger.debug(f"Repaired assistant message at index {idx} by converting reasoning to content")
+                else:
+                    # Fallback: add minimal content
+                    repaired_messages[idx]["content"] = "[Repaired empty assistant response]"
+                    logger.debug(f"Repaired assistant message at index {idx} by adding minimal content")
+
+        return repaired_messages
+
+    def validate_session_health(self) -> Dict[str, Any]:
+        """
+        Validate the current session health and provide recovery recommendations.
+
+        Returns:
+            Dict with session health status and recommendations.
+        """
+        # Use conversation manager's validation
+        history_validation = self.conversation.validate_history()
+
+        # Additional checks
+        issues = history_validation["issues"].copy()
+        recommendations = []
+
+        # Check for excessive message count
+        if history_validation["message_count"] > 100:
+            issues.append({
+                "type": "high_message_count",
+                "message": f"Session has {history_validation['message_count']} messages, which may impact performance",
+                "severity": "warning"
+            })
+            recommendations.append("Consider clearing old messages or starting a new session")
+
+        # Check for repeated errors in recent history
+        recent_messages = self.conversation.get_history()[-20:]  # Last 20 messages
+        error_count = 0
+        for msg in recent_messages:
+            if msg.get("role") == "tool":
+                try:
+                    result = json.loads(msg.get("content", "{}"))
+                    if not result.get("success", True):
+                        error_count += 1
+                except:
+                    pass
+
+        if error_count > 5:
+            issues.append({
+                "type": "frequent_errors",
+                "message": f"{error_count} errors in recent messages, indicating potential issues",
+                "severity": "warning"
+            })
+            recommendations.append("Review recent tool executions for patterns")
+
+        # Generate recovery recommendations based on issues
+        if history_validation["severity_levels"]["critical"] > 0:
+            recommendations.insert(0, "CRITICAL: Session has corrupted messages. Use '/clear' to start fresh")
+        elif history_validation["severity_levels"]["warning"] > 0:
+            recommendations.insert(0, "Session has warnings. Monitor for issues")
+
+        return {
+            "healthy": len([i for i in issues if i["severity"] == "critical"]) == 0,
+            "issues": issues,
+            "recommendations": recommendations,
+            "validation": history_validation
+        }
