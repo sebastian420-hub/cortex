@@ -138,6 +138,10 @@ class EnhancedCortex(Cortex):
         # Update system prompt with enhanced guidance
         self._update_system_prompt()
     
+    def load_project_context(self) -> str:
+        """Public method to load project context for backward compatibility."""
+        return self._load_project_context()
+    
     def _update_system_prompt(self) -> None:
         """Update system prompt with planning and memory guidance."""
         # Get base system prompt

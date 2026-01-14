@@ -337,7 +337,6 @@ Summary:"""
     ) -> str:
         """Format messages for the summarization prompt."""
         parts = []
-        total_chars = 0
 
         for msg in messages:
             role = msg.get("role", "unknown")
@@ -353,18 +352,13 @@ Summary:"""
                 except:
                     content = "[Tool result]"
 
-            # Truncate long content
-            if len(content) > 200:
-                content = content[:200] + "..."
-
             line = f"{role.upper()}: {content}"
-            if total_chars + len(line) > max_chars:
-                break
-
             parts.append(line)
-            total_chars += len(line)
 
-        return "\n".join(parts)
+        full_text = "\n".join(parts)
+        if len(full_text) > max_chars:
+            return full_text[:max_chars-3] + "..."
+        return full_text
 
 
 class HybridSummarizer(ConversationSummarizer):

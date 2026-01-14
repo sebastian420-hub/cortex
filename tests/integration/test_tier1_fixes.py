@@ -9,7 +9,7 @@ from cortex.agent import Cortex
 from cortex.storage.sessions import SessionManager
 from cortex.models import PermissionMode
 from cortex.utils.errors import create_error_response, ErrorType
-from cortex.core.recovery import RecoveryAction, RecoveryStrategy
+from cortex.core.recovery_strategies import RecoveryAction, RecoveryStrategy
 
 
 def test_recovery_flow_end_to_end(tmp_path):

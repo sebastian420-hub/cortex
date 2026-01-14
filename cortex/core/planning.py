@@ -152,6 +152,12 @@ class Plan:
     estimated_duration_minutes: Optional[int] = None
     actual_duration_minutes: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __len__(self):
+        return len(self.steps)
+
+    def __getitem__(self, index):
+        return self.steps[index]
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -198,7 +204,7 @@ class Plan:
         """Add a step to the plan."""
         self.steps.append(step)
     
-    def get_step(self, step_id: str) -> Optional[PlanStep]:
+    def get_step_by_id(self, step_id: str) -> Optional[PlanStep]:
         """Get a step by ID."""
         for step in self.steps:
             if step.id == step_id:
@@ -280,6 +286,7 @@ class PlanningEngine:
         skill_loader: Optional[Callable[[str], Dict[str, Any]]] = None,
         tool_executor: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
         reflection_callback: Optional[Callable[[Plan, str], None]] = None,
+        max_plan_steps: int = 100,
     ):
         """
         Initialize planning engine.
@@ -289,15 +296,17 @@ class PlanningEngine:
             skill_loader: Function to load skills by name
             tool_executor: Function to execute tools by name and arguments
             reflection_callback: Callback for reflection events
+            max_plan_steps: Maximum number of steps in a plan
         """
         self.project_dir = Path(project_dir).resolve()
         self.skill_loader = skill_loader
         self.tool_executor = tool_executor
         self.reflection_callback = reflection_callback
+        self.max_plan_steps = max_plan_steps
         self.active_plan: Optional[Plan] = None
-        self.plan_history: List[Plan] = []
+        self.plans: Dict[str, Plan] = {}
         
-    def generate_plan(
+    def create_plan(
         self,
         goal: str,
         context: Optional[Dict[str, Any]] = None,
@@ -329,67 +338,85 @@ class PlanningEngine:
             assumptions=assumptions or [],
         )
         
-        # For now, create a simple placeholder plan
-        # In a real implementation, this would use an LLM or rule-based system
-        # to generate detailed steps
-        
-        # Add initial analysis step
-        analysis_step = PlanStep(
-            id=f"{plan_id}_step_1",
-            description=f"Analyze the goal and understand requirements: {goal}",
-            step_type=PlanStepType.SUBTASK,
-            expected_outcome="Clear understanding of requirements and approach",
-        )
-        plan.add_step(analysis_step)
-        
-        # Add skill application step if skills are suggested
-        if skill_hints and self.skill_loader:
-            skill_step = PlanStep(
-                id=f"{plan_id}_step_2",
-                description=f"Apply relevant skills: {', '.join(skill_hints[:3])}",
-                step_type=PlanStepType.SKILL_APPLICATION,
-                skill_name=skill_hints[0] if skill_hints else None,
-                dependencies=[analysis_step.id],
-                expected_outcome="Successfully applied skill to progress toward goal",
-            )
-            plan.add_step(skill_step)
-        
-        # Add execution step
-        exec_step = PlanStep(
-            id=f"{plan_id}_step_3",
-            description="Execute the plan steps",
-            step_type=PlanStepType.TOOL_CALL,
-            dependencies=[analysis_step.id],
-            expected_outcome="Goal achieved or significant progress made",
-        )
-        plan.add_step(exec_step)
-        
-        # Add verification step
-        verify_step = PlanStep(
-            id=f"{plan_id}_step_4",
-            description="Verify goal achievement",
-            step_type=PlanStepType.CHECKPOINT,
-            dependencies=[exec_step.id],
-            checkpoint_name="goal_verification",
-            expected_outcome="Goal verified as achieved or failure documented",
-        )
-        plan.add_step(verify_step)
-        
-        # Add reflection step
-        reflect_step = PlanStep(
-            id=f"{plan_id}_step_5",
-            description="Reflect on the plan execution and outcomes",
-            step_type=PlanStepType.REFLECTION,
-            dependencies=[verify_step.id],
-            expected_outcome="Lessons learned for future planning",
-        )
-        plan.add_step(reflect_step)
-        
         self.active_plan = plan
-        self.plan_history.append(plan)
+        self.plans[plan.id] = plan
         
-        logger.info(f"Generated plan {plan_id} for goal: {goal}")
+        logger.info(f"Generated plan {plan.id} for goal: {goal}")
         return plan
+
+    def get_plan(self, plan_id: str) -> Optional[Plan]:
+        """Get a plan by ID."""
+        for plan in self.plans.values():
+            if plan.id == plan_id:
+                return plan
+        return None
+
+    def add_step(self, plan_id: str, description: str, step_type: PlanStepType = PlanStepType.TOOL_CALL, tool_name: Optional[str] = None, tool_arguments: Optional[Dict[str, Any]] = None) -> Optional[PlanStep]:
+        """Add a step to a plan."""
+        plan = self.get_plan(plan_id)
+        if not plan:
+            return None
+        
+        step_id = f"{plan_id}_step_{len(plan.steps) + 1}"
+        step = PlanStep(
+            id=step_id,
+            description=description,
+            step_type=step_type,
+            tool_name=tool_name,
+            tool_arguments=tool_arguments,
+        )
+        plan.add_step(step)
+        return step
+
+    def update_step_status(self, plan_id: str, step_id: str, status: PlanStepStatus, error: Optional[str] = None) -> bool:
+        """Update the status of a step."""
+        plan = self.get_plan(plan_id)
+        if not plan:
+            return False
+        
+        step = plan.get_step_by_id(step_id)
+        if not step:
+            return False
+            
+        step.status = status
+        if status == PlanStepStatus.IN_PROGRESS:
+            step.mark_started()
+        elif status == PlanStepStatus.COMPLETED:
+            step.mark_completed()
+        elif status == PlanStepStatus.FAILED:
+            step.mark_failed(error or "Unknown error")
+        elif status == PlanStepStatus.SKIPPED:
+            step.mark_skipped()
+            
+        return True
+
+    def execute_step(self, plan_id: str, step_id: str) -> Dict[str, Any]:
+        """Execute a single plan step by ID."""
+        plan = self.get_plan(plan_id)
+        if not plan:
+            return create_error_response(f"Plan not found: {plan_id}", ErrorType.NOT_FOUND)
+            
+        step = plan.get_step_by_id(step_id)
+        if not step:
+            return create_error_response(f"Step not found: {step_id}", ErrorType.NOT_FOUND)
+
+        step.mark_started()
+        
+        try:
+            result = self._execute_step(step, plan)
+            
+            if result["success"]:
+                step.mark_completed(result.get("outcome"))
+                logger.info(f"Step {step.id} completed: {step.description}")
+            else:
+                step.mark_failed(result.get("error", "Unknown error"))
+                logger.error(f"Step {step.id} failed: {result.get('error')}")
+
+            return result
+        except Exception as e:
+            step.mark_failed(str(e))
+            logger.exception(f"Exception executing step {step.id}")
+            return create_error_response(f"Exception executing step {step.id}: {str(e)}", ErrorType.EXECUTION)
     
     def execute_plan(
         self,
@@ -562,7 +589,7 @@ class PlanningEngine:
                 ErrorType.EXECUTION,
             )
     
-    def reflect_on_progress(
+    def reflect_on_plan(
         self,
         plan: Optional[Plan] = None,
         focus_areas: Optional[List[str]] = None,

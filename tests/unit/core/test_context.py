@@ -22,7 +22,7 @@ class TestEstimateTokens:
         test_text = "Hello, world! This is a test."
         
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.tiktoken') as mock_tiktoken:
+            with patch('cortex.core.context.tiktoken', create=True) as mock_tiktoken:
                 mock_encoding = MagicMock()
                 mock_encoding.encode.return_value = [1, 2, 3, 4, 5]
                 mock_tiktoken.encoding_for_model.return_value = mock_encoding
@@ -38,7 +38,7 @@ class TestEstimateTokens:
         test_text = "Hello, world!"
         
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.tiktoken') as mock_tiktoken:
+            with patch('cortex.core.context.tiktoken', create=True) as mock_tiktoken:
                 # Simulate KeyError for encoding_for_model
                 mock_tiktoken.encoding_for_model.side_effect = KeyError("Model not found")
                 mock_encoding = MagicMock()
@@ -57,7 +57,7 @@ class TestEstimateTokens:
         test_text = "Hello, world!"  # 13 characters
         
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.tiktoken') as mock_tiktoken:
+            with patch('cortex.core.context.tiktoken', create=True) as mock_tiktoken:
                 # Simulate multiple failures
                 mock_tiktoken.encoding_for_model.side_effect = KeyError("Model not found")
                 mock_tiktoken.get_encoding.side_effect = ValueError("Encoding not found")

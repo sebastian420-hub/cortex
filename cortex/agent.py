@@ -150,7 +150,7 @@ class Cortex:
         # Initialize loop guard with recovery manager if enabled
         recovery_manager = None
         if self.config.error_recovery.get("enable_smart_recovery", False):
-            from .core.recovery import create_recovery_manager_from_config
+            from .core.recovery_strategies import create_recovery_manager_from_config
 
             recovery_manager = create_recovery_manager_from_config(self.config.error_recovery)
 
@@ -821,7 +821,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                                         result, tool_name, parsed_arguments
                                     )
                                     if recovery_action:
-                                        from .core.recovery import RecoveryStrategy
+                                        from .core.recovery_strategies import RecoveryStrategy
     
                                         if recovery_action.strategy != RecoveryStrategy.ESCALATE:
                                             self._output_warning(

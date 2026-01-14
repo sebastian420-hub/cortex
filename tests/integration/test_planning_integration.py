@@ -46,7 +46,7 @@ def test_planning_with_skill_loader():
     
     # Generate a plan with skill hints
     goal = "Debug a performance issue in the user authentication module"
-    plan = engine.generate_plan(
+    plan = engine.create_plan(
         goal=goal,
         constraints=["Must not break existing tests"],
         assumptions=["Performance issue is reproducible"],

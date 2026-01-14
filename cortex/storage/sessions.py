@@ -157,7 +157,8 @@ class SessionManager:
                             self._secure_file(file_path)
                             return True
                 except (IOError, OSError):
-                    time.sleep(0.1)  # Brief wait before retry
+                    pass  # Ignore errors and retry
+                time.sleep(0.1)  # Brief wait before retry
 
             # If we couldn't acquire lock, still try atomic rename
             # (on some systems, rename is atomic even without explicit locking)

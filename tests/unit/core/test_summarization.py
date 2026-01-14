@@ -23,9 +23,9 @@ class TestSummarizationStrategy:
     
     def test_enum_values(self):
         """Test that SummarizationStrategy has correct values."""
-        assert SummarizationStrategy.SIMPLE == "simple"
-        assert SummarizationStrategy.LLM_BASED == "llm_based"
-        assert SummarizationStrategy.HYBRID == "hybrid"
+        assert SummarizationStrategy.SIMPLE.value == "simple"
+        assert SummarizationStrategy.LLM_BASED.value == "llm_based"
+        assert SummarizationStrategy.HYBRID.value == "hybrid"
 
 
 class TestSummaryChunk:
@@ -161,7 +161,7 @@ class TestSimpleSummarizer:
     
     def test_summarize_empty_messages(self, summarizer):
         """Test summarizing empty message list."""
-        with patch('cortex.core.summarization.estimate_tokens', return_value=0):
+        with patch('cortex.core.context.estimate_tokens', return_value=0):
             chunk = summarizer.summarize([], max_summary_tokens=500)
             
             assert chunk.original_message_count == 0
@@ -181,7 +181,7 @@ class TestSimpleSummarizer:
             {"role": "user", "content": "Also add tests"}
         ]
         
-        with patch('cortex.core.summarization.estimate_tokens', return_value=10):
+        with patch('cortex.core.context.estimate_tokens', return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
             
             assert chunk.original_message_count == 2
@@ -211,7 +211,7 @@ class TestSimpleSummarizer:
             }
         ]
         
-        with patch('cortex.core.summarization.estimate_tokens', return_value=10):
+        with patch('cortex.core.context.estimate_tokens', return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
             
             assert "main.py" in chunk.files_read
@@ -235,7 +235,7 @@ class TestSimpleSummarizer:
             }
         ]
         
-        with patch('cortex.core.summarization.estimate_tokens', return_value=10):
+        with patch('cortex.core.context.estimate_tokens', return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
             
             assert "pytest tests/" in chunk.commands_executed[0]
@@ -252,7 +252,7 @@ class TestSimpleSummarizer:
             }
         ]
         
-        with patch('cortex.core.summarization.estimate_tokens', return_value=10):
+        with patch('cortex.core.context.estimate_tokens', return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
             
             assert "File not found" in chunk.errors_encountered[0]
@@ -293,7 +293,7 @@ class TestLLMSummarizer:
             {"role": "assistant", "content": "I'll help with that"}
         ]
         
-        with patch('cortex.core.summarization.estimate_tokens', return_value=50):
+        with patch('cortex.core.context.estimate_tokens', return_value=50):
             with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
                 mock_simple_instance = Mock()
                 mock_simple_instance.summarize.return_value = SummaryChunk(
@@ -324,7 +324,7 @@ class TestLLMSummarizer:
         
         messages = [{"role": "user", "content": "Test"}]
         
-        with patch('cortex.core.summarization.estimate_tokens', return_value=10):
+        with patch('cortex.core.context.estimate_tokens', return_value=10):
             with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
                 mock_simple_instance = Mock()
                 mock_simple_instance.summarize.return_value = SummaryChunk(
@@ -391,7 +391,7 @@ class TestHybridSummarizer:
         
         messages = [{"role": "user", "content": "Test"}] * 11  # More than 10 messages
         
-        with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
+        with patch.object(summarizer.simple, 'summarize') as mock_simple_summarize:
             simple_chunk = SummaryChunk(
                 original_message_count=11,
                 original_token_count=2200,
@@ -403,11 +403,9 @@ class TestHybridSummarizer:
                 commands_executed=[],
                 errors_encountered=[]
             )
-            mock_simple_instance = Mock()
-            mock_simple_instance.summarize.return_value = simple_chunk
-            mock_simple.return_value = mock_simple_instance
-            
-            with patch('cortex.core.summarization.LLMSummarizer') as mock_llm:
+            mock_simple_summarize.return_value = simple_chunk
+
+            with patch.object(summarizer.llm, 'summarize') as mock_llm_summarize:
                 llm_chunk = SummaryChunk(
                     original_message_count=11,
                     original_token_count=2200,
@@ -419,12 +417,10 @@ class TestHybridSummarizer:
                     commands_executed=[],
                     errors_encountered=[]
                 )
-                mock_llm_instance = Mock()
-                mock_llm_instance.summarize.return_value = llm_chunk
-                mock_llm.return_value = mock_llm_instance
-                
+                mock_llm_summarize.return_value = llm_chunk
+
                 chunk = summarizer.summarize(messages, max_summary_tokens=500)
-                
+
                 # Should use LLM content but simple's structured data
                 assert chunk.summary_content == "Enhanced LLM summary"
                 assert chunk.key_decisions == ["decision"]
@@ -436,7 +432,7 @@ class TestHybridSummarizer:
         
         messages = [{"role": "user", "content": "Test"}]
         
-        with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
+        with patch.object(summarizer.simple, 'summarize') as mock_simple_summarize:
             simple_chunk = SummaryChunk(
                 original_message_count=1,
                 original_token_count=20,
@@ -448,22 +444,20 @@ class TestHybridSummarizer:
                 commands_executed=[],
                 errors_encountered=[]
             )
-            mock_simple_instance = Mock()
-            mock_simple_instance.summarize.return_value = simple_chunk
-            mock_simple.return_value = mock_simple_instance
-            
+            mock_simple_summarize.return_value = simple_chunk
+
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
-            
+
             # Should return simple summary
             assert chunk.summary_content == "Simple summary"
-    
+
     def test_hybrid_llm_failure(self, mock_provider):
         """Test hybrid summarizer when LLM enhancement fails."""
         summarizer = HybridSummarizer(provider=mock_provider, model="gpt-4")
         
         messages = [{"role": "user", "content": "Test"}] * 11
         
-        with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
+        with patch.object(summarizer.simple, 'summarize') as mock_simple_summarize:
             simple_chunk = SummaryChunk(
                 original_message_count=11,
                 original_token_count=2200,
@@ -475,20 +469,13 @@ class TestHybridSummarizer:
                 commands_executed=[],
                 errors_encountered=[]
             )
-            mock_simple_instance = Mock()
-            mock_simple_instance.summarize.return_value = simple_chunk
-            mock_simple.return_value = mock_simple_instance
-            
-            with patch('cortex.core.summarization.LLMSummarizer') as mock_llm:
-                mock_llm_instance = Mock()
-                mock_llm_instance.summarize.side_effect = Exception("LLM failed")
-                mock_llm.return_value = mock_llm_instance
-                
+            mock_simple_summarize.return_value = simple_chunk
+
+            with patch.object(summarizer.llm, 'summarize', side_effect=Exception("LLM failed")):
                 chunk = summarizer.summarize(messages, max_summary_tokens=500)
-                
+
                 # Should fall back to simple summary
                 assert chunk.summary_content == "Simple summary"
-
 
 class TestCreateSummarizer:
     """Test create_summarizer factory function."""

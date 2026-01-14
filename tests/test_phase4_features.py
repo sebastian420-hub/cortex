@@ -319,14 +319,13 @@ class TestEnhancedRecovery:
     """Tests for enhanced error recovery."""
 
     def test_recovery_manager_import(self):
-        """Test that RecoveryManager can be imported."""
-        from cortex.core.recovery import RecoveryManager
+        from cortex.core.recovery_strategies import RecoveryManager
 
         assert RecoveryManager is not None
 
     def test_not_found_recovery_enhanced(self):
         """Test enhanced not_found recovery with debugging steps."""
-        from cortex.core.recovery import RecoveryManager, RecoveryContext, RecoveryStrategy
+        from cortex.core.recovery_strategies import RecoveryManager, RecoveryContext, RecoveryStrategy
 
         manager = RecoveryManager()
         context = RecoveryContext(
@@ -347,7 +346,7 @@ class TestEnhancedRecovery:
 
     def test_execution_recovery_command_not_found(self):
         """Test execution recovery for command not found."""
-        from cortex.core.recovery import RecoveryManager, RecoveryContext, RecoveryStrategy
+        from cortex.core.recovery_strategies import RecoveryManager, RecoveryContext, RecoveryStrategy
 
         manager = RecoveryManager()
         context = RecoveryContext(
@@ -368,7 +367,7 @@ class TestEnhancedRecovery:
 
     def test_execution_recovery_test_failure(self):
         """Test execution recovery for test failures."""
-        from cortex.core.recovery import RecoveryManager, RecoveryContext, RecoveryStrategy
+        from cortex.core.recovery_strategies import RecoveryManager, RecoveryContext, RecoveryStrategy
 
         manager = RecoveryManager()
         context = RecoveryContext(

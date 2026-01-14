@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 from cortex.agent import Cortex
 from cortex.core.loop_guards import LoopGuard
-from cortex.core.recovery import RecoveryStrategy, RecoveryAction
+from cortex.core.recovery_strategies import RecoveryStrategy, RecoveryAction
 from cortex.utils.errors import create_error_response, create_success_response, ErrorType
 from cortex.models import PermissionMode
 

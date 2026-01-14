@@ -79,14 +79,17 @@ def truncate_history(
         other_messages = conversation_history
 
     # Keep recent messages
-    if len(other_messages) <= keep_recent:
+    if keep_recent == 0:
+        # Keep zero recent messages
+        recent_messages = []
+    elif len(other_messages) <= keep_recent:
         # If we can fit everything, just return
         if system_msg:
             return [system_msg] + other_messages
         return other_messages
-
-    # Truncate: keep system + recent messages
-    recent_messages = other_messages[-keep_recent:]
+    else:
+        # Truncate: keep only recent messages
+        recent_messages = other_messages[-keep_recent:]
 
     # Optionally summarize old messages (future enhancement)
     # For now, just drop them

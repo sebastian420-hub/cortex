@@ -3,7 +3,7 @@
 from typing import List, Tuple, Dict, Any, Set, Optional, TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from .recovery import RecoveryManager, RecoveryAction, RecoveryContext
+    from .recovery_strategies import RecoveryManager, RecoveryAction, RecoveryContext
 
 
 class LoopGuard:
@@ -280,7 +280,7 @@ class LoopGuard:
         if not self.recovery_manager:
             return None
 
-        from .recovery import RecoveryContext
+        from .recovery_strategies import RecoveryContext
 
         context = RecoveryContext(
             error_type=error.get("error_type", "unknown"),

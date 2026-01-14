@@ -235,6 +235,11 @@ class TransactionManager:
             self._current_transaction.add_backup(backup)
             return backup
 
+    def get_active_transaction(self) -> Optional[Transaction]:
+        """Get the currently active transaction, if any."""
+        with self._lock:
+            return self._current_transaction
+
     def commit(self) -> bool:
         """
         Commit the current transaction.
@@ -353,7 +358,12 @@ class TransactionManager:
             self.rollback()
             raise
 
-    def _cleanup_history(self) -> None:
+    def get_history(self) -> List[Transaction]:
+        """Get the transaction history."""
+        with self._lock:
+            return self._transaction_history[:]
+
+    def _cleanup_history(self):
         """Clean up old transactions from history."""
         while len(self._transaction_history) > self.max_backups:
             old_tx = self._transaction_history.pop(0)

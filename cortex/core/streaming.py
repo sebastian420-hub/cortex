@@ -79,7 +79,16 @@ def display_streaming_response(
                     # Update existing or add new
                     existing = next((t for t in tool_calls if t.get("id") == tc.get("id")), None)
                     if existing:
-                        existing.update(tc)
+                        # Deep merge 'function' dictionary
+                        if "function" in tc:
+                            if "function" not in existing:
+                                existing["function"] = {}
+                            existing["function"].update(tc["function"])
+                        
+                        # Update other top-level keys
+                        for key, value in tc.items():
+                            if key != "function":
+                                existing[key] = value
                     else:
                         tool_calls.append(tc)
 

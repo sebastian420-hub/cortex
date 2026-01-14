@@ -12,13 +12,16 @@ from cortex.ast.queries import ASTQueries
 from cortex.ast.service import ASTService
 from cortex.ast.languages import detect_language
 
-def test_parser():
-    print("=== Testing ASTParser ===")
-    parser = ASTParser()
-    print(f"Available: {parser.available}")
-    print(f"Languages loaded: {list(parser.parsers.keys())}")
-    
-    # Test parsing
+import pytest
+
+@pytest.fixture(scope="module")
+def parser():
+    print("=== Creating ASTParser ===")
+    return ASTParser()
+
+@pytest.fixture(scope="module")
+def ast(parser):
+    print("=== Parsing test code ===")
     test_code = """import os
 import sys as system
 from collections import defaultdict
@@ -36,11 +39,15 @@ class Calculator:
     def multiply(self, x: int, y: int) -> int:
         return x * y
 """
-    
-    ast = parser.parse(test_code, 'python')
+    return parser.parse(test_code, 'python')
+
+def test_parser_execution(parser, ast):
+    print("=== Testing ASTParser ===")
+    print(f"Available: {parser.available}")
+    print(f"Languages loaded: {list(parser.parsers.keys())}")
     assert ast is not None, "Parse failed"
     print(f"Parse successful! Root type: {ast.root_node.type}")
-    return parser, ast
+
 
 def test_queries(parser, ast):
     print("\n=== Testing ASTQueries ===")

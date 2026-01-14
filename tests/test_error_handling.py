@@ -83,7 +83,7 @@ def test_success_response_format():
 def test_error_recovery_flows(tmp_path):
     """Test loop guard intervention on errors"""
     from cortex.core.loop_guards import LoopGuard
-    from cortex.core.recovery import RecoveryStrategy, RecoveryAction, RecoveryManager
+    from cortex.core.recovery_strategies import RecoveryStrategy, RecoveryAction, RecoveryManager
 
     # Create loop guard with recovery manager
     recovery_manager = RecoveryManager()

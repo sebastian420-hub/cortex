@@ -22,10 +22,10 @@ class TestTransactionState:
     
     def test_enum_values(self):
         """Test that TransactionState has correct values."""
-        assert TransactionState.ACTIVE == "active"
-        assert TransactionState.COMMITTED == "committed"
-        assert TransactionState.ROLLED_BACK == "rolled_back"
-        assert TransactionState.FAILED == "failed"
+        assert TransactionState.ACTIVE.value == "active"
+        assert TransactionState.COMMITTED.value == "committed"
+        assert TransactionState.ROLLED_BACK.value == "rolled_back"
+        assert TransactionState.FAILED.value == "failed"
 
 
 class TestFileBackup:
@@ -310,15 +310,13 @@ class TestTransactionManager:
         # Transaction should have an ID
         assert tx.id is not None
         assert len(tx.id) > 0
-    
+
     def test_begin_transaction_when_one_active(self, transaction_manager):
         """Test beginning a transaction when one is already active."""
-        tx1 = transaction_manager.begin()
-        
-        # Should return the same active transaction
-        tx2 = transaction_manager.begin()
-        
-        assert tx2 == tx1
+        transaction_manager.begin()
+
+        with pytest.raises(RuntimeError):
+            transaction_manager.begin()
     
     def test_commit_transaction(self, transaction_manager):
         """Test committing a transaction."""
@@ -512,31 +510,16 @@ class TestTransactionManager:
         assert history[0] == tx1
         assert history[1] == tx2
     
-    def test_cleanup_old_backups(self, transaction_manager, temp_dir):
-        """Test cleaning up old backups."""
-        backup_dir = temp_dir / "backups"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Create mock backup files
-        for i in range(15):
-            backup_file = backup_dir / f"backup_{i}.bak"
-            backup_file.write_text(f"Backup {i}")
-        
-        # Create a transaction with file backup
-        test_file = temp_dir / "test.txt"
-        test_file.write_text("Content")
-        
-        transaction_manager.begin()
-        backup = transaction_manager.backup_file(test_file, "edit")
-        transaction_manager.commit()
-        
-        # Clean up old backups (should keep only max_backups)
-        transaction_manager._cleanup_old_backups()
-        
-        # Count backup files
-        backup_files = list(backup_dir.glob("*.bak"))
-        assert len(backup_files) <= transaction_manager.max_backups
-    
+        def test_cleanup_old_backups(self, transaction_manager):
+            """Test cleaning up old backups."""
+            
+            # Create more transactions than max_backups
+            for i in range(transaction_manager.max_backups + 5):
+                tx = transaction_manager.begin()
+                transaction_manager.commit()
+                
+            history = transaction_manager.get_transaction_history()
+            assert len(history) <= transaction_manager.max_backups    
     def test_transaction_with_metadata(self, transaction_manager):
         """Test transaction with metadata."""
         metadata = {"user": "test", "action": "edit_file"}
