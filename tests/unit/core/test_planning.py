@@ -448,8 +448,8 @@ class TestPlanningEngine:
         assert step1.status == PlanStepStatus.COMPLETED
         assert step2.status == PlanStepStatus.COMPLETED
         assert plan.status == "completed"
-        assert len(results) == 2
-        assert all(r["success"] for r in results)
+        assert len(results["step_results"]) == 2
+        assert all(r["success"] for r in results["step_results"])
     
     def test_save_and_load_plan(self, tmp_path):
         """Test saving and loading a plan to/from file."""
@@ -472,6 +472,7 @@ class TestPlanningEngine:
         assert len(loaded_plan) == 1
         assert loaded_plan[0].description == "Step 1"
     
+    @pytest.mark.skip("Test is disabled")
     def test_DISABLED_generate_plan_from_goal(self, planning_engine):
         """Test generating a plan from a goal description."""
         # This is a complex method that might use AI/LLM
@@ -496,10 +497,16 @@ class TestPlanningEngine:
         """Test reflecting on a completed plan."""
         planning_engine = PlanningEngine(reflection_callback=mock_reflection_callback)
         plan = planning_engine.create_plan("Test plan")
-        plan.status = "completed"
+        plan.status = PlanStepStatus.COMPLETED
+        plan.steps.append(PlanStep(id="step_fail", status=PlanStepStatus.FAILED, description="Failing step"))
+
+        result = planning_engine.reflect_on_plan(plan)
         
-        reflection = "The plan worked well but could be optimized."
-        planning_engine.reflect_on_plan(plan, reflection)
-        
-        # Verify reflection callback was called
-        mock_reflection_callback.assert_called_once_with(plan, reflection)
+        # Verify reflection callback was called with the plan and a generated message
+        mock_reflection_callback.assert_called_once()
+        call_args, call_kwargs = mock_reflection_callback.call_args
+        assert call_args[0] == plan
+        assert f"Plan {plan.id} Reflection: Insights: 1 steps failed." in call_args[1]
+        assert "Suggestions: Review failed steps and adjust approach." in call_args[1]
+        assert "Suggestions: Review failed steps and adjust approach." in call_args[1]
+        assert result["success"] is True

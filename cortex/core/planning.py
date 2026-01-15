@@ -346,15 +346,12 @@ class PlanningEngine:
 
     def get_plan(self, plan_id: str) -> Optional[Plan]:
         """Get a plan by ID."""
-        for plan in self.plans.values():
-            if plan.id == plan_id:
-                return plan
-        return None
+        return self.plans.get(plan_id)
 
     def add_step(self, plan_id: str, description: str, step_type: PlanStepType = PlanStepType.TOOL_CALL, tool_name: Optional[str] = None, tool_arguments: Optional[Dict[str, Any]] = None) -> Optional[PlanStep]:
         """Add a step to a plan."""
         plan = self.get_plan(plan_id)
-        if not plan:
+        if plan is None:
             return None
         
         step_id = f"{plan_id}_step_{len(plan.steps) + 1}"
@@ -371,11 +368,11 @@ class PlanningEngine:
     def update_step_status(self, plan_id: str, step_id: str, status: PlanStepStatus, error: Optional[str] = None) -> bool:
         """Update the status of a step."""
         plan = self.get_plan(plan_id)
-        if not plan:
+        if plan is None:
             return False
         
         step = plan.get_step_by_id(step_id)
-        if not step:
+        if step is None:
             return False
             
         step.status = status
@@ -393,11 +390,11 @@ class PlanningEngine:
     def execute_step(self, plan_id: str, step_id: str) -> Dict[str, Any]:
         """Execute a single plan step by ID."""
         plan = self.get_plan(plan_id)
-        if not plan:
+        if plan is None:
             return create_error_response(f"Plan not found: {plan_id}", ErrorType.NOT_FOUND)
             
         step = plan.get_step_by_id(step_id)
-        if not step:
+        if step is None:
             return create_error_response(f"Step not found: {step_id}", ErrorType.NOT_FOUND)
 
         step.mark_started()
@@ -406,7 +403,7 @@ class PlanningEngine:
             result = self._execute_step(step, plan)
             
             if result["success"]:
-                step.mark_completed(result.get("outcome"))
+                step.mark_completed(result.get("content"))
                 logger.info(f"Step {step.id} completed: {step.description}")
             else:
                 step.mark_failed(result.get("error", "Unknown error"))
@@ -443,6 +440,7 @@ class PlanningEngine:
         
         plan.mark_started()
         steps_executed = 0
+        step_results = [] # Initialize here
         
         while True:
             # Check if we've reached max steps
@@ -466,6 +464,7 @@ class PlanningEngine:
                         "message": "Plan execution completed",
                         "plan_id": plan.id,
                         "progress": plan.get_progress(),
+                        "step_results": step_results,
                     })
                 else:
                     # Some steps are still pending but dependencies not met
@@ -488,7 +487,7 @@ class PlanningEngine:
                 result = self._execute_step(step, plan)
                 
                 if result["success"]:
-                    step.mark_completed(result.get("outcome"))
+                    step.mark_completed(result.get("content"))
                     logger.info(f"Step {step.id} completed: {step.description}")
                 else:
                     step.mark_failed(result.get("error", "Unknown error"))
@@ -522,6 +521,7 @@ class PlanningEngine:
                         }
                     )
             
+            step_results.append(result)
             steps_executed += 1
         
         return create_success_response({
@@ -639,6 +639,10 @@ class PlanningEngine:
         
         # Generate reflection result
         reflection_id = f"reflect_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        if self.reflection_callback:
+            reflection_message = f"Plan {plan.id} Reflection: Insights: {', '.join(insights)}. Suggestions: {', '.join(suggestions)}."
+            self.reflection_callback(plan, reflection_message)
         
         result = create_success_response({
             "reflection_id": reflection_id,
