@@ -81,6 +81,15 @@ def list_providers():
         anthropic_key,
     )
 
+    # OpenRouter
+    openrouter_key = "Yes" if os.getenv("OPENROUTER_API_KEY") else "[red]Yes (not set)[/red]"
+    table.add_row(
+        "OpenRouter",
+        "devstral-2512, openrouter/* (any OpenRouter model)",
+        "Cloud API - Access to multiple models via OpenRouter",
+        openrouter_key,
+    )
+
     console.print(table)
     console.print(
         "\n[dim]Note: Provider is auto-detected from model name. Use --provider to override.[/dim]"
@@ -776,14 +785,15 @@ Backup Dir: {stats['backup_dir']}
 
     elif cmd.startswith("/reset-context"):
         # Clear conversation but preserve memory bank
-        memory_backup = agent.memory_bank.to_dict() if agent.memory_bank else None
-        agent.clear_conversation()
-        if memory_backup:
-            from .core.memory import MemoryBank
-
-            agent.memory_bank = MemoryBank.from_dict(memory_backup)
+        if hasattr(agent, 'memory_bank') and agent.memory_bank:
+            memory_class = type(agent.memory_bank)
+            memory_backup = agent.memory_bank.to_dict()
+            agent.clear_conversation()
+            agent.memory_bank = memory_class.from_dict(memory_backup)
             # Re-inject memory into system prompt
             agent.conversation.history[0]["content"] = agent._get_system_prompt()
+        else:
+            agent.clear_conversation()
         console.print("[green]✓[/green] Context cleared. Memory preserved.")
         console.print(
             f"[dim]Memory items: {len(agent.memory_bank.items) if agent.memory_bank else 0}[/dim]"
