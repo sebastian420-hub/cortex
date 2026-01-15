@@ -19,6 +19,23 @@ from .core.conversation import ConversationManager
 from .core.parallel import ParallelToolExecutor, ToolCall
 from .core.streaming import stream_model_response, display_streaming_response
 from .core.providers import ProviderFactory, ProviderError
+
+# Import routing system (optional, gracefully handle if not available)
+try:
+    from .core.routing import (
+        RoutingOrchestrator,
+        RoutingConfig,
+        RoutingContext,
+        RoutingDecision,
+        get_orchestrator,
+    )
+    ROUTING_AVAILABLE = True
+except ImportError:
+    ROUTING_AVAILABLE = False
+    RoutingOrchestrator = None
+    RoutingConfig = None
+    RoutingContext = None
+    RoutingDecision = None
 from .core.security import SecurityError
 from .core.loop_guards import LoopGuard
 from .core.recovery import (
@@ -185,6 +202,29 @@ class Cortex:
         except ProviderError as e:
             raise ProviderError(f"Failed to initialize provider: {e}") from e
 
+        # Initialize intelligent routing (if enabled and available)
+        self.router = None
+        self._routing_enabled = False
+        routing_config = self.config.get_routing_config()
+        if ROUTING_AVAILABLE and routing_config.get("enabled", False):
+            try:
+                self.router = RoutingOrchestrator(RoutingConfig(
+                    enabled=True,
+                    mode=routing_config.get("mode", "rule_based"),
+                    prefer_local_models=routing_config.get("prefer_local_models", True),
+                    allow_cloud_fallback=routing_config.get("allow_cloud_fallback", True),
+                    task_analysis_enabled=routing_config.get("task_analysis_enabled", True),
+                    cost_optimization_enabled=routing_config.get("cost_optimization_enabled", True),
+                    transparency_enabled=routing_config.get("transparency_enabled", True),
+                    cache_decisions=routing_config.get("cache_decisions", True),
+                    log_decisions=routing_config.get("log_decisions", False),
+                    log_file=routing_config.get("log_file"),
+                ))
+                self._routing_enabled = True
+                logger.info("Intelligent model routing enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize routing system: {e}")
+
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
 
@@ -277,6 +317,80 @@ class Cortex:
             # Keep old model on error
             console.print(f"[red]Failed to switch model:[/red] {e}")
             raise ProviderError(f"Failed to switch model: {e}") from e
+
+    def route_request(self, user_request: str) -> Optional["RoutingDecision"]:
+        """
+        Route a user request using the intelligent routing system.
+
+        This analyzes the request and determines the optimal model/provider.
+        If routing is not enabled, returns None and uses the default model.
+
+        Args:
+            user_request: The user's natural language request
+
+        Returns:
+            RoutingDecision if routing is enabled, None otherwise
+        """
+        if not self._routing_enabled or not self.router:
+            return None
+
+        try:
+            # Create routing context from current session
+            context = RoutingContext(
+                session_id=str(id(self)),
+                conversation_history=self.conversation.get_history(),
+            )
+
+            # Get routing decision
+            decision = self.router.route_request(
+                user_request,
+                context=context,
+                force_model=self.model if self.config.provider else None,
+            )
+
+            # Display routing decision if in text mode
+            if self._is_text_output() and decision:
+                self._display_routing_decision(decision)
+
+            return decision
+
+        except Exception as e:
+            logger.warning(f"Routing failed, using default model: {e}")
+            return None
+
+    def _display_routing_decision(self, decision: "RoutingDecision") -> None:
+        """Display routing decision to user."""
+        if not self._is_text_output():
+            return
+
+        # Compact display
+        task_info = ""
+        if decision.task_analysis:
+            task_info = f" ({decision.task_analysis.task_type.value})"
+
+        cost_info = ""
+        if decision.estimated_cost_usd is not None:
+            if decision.estimated_cost_usd == 0:
+                cost_info = " [free]"
+            else:
+                cost_info = f" [~${decision.estimated_cost_usd:.4f}]"
+
+        console.print(
+            f"[dim]Router:[/dim] {decision.model_name} via {decision.provider_name}"
+            f"{task_info}{cost_info}"
+        )
+
+    def get_routing_statistics(self) -> Optional[Dict[str, Any]]:
+        """
+        Get routing system statistics.
+
+        Returns:
+            Dictionary of routing statistics, or None if routing is disabled
+        """
+        if not self._routing_enabled or not self.router:
+            return None
+
+        return self.router.get_statistics()
 
     def _load_project_context(self) -> str:
         """Load AGENT.md or README.md for project context"""

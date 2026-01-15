@@ -63,6 +63,20 @@ DEFAULT_PARALLEL_EXECUTION = {
     "batch_size": 10,
 }
 
+# Default routing settings
+DEFAULT_ROUTING = {
+    "enabled": False,  # Disabled by default for backward compatibility
+    "mode": "rule_based",  # "rule_based", "manual", "auto"
+    "prefer_local_models": True,
+    "allow_cloud_fallback": True,
+    "task_analysis_enabled": True,
+    "cost_optimization_enabled": True,
+    "transparency_enabled": True,
+    "cache_decisions": True,
+    "log_decisions": False,
+    "log_file": None,
+}
+
 
 class AgentConfig:
     """
@@ -111,6 +125,8 @@ class AgentConfig:
         transactions: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
+        # Routing settings (new)
+        routing: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         # Core settings
@@ -168,6 +184,9 @@ class AgentConfig:
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
 
+        # Routing settings (merge with defaults)
+        self.routing = {**DEFAULT_ROUTING, **(routing or {})}
+
         # Extra settings for extensibility
         self.extra = kwargs
 
@@ -208,6 +227,10 @@ class AgentConfig:
     def get_parallel_execution_config(self) -> Dict[str, Any]:
         """Get configuration for ParallelToolExecutor."""
         return self.parallel_execution
+
+    def get_routing_config(self) -> Dict[str, Any]:
+        """Get configuration for RoutingOrchestrator."""
+        return self.routing
 
     @classmethod
     def from_file(cls, config_path: Path) -> "AgentConfig":
@@ -354,4 +377,5 @@ class AgentConfig:
             "error_recovery": self.error_recovery,
             "file_cache": self.file_cache,
             "transactions": self.transactions,
+            "routing": self.routing,
         }

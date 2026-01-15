@@ -200,6 +200,12 @@ Examples:
 
     parser.add_argument("--enhanced", action="store_true", help="Use enhanced agent with planning and layered memory")
 
+    parser.add_argument(
+        "--routing",
+        action="store_true",
+        help="Enable intelligent model routing (auto-selects best model for task)"
+    )
+
     parser.add_argument("--prompt", "-p", help="One-shot prompt (exit after completion)")
 
     parser.add_argument("--config", "-c", type=str, help="Path to configuration file (YAML)")
@@ -267,6 +273,11 @@ Examples:
 
     if args.provider:
         config.provider = args.provider
+
+    # Enable intelligent routing if requested
+    if args.routing:
+        config.routing["enabled"] = True
+        console.print("[cyan]Intelligent model routing enabled[/cyan]")
 
     # Validate provider setup
     if not validate_provider_setup(config.model, config.provider):
@@ -878,6 +889,33 @@ Files Written: {loop_stats.get('files_written_count', 0)}
 Items: {len(agent.memory_bank.items) if agent.memory_bank else 0}
 """
         console.print(Panel(stats_text, title="Stats", border_style="cyan"))
+
+    elif cmd == "/routing":
+        # Show routing statistics
+        if hasattr(agent, 'get_routing_statistics'):
+            routing_stats = agent.get_routing_statistics()
+            if routing_stats:
+                stats_text = f"""
+[bold]Routing Statistics[/bold]
+
+Total Requests: {routing_stats.get('total_requests', 0)}
+Cache Hits: {routing_stats.get('cache_hits', 0)}
+Cache Misses: {routing_stats.get('cache_misses', 0)}
+Cache Hit Rate: {routing_stats.get('cache_hit_rate', 0):.1%}
+Errors: {routing_stats.get('errors', 0)}
+
+[bold]Performance[/bold]
+Avg Task Analysis: {routing_stats.get('avg_task_analysis_time_ms', 0):.1f}ms
+Avg Routing Time: {routing_stats.get('avg_routing_time_ms', 0):.1f}ms
+
+[bold]Cache[/bold]
+Entries: {routing_stats.get('cache_size', 0)}
+"""
+                console.print(Panel(stats_text, title="Routing Stats", border_style="cyan"))
+            else:
+                console.print("[dim]Routing is not enabled. Use --routing flag to enable.[/dim]")
+        else:
+            console.print("[dim]Routing is not available.[/dim]")
 
     # Session Recovery Commands
     elif cmd.startswith("/session"):
