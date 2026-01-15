@@ -245,10 +245,34 @@ Your enhanced capabilities are enabled. Use them to work more effectively.
         # Add to conversation
         self.conversation.add_user_message(user_message_with_context)
         self._session_dirty = True
-        
+
+        # Apply intelligent routing if enabled (inherited from base Cortex)
+        if self._routing_enabled and self.router:
+            try:
+                routing_decision = self.route_request(user_message)
+                if routing_decision and routing_decision.model_name != self.model:
+                    old_model = self.model
+                    try:
+                        self.switch_model(
+                            routing_decision.model_name,
+                            provider_override=routing_decision.provider_name
+                        )
+                        if self._is_text_output():
+                            from .ui.console import console
+                            console.print(
+                                f"[cyan]Routed:[/cyan] {old_model} → {routing_decision.model_name} "
+                                f"({routing_decision.reasoning.primary_reason})"
+                            )
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning(f"Failed to switch to routed model: {e}")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Routing failed: {e}")
+
         # Set processing flag
         self._is_processing = True
-        
+
         # Main enhanced processing loop
         max_iterations = self.config.max_iterations
         iteration = 0
