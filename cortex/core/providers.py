@@ -485,6 +485,124 @@ class AnthropicProvider(ModelProvider):
         return os.getenv("ANTHROPIC_API_KEY") is not None
 
 
+class OpenRouterProvider(ModelProvider):
+    """Provider for OpenRouter (OpenAI-compatible)"""
+
+    def __init__(self):
+        try:
+            from openai import OpenAI
+
+            self.client_class = OpenAI
+        except ImportError:
+            raise ProviderError("OpenAI package not installed. Install with: pip install openai")
+
+        api_key = os.getenv("OPENROUTER_API_KEY")
+        if not api_key:
+            raise ProviderError(
+                "OPENROUTER_API_KEY environment variable not set. "
+                "Get your API key from https://openrouter.ai/ and set it."
+            )
+
+        self.client = self.client_class(
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            default_headers={
+                # Optional: For rankings on openrouter.ai, if applicable
+                "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:8000"),
+                "X-Title": os.getenv("OPENROUTER_X_TITLE", "Cortex CLI"),
+            }
+        )
+
+    def chat(
+        self,
+        model: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Call OpenRouter API"""
+        try:
+            # OpenRouter expects OpenAI-compatible messages and tool definitions
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+
+            kwargs = {"model": model, "messages": sanitized_messages}
+            if sanitized_tools:
+                kwargs["tools"] = sanitized_tools
+
+            response = self.client.chat.completions.create(**kwargs)
+
+            # Convert OpenAI format to Cortex internal format
+            message = response.choices[0].message
+            result = {"message": {"role": message.role, "content": message.content or ""}}
+
+            if hasattr(message, "tool_calls") and message.tool_calls:
+                result["message"]["tool_calls"] = [
+                    {
+                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        "id": tc.id,
+                        "type": tc.type,
+                    }
+                    for tc in message.tool_calls
+                ]
+            return result
+        except Exception as e:
+            raise ProviderError(f"OpenRouter API error: {e}") from e
+
+    def stream_chat(
+        self,
+        model: str,
+        messages: List[Dict[str, Any]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Stream responses from OpenRouter API"""
+        try:
+            sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+
+            kwargs = {"model": model, "messages": sanitized_messages, "stream": True}
+            if sanitized_tools:
+                kwargs["tools"] = sanitized_tools
+
+            stream = self.client.chat.completions.create(**kwargs)
+
+            for chunk in stream:
+                if chunk.choices:
+                    choice = chunk.choices[0]
+                    if choice.delta:
+                        delta = choice.delta
+                        result = {
+                            "message": {
+                                "role": delta.role or "assistant",
+                                "content": delta.content or "",
+                            }
+                        }
+                        if hasattr(delta, "tool_calls") and delta.tool_calls:
+                            result["message"]["tool_calls"] = [
+                                {
+                                    "function": {
+                                        "name": tc.function.name if tc.function else None,
+                                        "arguments": tc.function.arguments if tc.function else "",
+                                    },
+                                    "id": tc.id,
+                                    "index": tc.index,
+                                    "type": tc.type,
+                                }
+                                for tc in delta.tool_calls
+                            ]
+                        yield result
+        except Exception as e:
+            raise ProviderError(f"OpenRouter streaming error: {e}") from e
+
+    def supports_streaming(self) -> bool:
+        return True
+
+    def normalize_model_name(self, model: str) -> str:
+        """OpenRouter model names are used as-is"""
+        return model
+
+    def validate_api_key(self) -> bool:
+        """Validate OpenRouter API key is set"""
+        return os.getenv("OPENROUTER_API_KEY") is not None
+
+
 class ProviderFactory:
     """Factory for creating model providers based on model name"""
 
@@ -505,6 +623,10 @@ class ProviderFactory:
 
         # Auto-detect provider from model name
         model_lower = model_name.lower()
+
+        # Check for OpenRouter models first
+        if "devstral" in model_lower or model_lower.startswith("openrouter/") or provider_override == "openrouter":
+            return OpenRouterProvider()
 
         # Check for Ollama model patterns first (contains colon or known patterns)
         if ":" in model_name:
@@ -531,6 +653,8 @@ class ProviderFactory:
             return DeepSeekProvider()
         elif provider_lower in ["anthropic", "claude"]:
             return AnthropicProvider()
+        elif provider_lower == "openrouter":
+            return OpenRouterProvider()
         else:
             raise ProviderError(f"Unknown provider: {provider_name}")
 
@@ -540,20 +664,26 @@ class ProviderFactory:
         model_lower = model_name.lower()
         # Exclude Ollama model names (they contain colons or are known Ollama models)
         # Ollama models: deepseek-r1:8b, llama3.2, etc.
-        if ":" in model_name or not model_lower.startswith(("deepseek-", "claude-")):
+        if ":" in model_name or not model_lower.startswith(("deepseek-", "claude-", "devstral", "openrouter/")):
             # Check if it's a known Ollama model pattern
-            if model_lower.startswith("deepseek-") and ":" in model_name:
-                return False  # Ollama model like "deepseek-r1:8b"
+            if (model_lower.startswith("deepseek-") or "devstral" in model_lower) and ":" in model_name:
+                return False  # Ollama model like "deepseek-r1:8b" or "devstral:latest"
         return (
             model_lower.startswith("deepseek-")
             or model_lower.startswith("claude-")
             or model_lower == "claude"
+            or "devstral" in model_lower
+            or model_lower.startswith("openrouter/")
         )
 
     @staticmethod
     def get_provider_name(model_name: str) -> str:
         """Get provider name for a model"""
         model_lower = model_name.lower()
+
+        # Check for OpenRouter models
+        if "devstral" in model_lower or model_lower.startswith("openrouter/"):
+            return "openrouter"
 
         # Check for Ollama model patterns first (contains colon)
         if ":" in model_name:
