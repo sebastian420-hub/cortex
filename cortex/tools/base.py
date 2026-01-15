@@ -25,6 +25,7 @@ class Tool(ABC):
         console=None,
         timeout_config: Optional["TimeoutConfig"] = None,
         transaction_manager: Optional["TransactionManager"] = None,
+        **kwargs,
     ):
         self.project_dir = project_dir
         self.permission_mode = permission_mode

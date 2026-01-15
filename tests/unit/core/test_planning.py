@@ -319,9 +319,9 @@ class TestPlanningEngine:
         assert step.tool_name == "read_file"
         assert step.tool_arguments == {"path": "config.yaml"}
         
-        # Verify step is in plan
-        assert len(plan) == 1
-        assert plan[0].id == step.id
+        # Verify step is in plan (plan already has analysis step from create_plan)
+        assert len(plan) == 2  # Analysis step + added step
+        assert plan[1].id == step.id  # Added step is at index 1
     
     def test_get_plan(self, planning_engine):
         """Test retrieving a plan by ID."""
@@ -443,12 +443,12 @@ class TestPlanningEngine:
         # Execute plan
         results = planning_engine.execute_plan(plan)
         
-        # Verify both steps were executed
-        assert mock_tool_executor.call_count == 2
+        # Verify both steps were executed (plus analysis step)
+        assert mock_tool_executor.call_count == 2  # Only tool calls, not subtasks
         assert step1.status == PlanStepStatus.COMPLETED
         assert step2.status == PlanStepStatus.COMPLETED
         assert plan.status == "completed"
-        assert len(results["step_results"]) == 2
+        assert len(results["step_results"]) == 3  # Analysis step + 2 tool steps
         assert all(r["success"] for r in results["step_results"])
     
     def test_save_and_load_plan(self, tmp_path):
@@ -469,8 +469,8 @@ class TestPlanningEngine:
         assert loaded_plan is not None
         assert loaded_plan.id == plan.id
         assert loaded_plan.goal == plan.goal
-        assert len(loaded_plan) == 1
-        assert loaded_plan[0].description == "Step 1"
+        assert len(loaded_plan) == 2  # Analysis step + added step
+        assert loaded_plan[1].description == "Step 1"  # Added step is at index 1
     
     @pytest.mark.skip("Test is disabled")
     def test_DISABLED_generate_plan_from_goal(self, planning_engine):

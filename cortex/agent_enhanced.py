@@ -525,7 +525,7 @@ Your enhanced capabilities are enabled. Use them to work more effectively.
         
         try:
             # Generate plan
-            plan = self.planning_engine.generate_plan(goal)
+            plan = self.planning_engine.create_plan(goal)
             self.plans_generated += 1
             
             # Set active plan in state manager

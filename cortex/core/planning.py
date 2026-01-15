@@ -222,7 +222,7 @@ class Plan:
             # Check if all dependencies are completed
             all_deps_completed = True
             for dep_id in step.dependencies:
-                dep_step = self.get_step(dep_id)
+                dep_step = self.get_step_by_id(dep_id)
                 if not dep_step or dep_step.status != PlanStepStatus.COMPLETED:
                     all_deps_completed = False
                     break
@@ -338,10 +338,31 @@ class PlanningEngine:
             assumptions=assumptions or [],
         )
         
+        # Add an initial analysis step
+        analysis_step = PlanStep(
+            id=f"{plan_id}_step_1",
+            description=f"Analyze requirements for: {goal}",
+            step_type=PlanStepType.SUBTASK,
+            expected_outcome="Clear understanding of requirements and approach",
+        )
+        plan.add_step(analysis_step)
+        
+        # If skill hints provided, add skill application steps
+        if skill_hints:
+            for i, skill in enumerate(skill_hints[:3]):  # Limit to 3 skills
+                skill_step = PlanStep(
+                    id=f"{plan_id}_skill_{i+2}",
+                    description=f"Apply {skill} skill to achieve goal",
+                    step_type=PlanStepType.SKILL_APPLICATION,
+                    skill_name=skill,
+                    dependencies=[analysis_step.id],
+                )
+                plan.add_step(skill_step)
+        
         self.active_plan = plan
         self.plans[plan.id] = plan
         
-        logger.info(f"Generated plan {plan.id} for goal: {goal}")
+        logger.info(f"Generated plan {plan.id} for goal: {goal} with {len(plan.steps)} steps")
         return plan
 
     def get_plan(self, plan_id: str) -> Optional[Plan]:

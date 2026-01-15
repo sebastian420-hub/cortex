@@ -675,6 +675,7 @@ def create_tool_instance(
         console,
         timeout_config=timeout_config,
         transaction_manager=transaction_manager,
+        parent_agent=parent_agent,
     )
 
 

@@ -246,6 +246,18 @@ class ToolRegistry:
         
         # Skill tools
         from .skill_tools import SkillLoaderTool
+        
+        # Planning tools
+        from .planning_tools import (
+            CreatePlanTool,
+            ExecutePlanTool,
+            MonitorPlanTool,
+            UpdatePlanTool,
+            CREATE_PLAN_SCHEMA,
+            EXECUTE_PLAN_SCHEMA,
+            MONITOR_PLAN_SCHEMA,
+            UPDATE_PLAN_SCHEMA,
+        )
 
         # Tool class mapping
         builtin_tools = {
@@ -277,6 +289,11 @@ class ToolRegistry:
             "web_search": WebSearchTool,
             # Skill tools
             "skill_loader": SkillLoaderTool,
+            # Planning tools
+            "create_plan": CreatePlanTool,
+            "execute_plan": ExecutePlanTool,
+            "monitor_plan": MonitorPlanTool,
+            "update_plan": UpdatePlanTool,
         }
 
         # Tool schemas (inline definitions)
@@ -824,6 +841,10 @@ class ToolRegistry:
                     },
                 },
             },
+            "create_plan": CREATE_PLAN_SCHEMA,
+            "execute_plan": EXECUTE_PLAN_SCHEMA,
+            "monitor_plan": MONITOR_PLAN_SCHEMA,
+            "update_plan": UPDATE_PLAN_SCHEMA,
         }
 
         # Register all builtin tools

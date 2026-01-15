@@ -363,7 +363,7 @@ class StateManager:
         if not self.state.active_plan:
             return
         
-        step = self.state.active_plan.get_step(step_id)
+        step = self.state.active_plan.get_step_by_id(step_id)
         if not step:
             return
         
