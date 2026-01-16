@@ -183,7 +183,7 @@ Examples:
 
     parser.add_argument(
         "--provider",
-        choices=["ollama", "deepseek", "anthropic"],
+        choices=["ollama", "deepseek", "anthropic", "openrouter"],
         default=None,
         help="Override provider auto-detection (normally auto-detected from model name)",
     )

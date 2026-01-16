@@ -625,10 +625,31 @@ class ProviderFactory:
         model_lower = model_name.lower()
 
         # Check for OpenRouter models first
-        if "devstral" in model_lower or model_lower.startswith("openrouter/") or provider_override == "openrouter":
+        # Check for OpenRouter models first (including models with colons)
+        openrouter_indicators = [
+            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
+            "mistralai/", "google/", "anthropic/", "meta-llama/",
+            "perplexity/", "cohere/", "jamba/", "qwen/", "llama3"
+        ]
+        
+        # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
+        if "llama3" in model_lower and ":" in model_name:
+            # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
+            import re
+            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+                # This is an Ollama model, skip to Ollama detection below
+                # Don't return here, let it fall through
+                pass
+            else:
+                # Check other OpenRouter indicators (excluding llama3)
+                other_indicators = [indicator for indicator in openrouter_indicators if indicator != "llama3"]
+                if any(indicator in model_lower for indicator in other_indicators):
+                    return OpenRouterProvider()
+                # If no other indicators, fall through to Ollama
+        elif any(indicator in model_lower for indicator in openrouter_indicators):
             return OpenRouterProvider()
 
-        # Check for Ollama model patterns first (contains colon or known patterns)
+        # Check for Ollama model patterns (contains colon but not OpenRouter patterns)
         if ":" in model_name:
             # Ollama models use colons: deepseek-r1:8b, llama3.2:70b
             return OllamaProvider()
@@ -662,30 +683,56 @@ class ProviderFactory:
     def is_cloud_provider(model_name: str) -> bool:
         """Check if model name indicates a cloud provider"""
         model_lower = model_name.lower()
-        # Exclude Ollama model names (they contain colons or are known Ollama models)
-        # Ollama models: deepseek-r1:8b, llama3.2, etc.
-        if ":" in model_name or not model_lower.startswith(("deepseek-", "claude-", "devstral", "openrouter/")):
-            # Check if it's a known Ollama model pattern
-            if (model_lower.startswith("deepseek-") or "devstral" in model_lower) and ":" in model_name:
-                return False  # Ollama model like "deepseek-r1:8b" or "devstral:latest"
-        return (
-            model_lower.startswith("deepseek-")
-            or model_lower.startswith("claude-")
-            or model_lower == "claude"
-            or "devstral" in model_lower
-            or model_lower.startswith("openrouter/")
-        )
+        
+        # Check for OpenRouter indicators first (including models with colons)
+        openrouter_indicators = [
+            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
+            "mistralai/", "google/", "anthropic/", "meta-llama/",
+            "perplexity/", "cohere/", "jamba/", "qwen/", "llama3"
+        ]
+        if any(indicator in model_lower for indicator in openrouter_indicators):
+            return True
+        
+        # Check for other cloud providers
+        if model_lower.startswith("deepseek-"):
+            return True
+        if model_lower.startswith("claude-") or model_lower == "claude":
+            return True
+        
+        # Ollama models (local) - contain colons but not cloud indicators
+        if ":" in model_name:
+            return False
+        
+        return False
 
     @staticmethod
     def get_provider_name(model_name: str) -> str:
         """Get provider name for a model"""
         model_lower = model_name.lower()
 
-        # Check for OpenRouter models
-        if "devstral" in model_lower or model_lower.startswith("openrouter/"):
+        # Check for OpenRouter models first (including models with colons)
+        openrouter_indicators = [
+            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
+            "mistralai/", "google/", "anthropic/", "meta-llama/",
+            "perplexity/", "cohere/", "jamba/", "qwen/", "llama3"
+        ]
+        
+        # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
+        if "llama3" in model_lower and ":" in model_name:
+            # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
+            import re
+            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+                # This is an Ollama model, skip to Ollama detection below
+                pass
+            else:
+                # Check other OpenRouter indicators (excluding llama3)
+                other_indicators = [indicator for indicator in openrouter_indicators if indicator != "llama3"]
+                if any(indicator in model_lower for indicator in other_indicators):
+                    return "openrouter"
+        elif any(indicator in model_lower for indicator in openrouter_indicators):
             return "openrouter"
 
-        # Check for Ollama model patterns first (contains colon)
+        # Check for Ollama model patterns (contains colon but not OpenRouter patterns)
         if ":" in model_name:
             return "ollama"
 
