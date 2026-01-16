@@ -82,12 +82,16 @@ class TestEnhancedCortexInitialization:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL
         )
-        
+
         # Get system prompt from conversation
         system_message = agent.conversation.history[0]
-        assert "ENHANCED PLANNING AND MEMORY CAPABILITIES" in system_message["content"]
-        assert "Goal Decomposition" in system_message["content"]
-        assert "Memory Layers" in system_message["content"]
+        # Check for new enhanced prompt header and key sections
+        assert "ENHANCED AGENT: PLANNING TOOLS & MEMORY" in system_message["content"]
+        assert "PLANNING TOOLS REFERENCE" in system_message["content"]
+        assert "create_plan" in system_message["content"]
+        assert "execute_plan" in system_message["content"]
+        assert "WHEN TO USE PLANNING" in system_message["content"]
+        assert "MEMORY SYSTEM" in system_message["content"]
         
     def test_enhanced_agent_backward_compatibility(self, tmp_project_dir):
         """Test that enhanced agent maintains compatibility with base agent API."""
