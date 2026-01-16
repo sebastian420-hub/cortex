@@ -420,7 +420,7 @@ Your enhanced memory helps you work smarter:
         
         # Add enhanced context to conversation
         enhanced_context = self._get_enhanced_context()
-        user_message_with_context = f"{enhanced_context}\\n\\nUser request: {user_message}"
+        user_message_with_context = f"{enhanced_context}\n\nUser request: {user_message}"
         
         # Add to conversation
         self.conversation.add_user_message(user_message_with_context)
@@ -660,7 +660,7 @@ Your enhanced memory helps you work smarter:
             context_parts.append("## PROJECT CONTEXT")
             context_parts.append(self.project_context[:1000])  # Limit length
         
-        return "\\n\\n".join(context_parts)
+        return "\n\n".join(context_parts)
     
     def _extract_insights_from_response(self, response: str) -> None:
         """Extract insights from final response text."""
@@ -678,7 +678,7 @@ Your enhanced memory helps you work smarter:
             "discovered that",
         ]
         
-        lines = response.split('\\n')
+        lines = response.split('\n')
         for line in lines:
             line_lower = line.lower()
             for indicator in insight_indicators:
