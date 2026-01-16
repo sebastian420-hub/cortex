@@ -257,6 +257,8 @@ class ASTAnalyzeTool(Tool):
             
             # Remove duplicates
             for key in dependencies:
+                if key == "imports":
+                    continue
                 if isinstance(dependencies[key], list):
                     dependencies[key] = list(set(dependencies[key]))
             

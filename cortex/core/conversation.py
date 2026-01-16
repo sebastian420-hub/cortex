@@ -122,6 +122,19 @@ class ConversationManager:
         else:
             self.history = []
 
+    def update_system_prompt(self, new_prompt: str) -> None:
+        """
+        Update the system prompt in the conversation history.
+
+        Args:
+            new_prompt: The new system prompt content
+        """
+        if self.history and self.history[0].get("role") == "system":
+            self.history[0]["content"] = new_prompt
+        else:
+            # Insert system prompt at the beginning
+            self.history.insert(0, {"role": "system", "content": new_prompt})
+
     def _optimize(self) -> None:
         """Optimize conversation history if it exceeds token limit."""
         current_tokens = get_conversation_tokens(self.history, self.model)

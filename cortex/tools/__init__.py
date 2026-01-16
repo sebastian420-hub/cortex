@@ -668,6 +668,47 @@ def create_tool_instance(
             timeout_config=timeout_config,
         )
 
+    # Special handling for delegation tools (model orchestration)
+    if tool_name == "delegate_to_model":
+        from .delegation_tools import DelegateToModelTool
+        delegation_tracker = None
+        model_registry = None
+        current_model = None
+        if parent_agent:
+            delegation_tracker = getattr(parent_agent, "_delegation_tracker", None)
+            model_registry = getattr(parent_agent, "_model_registry", None)
+            current_model = getattr(parent_agent, "model", None)
+        return DelegateToModelTool(
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            console=console,
+            timeout_config=timeout_config,
+            delegation_tracker=delegation_tracker,
+            model_registry=model_registry,
+            current_model=current_model,
+        )
+
+    if tool_name == "return_to_coordinator":
+        from .delegation_tools import ReturnToCoordinatorTool
+        delegation_tracker = None
+        current_model = None
+        coordinator_model = "mimo-v2-flash"
+        if parent_agent:
+            delegation_tracker = getattr(parent_agent, "_delegation_tracker", None)
+            current_model = getattr(parent_agent, "model", None)
+            orchestration = getattr(parent_agent, "_orchestration", None)
+            if orchestration:
+                coordinator_model = orchestration.default_coordinator
+        return ReturnToCoordinatorTool(
+            project_dir=project_dir,
+            permission_mode=permission_mode,
+            console=console,
+            timeout_config=timeout_config,
+            delegation_tracker=delegation_tracker,
+            current_model=current_model,
+            coordinator_model=coordinator_model,
+        )
+
     return get_registry().create_instance(
         tool_name,
         project_dir,

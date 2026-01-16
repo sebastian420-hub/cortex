@@ -259,6 +259,14 @@ class ToolRegistry:
             UPDATE_PLAN_SCHEMA,
         )
 
+        # Delegation tools (for model orchestration)
+        from .delegation_tools import (
+            DelegateToModelTool,
+            ReturnToCoordinatorTool,
+            DELEGATE_TO_MODEL_SCHEMA,
+            RETURN_TO_COORDINATOR_SCHEMA,
+        )
+
         # Tool class mapping
         builtin_tools = {
             "read_file": ReadFileTool,
@@ -294,6 +302,9 @@ class ToolRegistry:
             "execute_plan": ExecutePlanTool,
             "monitor_plan": MonitorPlanTool,
             "update_plan": UpdatePlanTool,
+            # Delegation tools (model orchestration)
+            "delegate_to_model": DelegateToModelTool,
+            "return_to_coordinator": ReturnToCoordinatorTool,
         }
 
         # Tool schemas (inline definitions)
@@ -845,6 +856,9 @@ class ToolRegistry:
             "execute_plan": EXECUTE_PLAN_SCHEMA,
             "monitor_plan": MONITOR_PLAN_SCHEMA,
             "update_plan": UPDATE_PLAN_SCHEMA,
+            # Delegation tools (model orchestration)
+            "delegate_to_model": DELEGATE_TO_MODEL_SCHEMA,
+            "return_to_coordinator": RETURN_TO_COORDINATOR_SCHEMA,
         }
 
         # Register all builtin tools

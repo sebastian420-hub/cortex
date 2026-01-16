@@ -172,6 +172,11 @@ class DeepSeekProvider(ModelProvider):
         try:
             # Sanitize messages and tools to remove invalid UTF-8 characters
             sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
+
+            # For deepseek-reasoner, ensure all assistant messages have reasoning_content
+            if model == "deepseek-reasoner":
+                sanitized_messages = self._ensure_reasoning_content(sanitized_messages)
+
             kwargs = {"model": model, "messages": sanitized_messages}
             if sanitized_tools:
                 kwargs["tools"] = sanitized_tools
@@ -255,6 +260,25 @@ class DeepSeekProvider(ModelProvider):
 
     def supports_streaming(self) -> bool:
         return True
+
+    def _ensure_reasoning_content(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Ensure all assistant messages have reasoning_content field.
+
+        DeepSeek reasoner model requires reasoning_content in all assistant messages.
+        This adds an empty string for messages that don't have it (e.g., from other models).
+        """
+        result = []
+        for msg in messages:
+            if msg.get("role") == "assistant":
+                # Copy the message and add reasoning_content if missing
+                new_msg = msg.copy()
+                if "reasoning_content" not in new_msg:
+                    new_msg["reasoning_content"] = ""
+                result.append(new_msg)
+            else:
+                result.append(msg)
+        return result
 
     def normalize_model_name(self, model: str) -> str:
         """Normalize DeepSeek model names"""
@@ -624,12 +648,21 @@ class ProviderFactory:
         # Auto-detect provider from model name
         model_lower = model_name.lower()
 
-        # Check for OpenRouter models first
+        # Exclude models with ollama/ prefix - these are local
+        if model_lower.startswith("ollama/"):
+            return OllamaProvider()
+
+        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
+        if '/' in model_name:
+            return OpenRouterProvider()
+
         # Check for OpenRouter models first (including models with colons)
         openrouter_indicators = [
             "devstral", "openrouter/", "nvidia/", ":free", ":paid",
             "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/", "llama3"
+            "perplexity/", "cohere/", "jamba/", "qwen/",
+            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
+            "nousresearch/", "z-ai/"
         ]
         
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
@@ -641,9 +674,8 @@ class ProviderFactory:
                 # Don't return here, let it fall through
                 pass
             else:
-                # Check other OpenRouter indicators (excluding llama3)
-                other_indicators = [indicator for indicator in openrouter_indicators if indicator != "llama3"]
-                if any(indicator in model_lower for indicator in other_indicators):
+                # Check other OpenRouter indicators
+                if any(indicator in model_lower for indicator in openrouter_indicators):
                     return OpenRouterProvider()
                 # If no other indicators, fall through to Ollama
         elif any(indicator in model_lower for indicator in openrouter_indicators):
@@ -683,15 +715,41 @@ class ProviderFactory:
     def is_cloud_provider(model_name: str) -> bool:
         """Check if model name indicates a cloud provider"""
         model_lower = model_name.lower()
-        
+
+        # Exclude models with ollama/ prefix - these are local
+        if model_lower.startswith("ollama/"):
+            return False
+
+        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
+        if '/' in model_name:
+            return True
+
         # Check for OpenRouter indicators first (including models with colons)
         openrouter_indicators = [
             "devstral", "openrouter/", "nvidia/", ":free", ":paid",
             "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/", "llama3"
+            "perplexity/", "cohere/", "jamba/", "qwen/",
+            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
+            "nousresearch/", "z-ai/"
         ]
-        if any(indicator in model_lower for indicator in openrouter_indicators):
+        
+        # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
+        if "llama3" in model_lower and ":" in model_name:
+            import re
+            # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
+            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+                # This is an Ollama model (local)
+                return False
+            else:
+                # Check other OpenRouter indicators
+                if any(indicator in model_lower for indicator in openrouter_indicators):
+                    return True
+        elif any(indicator in model_lower for indicator in openrouter_indicators):
             return True
+
+        # Check for Ollama model patterns (contains colon but not OpenRouter patterns)
+        if ":" in model_name:
+            return False
         
         # Check for other cloud providers
         if model_lower.startswith("deepseek-"):
@@ -699,10 +757,7 @@ class ProviderFactory:
         if model_lower.startswith("claude-") or model_lower == "claude":
             return True
         
-        # Ollama models (local) - contain colons but not cloud indicators
-        if ":" in model_name:
-            return False
-        
+        # Default to local (Ollama)
         return False
 
     @staticmethod
@@ -710,11 +765,21 @@ class ProviderFactory:
         """Get provider name for a model"""
         model_lower = model_name.lower()
 
+        # Exclude models with ollama/ prefix - these are local
+        if model_lower.startswith("ollama/"):
+            return "ollama"
+
+        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
+        if '/' in model_name:
+            return "openrouter"
+
         # Check for OpenRouter models first (including models with colons)
         openrouter_indicators = [
             "devstral", "openrouter/", "nvidia/", ":free", ":paid",
             "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/", "llama3"
+            "perplexity/", "cohere/", "jamba/", "qwen/",
+            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
+            "nousresearch/", "z-ai/"
         ]
         
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
@@ -725,9 +790,8 @@ class ProviderFactory:
                 # This is an Ollama model, skip to Ollama detection below
                 pass
             else:
-                # Check other OpenRouter indicators (excluding llama3)
-                other_indicators = [indicator for indicator in openrouter_indicators if indicator != "llama3"]
-                if any(indicator in model_lower for indicator in other_indicators):
+                # Check other OpenRouter indicators
+                if any(indicator in model_lower for indicator in openrouter_indicators):
                     return "openrouter"
         elif any(indicator in model_lower for indicator in openrouter_indicators):
             return "openrouter"

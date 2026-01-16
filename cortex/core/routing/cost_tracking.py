@@ -203,6 +203,24 @@ class PricingRegistry:
             supports_streaming=True,
             notes="OpenRouter auto-routing average pricing"
         ))
+        self.register(ModelPricing(
+            model_name="devstral-2512",
+            provider="openrouter",
+            input_cost_per_1k_tokens=0.0,
+            output_cost_per_1k_tokens=0.0,
+            context_window=256000,
+            supports_streaming=True,
+            notes="Devstral 2 2512 free model via OpenRouter"
+        ))
+        self.register(ModelPricing(
+            model_name="devstral-small",
+            provider="openrouter",
+            input_cost_per_1k_tokens=0.0,
+            output_cost_per_1k_tokens=0.0,
+            context_window=128000,
+            supports_streaming=True,
+            notes="Devstral Small free model via OpenRouter"
+        ))
     
     def register(self, pricing: ModelPricing) -> None:
         """

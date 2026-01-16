@@ -286,20 +286,38 @@ class TaskTool(Tool):
         )
         context.tools_called = subagent._tools_used.copy()
 
-        # Extract final response
-        final_messages = [
+        # Extract final response - collect ALL assistant responses for better context
+        assistant_messages = [
             msg
             for msg in context.conversation_history
             if msg.get("role") == "assistant" and msg.get("content")
         ]
 
+        # Combine all assistant outputs for comprehensive response
         final_response = ""
-        if final_messages:
-            final_response = final_messages[-1].get("content", "")
+        if assistant_messages:
+            # If there's only one message, use it directly
+            if len(assistant_messages) == 1:
+                final_response = assistant_messages[0].get("content", "")
+            else:
+                # For multiple messages, synthesize them
+                # Use the last substantive message as the primary response
+                # but include summary of analysis if available
+                all_content = [msg.get("content", "") for msg in assistant_messages]
+                # Filter out very short responses (likely just "I'll do X")
+                substantive = [c for c in all_content if len(c) > 50]
+                if substantive:
+                    final_response = substantive[-1]  # Last substantive response
+                    # Add earlier analysis if available
+                    if len(substantive) > 1:
+                        final_response = f"## Analysis Summary\n{substantive[0][:500]}...\n\n## Final Result\n{final_response}"
+                else:
+                    final_response = all_content[-1] if all_content else ""
 
         return {
             "final_response": final_response,
             "messages_count": len(context.conversation_history),
+            "total_assistant_messages": len(assistant_messages),
         }
 
     def _get_subagent_prompt(self, context: SubagentContext) -> str:

@@ -277,7 +277,19 @@ Examples:
     # Enable intelligent routing if requested
     if args.routing:
         config.routing["enabled"] = True
-        console.print("[cyan]Intelligent model routing enabled[/cyan]")
+        # Also ensure orchestration is enabled (new self-orchestrating system)
+        if not hasattr(config, "orchestration"):
+            config.orchestration = {}
+        config.orchestration["enabled"] = True
+
+        # Set default coordinator model if no model explicitly specified
+        if not args.model:
+            # Use full OpenRouter model name for API calls
+            config.model = "xiaomi/mimo-v2-flash:free"
+            config.provider = "openrouter"
+            console.print("[cyan]Model orchestration enabled - using xiaomi/mimo-v2-flash:free as coordinator[/cyan]")
+        else:
+            console.print("[cyan]Model orchestration enabled (self-switching models)[/cyan]")
 
     # Validate provider setup
     if not validate_provider_setup(config.model, config.provider):

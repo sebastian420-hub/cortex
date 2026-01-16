@@ -38,6 +38,14 @@ except ImportError:
     RoutingDecision = None
 from .core.security import SecurityError
 from .core.loop_guards import LoopGuard
+from .core.orchestration import (
+    OrchestrationManager,
+    DelegationTracker,
+    DelegationContext,
+    get_orchestration_manager,
+)
+from .core.models import get_model_registry, ModelRegistry
+from .core.prompts import get_prompt_profile, get_delegation_instructions
 from .core.recovery import (
     CheckpointManager,
     SessionHealthMonitor,
@@ -53,7 +61,7 @@ from .core.memory import (
     create_memory_bank,
     extract_memories_from_messages,
 )
-from .tools import TOOLS, create_tool_instance
+from .tools import TOOLS, create_tool_instance, get_registry
 from .ui.console import console
 from .utils.errors import retry_with_backoff, ModelError, create_error_response, create_success_response, ErrorType
 
@@ -228,6 +236,9 @@ class Cortex:
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
 
+        # Initialize model orchestration system
+        self._init_orchestration()
+
         # Shutdown flag for graceful termination
         self._shutdown_requested = False
         self._session_dirty = False  # Track if session needs saving
@@ -261,7 +272,175 @@ class Cortex:
                 f"({remaining} remaining)"
             )
 
-    def switch_model(self, new_model: str, provider_override: Optional[str] = None) -> None:
+    def _init_orchestration(self) -> None:
+        """Initialize the model orchestration system."""
+        # Get orchestration configuration
+        orchestration_config = getattr(self.config, "orchestration", {})
+        self._orchestration_enabled = orchestration_config.get("enabled", True)
+
+        if not self._orchestration_enabled:
+            self._orchestration = None
+            self._model_registry = None
+            self._delegation_tracker = None
+            return
+
+        # Initialize model registry
+        self._model_registry = get_model_registry()
+
+        # Initialize orchestration manager
+        default_coordinator = orchestration_config.get("default_model", "xiaomi/mimo-v2-flash:free")
+        max_delegations = orchestration_config.get("max_delegations_per_request", 5)
+
+        self._orchestration = OrchestrationManager(
+            default_coordinator=default_coordinator,
+            max_delegations=max_delegations,
+        )
+
+        # Delegation tracker will be created per-request
+        self._delegation_tracker = None
+
+        # Track current delegation context
+        self._delegation_context: Optional[DelegationContext] = None
+
+        logger.info(f"Model orchestration initialized (coordinator: {default_coordinator})")
+
+    def _get_orchestration_prompt(self) -> str:
+        """Generate orchestration-specific prompt injection for current model."""
+        # Check if orchestration has been initialized yet
+        if not hasattr(self, "_orchestration_enabled") or not self._orchestration_enabled:
+            return ""
+        if not hasattr(self, "_model_registry") or not self._model_registry:
+            return ""
+
+        # Get model config
+        model_config = self._model_registry.get_model(self.model)
+        if not model_config:
+            return ""
+
+        # Get available delegation targets
+        available_delegates = self._model_registry.get_delegation_targets(self.model)
+
+        # Get remaining delegations
+        remaining = 5  # Default
+        if self._delegation_tracker:
+            remaining = self._delegation_tracker.get_remaining()
+
+        # Get prompt profile
+        profile_name = model_config.prompt_profile
+        prompt = get_delegation_instructions(
+            current_model=self.model,
+            available_delegates=available_delegates,
+            remaining_delegations=remaining,
+            profile_name=profile_name,
+        )
+
+        # Add delegation context if present
+        if self._delegation_context:
+            prompt = f"{self._delegation_context.to_system_context()}\n\n{prompt}"
+
+        return prompt
+
+    def _handle_delegation_action(self, result: Dict[str, Any]) -> bool:
+        """
+        Handle a delegation action from a tool result.
+
+        Args:
+            result: Tool result containing delegation action
+
+        Returns:
+            True if delegation was handled and model switched, False otherwise
+        """
+        action = result.get("action")
+
+        if action == "delegate":
+            target_model = result.get("target_model")
+            task = result.get("task", "")
+            handoff_notes = result.get("handoff_notes", "")
+
+            if not target_model:
+                logger.warning("Delegation action missing target_model")
+                return False
+
+            # Prepare delegation context
+            if self._orchestration:
+                self._delegation_context = self._orchestration.prepare_delegation(
+                    to_model=target_model,
+                    task=task,
+                    handoff_notes=handoff_notes,
+                    conversation_history=self.conversation.get_history(),
+                    state_summary=self._get_state_summary(),
+                )
+
+            # Switch to target model
+            try:
+                target_config = self._model_registry.get_model(target_model) if self._model_registry else None
+                provider_override = target_config.provider if target_config else None
+                # Use full API model name if available
+                api_model_name = target_config.api_model_name if target_config and target_config.api_model_name else target_model
+
+                self.switch_model(api_model_name, provider_override=provider_override, silent=True)
+
+                # Update system prompt with new model's profile
+                new_prompt = self._get_system_prompt()
+                self.conversation.update_system_prompt(new_prompt)
+
+                if self._is_text_output():
+                    console.print(
+                        f"[cyan]Delegated:[/cyan] {result.get('from_model')} -> {target_model}\n"
+                        f"[dim]Task: {task[:80]}...[/dim]"
+                    )
+
+                return True
+
+            except ProviderError as e:
+                logger.error(f"Failed to switch model for delegation: {e}")
+                if self._is_text_output():
+                    console.print(f"[red]Delegation failed:[/red] {e}")
+                return False
+
+        elif action == "return_to_coordinator":
+            coordinator = result.get("target_model", "mimo-v2-flash")
+            summary = result.get("summary", "")
+
+            # Clear delegation context
+            self._delegation_context = None
+
+            # Switch back to coordinator
+            try:
+                coordinator_config = self._model_registry.get_model(coordinator) if self._model_registry else None
+                provider_override = coordinator_config.provider if coordinator_config else None
+                # Use full API model name if available
+                api_model_name = coordinator_config.api_model_name if coordinator_config and coordinator_config.api_model_name else coordinator
+
+                self.switch_model(api_model_name, provider_override=provider_override, silent=True)
+
+                # Update system prompt
+                new_prompt = self._get_system_prompt()
+                self.conversation.update_system_prompt(new_prompt)
+
+                if self._is_text_output():
+                    console.print(
+                        f"[cyan]Returned to coordinator:[/cyan] {coordinator}\n"
+                        f"[dim]Summary: {summary[:80]}...[/dim]"
+                    )
+
+                return True
+
+            except ProviderError as e:
+                logger.error(f"Failed to return to coordinator: {e}")
+                return False
+
+        return False
+
+    def _get_state_summary(self) -> Dict[str, Any]:
+        """Get a summary of current agent state for delegation context."""
+        return {
+            "files_read": list(set(self._tools_used))[:20],  # Recent tool usage as proxy for files
+            "decisions": [],  # Could be enhanced with memory bank
+            "current_model": self.model,
+        }
+
+    def switch_model(self, new_model: str, provider_override: Optional[str] = None, silent: bool = False) -> None:
         """
         Switch to a different model while maintaining conversation history.
 
@@ -272,6 +451,7 @@ class Cortex:
         Args:
             new_model: New model name to use
             provider_override: Optional provider override
+            silent: If True, suppress the UI output (useful for orchestrated switches)
 
         Raises:
             ProviderError: If provider initialization fails or API key is missing
@@ -303,19 +483,21 @@ class Cortex:
             # Update conversation manager's model reference for token counting
             self.conversation.update_model(new_model)
 
-            # Notify user of model switch
-            new_provider_name = ProviderFactory.get_provider_name(new_model)
-            if old_provider_name != new_provider_name:
-                console.print(
-                    f"[cyan]Switched model:[/cyan] {old_model} ({old_provider_name}) -> "
-                    f"{new_model} ({new_provider_name})"
-                )
-            else:
-                console.print(f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}")
+            # Notify user of model switch (unless silent mode)
+            if not silent:
+                new_provider_name = ProviderFactory.get_provider_name(new_model)
+                if old_provider_name != new_provider_name:
+                    console.print(
+                        f"[cyan]Switched model:[/cyan] {old_model} ({old_provider_name}) -> "
+                        f"{new_model} ({new_provider_name})"
+                    )
+                else:
+                    console.print(f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}")
 
         except ProviderError as e:
             # Keep old model on error
-            console.print(f"[red]Failed to switch model:[/red] {e}")
+            if not silent:
+                console.print(f"[red]Failed to switch model:[/red] {e}")
             raise ProviderError(f"Failed to switch model: {e}") from e
 
     def route_request(self, user_request: str) -> Optional["RoutingDecision"]:
@@ -420,7 +602,7 @@ class Cortex:
         if hasattr(self, "memory_bank") and self.memory_bank:
             memory_summary = self.memory_bank.get_summary()
 
-        return f"""You are Cortex, a powerful AI coding assistant working in: {self.project_dir}
+        base_prompt = f"""You are Cortex, a powerful AI coding assistant working in: {self.project_dir}
 
 Permission Mode: {self.permission_mode.upper()}
 {mode_instructions[self.permission_mode]}
@@ -533,6 +715,13 @@ For detailed reference information, use the `/help` command:
 **Read before modifying** | **Search before creating** | **Test after changing**
 
 Remember: You are a skilled developer's assistant. Think systematically, act precisely, communicate clearly."""
+
+        # Add orchestration prompt if enabled
+        orchestration_prompt = self._get_orchestration_prompt()
+        if orchestration_prompt:
+            base_prompt += f"\n\n{orchestration_prompt}"
+
+        return base_prompt
 
     def _dispatch_session_start(self) -> None:
         """Dispatch session start event to hooks."""
@@ -778,31 +967,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         self.conversation.add_user_message(user_message)
         self._session_dirty = True
 
-        # Apply intelligent routing if enabled
-        if self._routing_enabled and self.router:
-            try:
-                routing_decision = self.route_request(user_message)
-                if routing_decision:
-                    # Check if we need to switch models
-                    if routing_decision.model_name != self.model:
-                        old_model = self.model
-                        try:
-                            self.switch_model(
-                                routing_decision.model_name,
-                                provider_override=routing_decision.provider_name
-                            )
-                            if self._is_text_output():
-                                console.print(
-                                    f"[cyan]Routed:[/cyan] {old_model} → {routing_decision.model_name} "
-                                    f"({routing_decision.reasoning.primary_reason})"
-                                )
-                        except ProviderError as e:
-                            # Failed to switch, continue with current model
-                            logger.warning(f"Failed to switch to routed model: {e}")
-                            if self._is_text_output():
-                                console.print(f"[yellow]Routing fallback:[/yellow] Staying with {self.model}")
-            except Exception as e:
-                logger.warning(f"Routing failed: {e}")
+        # Initialize delegation tracker for this request (model orchestration)
+        if self._orchestration_enabled and self._orchestration:
+            self._delegation_tracker = self._orchestration.start_request(self.model)
 
         # Set processing flag
         self._is_processing = True
@@ -852,6 +1019,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     messages = self.conversation.get_history()
     
                     # Show thinking indicator
+                    # Get tools from registry (includes delegation tools)
+                    tools = get_registry().get_all_schemas()
+
                     with console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
                         if (
                             use_streaming
@@ -861,12 +1031,12 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                             # Streaming mode
                             normalized_model = self.provider.normalize_model_name(self.model)
                             stream = stream_model_response(
-                                self.provider, normalized_model, messages, TOOLS
+                                self.provider, normalized_model, messages, tools
                             )
                             response_message = display_streaming_response(stream)
                         else:
                             # Non-streaming mode
-                            response = self._call_model(messages, TOOLS)
+                            response = self._call_model(messages, tools)
                             response_message = response["message"]
     
                     # Add assistant response
@@ -932,7 +1102,15 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
     
                             # Output tool result (for JSON modes)
                             self._output_tool_result(tool_name, result)
-    
+
+                            # Check for delegation actions (model orchestration)
+                            if tool_name in ("delegate_to_model", "return_to_coordinator"):
+                                if self._handle_delegation_action(result):
+                                    # Model was switched - add result and continue with new model
+                                    self.conversation.add_tool_result(tool_result.id, result)
+                                    # Don't return - let the loop continue with the new model
+                                    continue
+
                             # Validate result
                             if not self._validate_tool_result(tool_name, result):
                                 self._output_warning(f"Invalid tool result format from {tool_name}")
@@ -941,7 +1119,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                                     ErrorType.EXECUTION,
                                     {"tool_name": tool_name},
                                 )
-    
+
                             # Add result to conversation
                             self.conversation.add_tool_result(tool_result.id, result)
     
