@@ -61,6 +61,8 @@ from .core.memory import (
     create_memory_bank,
     extract_memories_from_messages,
 )
+from .core.memory_layers import StateManager, AgentFocus
+from .core.prompt_adapter import adapt_system_prompt, get_profile_info
 from .tools import TOOLS, create_tool_instance, get_registry
 from .ui.console import console
 from .utils.errors import retry_with_backoff, ModelError, create_error_response, create_success_response, ErrorType
@@ -121,6 +123,9 @@ class Cortex:
 
         # Initialize memory bank for tracking decisions and facts
         self.memory_bank = create_memory_bank(max_items=50)
+        
+        # Initialize StateManager for task tracking and state management
+        self.state_manager = StateManager(project_dir=self.project_dir)
 
         # Initialize conversation manager with summarization support
         system_prompt = self._get_system_prompt()
@@ -585,7 +590,8 @@ class Cortex:
                     content = filepath.read_text(encoding="utf-8-sig")
                     console.print(f"[dim]Loaded project context from {filename}[/dim]")
                     return content[:2000]  # Limit context size
-                except:
+                except (UnicodeDecodeError, IOError, OSError) as e:
+                    logger.debug(f"Failed to read {filename}: {e}")
                     pass
         return ""
 
@@ -609,6 +615,7 @@ Permission Mode: {self.permission_mode.upper()}
 
 {f"Project Context:{chr(10)}{self.project_context}" if self.project_context else ""}
 {f"Session Memory:{chr(10)}{memory_summary}" if memory_summary else ""}
+{f"Current State:{chr(10)}{self.state_manager.get_llm_context()}" if hasattr(self, 'state_manager') and self.state_manager else ""}
 
 # Mental Model for Codebase Understanding
 
@@ -721,7 +728,14 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         if orchestration_prompt:
             base_prompt += f"\n\n{orchestration_prompt}"
 
-        return base_prompt
+        # Adapt prompt based on model capabilities
+        adapted_prompt = adapt_system_prompt(base_prompt, self.model)
+
+        # Log profile info for debugging
+        profile_info = get_profile_info(self.model)
+        logger.debug(f"Model profile: {profile_info}")
+
+        return adapted_prompt
 
     def _dispatch_session_start(self) -> None:
         """Dispatch session start event to hooks."""
@@ -973,6 +987,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
 
         # Set processing flag
         self._is_processing = True
+        # Set agent focus to EXECUTING mode
+        self.state_manager.set_focus(AgentFocus.EXECUTING)
+        
         # Agent loop - use while True with explicit break for dynamic iteration extension
         max_iterations = self.config.max_iterations
         iteration = 0
@@ -980,6 +997,8 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         try:
             while True:
                 iteration += 1
+                # Track iteration in state manager
+                self.state_manager.increment_iteration()
 
                 # Check for shutdown request
                 if self._shutdown_requested:
@@ -1102,6 +1121,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
     
                             # Output tool result (for JSON modes)
                             self._output_tool_result(tool_name, result)
+                            
+                            # Track tool execution in state manager
+                            self.state_manager.record_tool_execution(tool_name, arguments, result)
 
                             # Check for delegation actions (model orchestration)
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
@@ -1222,6 +1244,8 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     return
         finally:
             self._is_processing = False
+            # Reset agent focus to EXPLORING when done
+            self.state_manager.set_focus(AgentFocus.EXPLORING)
 
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get current conversation history"""
@@ -1339,7 +1363,8 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     result = json.loads(msg.get("content", "{}"))
                     if not result.get("success", True):
                         error_count += 1
-                except:
+                except json.JSONDecodeError as e:
+                    logger.debug(f"Failed to parse tool result JSON: {e}")
                     pass
 
         if error_count > 5:
