@@ -405,6 +405,9 @@ Tips: Read before edit. Search before assuming paths."""
 | Run command | `bash` | Execute system commands, tests |
 | Create plan | `create_plan` | For complex multi-step tasks |
 | Execute plan | `execute_plan` | Run through plan steps |
+| Find functions/classes | `ast_search` | Structural code search by definition |
+| Extract code structure | `ast_extract` | Get functions/classes with metadata |
+| Analyze code quality | `ast_analyze` | Complexity metrics, issues, dependencies |
 
 ## Decision Tree
 
@@ -412,7 +415,8 @@ Tips: Read before edit. Search before assuming paths."""
 Need to understand code?
 ├── Know the file? → read_file
 ├── Know the pattern? → grep_search
-└── Know the extension? → glob_files
+├── Know the extension? → glob_files
+└── Need function/class definitions? → ast_search or ast_extract
 
 Need to modify code?
 ├── Small change? → edit_file
@@ -423,7 +427,16 @@ Need to run something?
 ├── Tests? → bash command
 ├── Build? → bash command
 └── Other? → bash command
+
+Need code analysis?
+├── Find code structure? → ast_search (search_type="function" or "class")
+├── Get full definitions? → ast_extract (with docstrings, decorators)
+└── Analyze complexity? → ast_analyze
 ```
+
+## grep vs ast_search
+- **grep**: Text patterns, strings, comments, regex matching
+- **ast_search**: Function/class/import definitions by structure
 
 ## Common Mistakes to Avoid
 

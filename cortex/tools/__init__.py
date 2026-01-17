@@ -66,6 +66,26 @@ from .delegation_tools import (
     get_delegation_schemas,
 )
 
+# AST tools for code analysis (conditional - requires tree-sitter)
+try:
+    from .ast import (
+        ASTSearchTool,
+        ASTExtractTool,
+        ASTAnalyzeTool,
+        AST_SEARCH_SCHEMA,
+        AST_EXTRACT_SCHEMA,
+        AST_ANALYZE_SCHEMA,
+    )
+    AST_TOOLS_AVAILABLE = True
+except ImportError:
+    AST_TOOLS_AVAILABLE = False
+    ASTSearchTool = None
+    ASTExtractTool = None
+    ASTAnalyzeTool = None
+    AST_SEARCH_SCHEMA = None
+    AST_EXTRACT_SCHEMA = None
+    AST_ANALYZE_SCHEMA = None
+
 if TYPE_CHECKING:
     from ..agent import Cortex
     from ..utils.timeouts import TimeoutConfig
@@ -632,6 +652,14 @@ TOOLS: List[Dict[str, Any]] = [
     RETURN_TO_COORDINATOR_SCHEMA,
 ]
 
+# Conditionally add AST tools if tree-sitter is available
+if AST_TOOLS_AVAILABLE:
+    TOOLS.extend([
+        AST_SEARCH_SCHEMA,
+        AST_EXTRACT_SCHEMA,
+        AST_ANALYZE_SCHEMA,
+    ])
+
 
 def create_tool_instance(
     tool_name: str,
@@ -810,4 +838,12 @@ __all__ = [
     "ToolRegistry",
     "get_registry",
     "reset_registry",
+    # AST tools (conditional - requires tree-sitter)
+    "AST_TOOLS_AVAILABLE",
+    "ASTSearchTool",
+    "ASTExtractTool",
+    "ASTAnalyzeTool",
+    "AST_SEARCH_SCHEMA",
+    "AST_EXTRACT_SCHEMA",
+    "AST_ANALYZE_SCHEMA",
 ]

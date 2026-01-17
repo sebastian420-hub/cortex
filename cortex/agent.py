@@ -652,6 +652,26 @@ Only read files when you have a specific reason. Track what you've read to avoid
 - **Edit**: Surgical changes with exact string replacement
 - **Write**: Create new files or replace content entirely
 - **Execute**: Run commands, tests, git operations
+- **AST Analysis**: Structural code understanding with ast_search, ast_extract, ast_analyze
+
+## AST Tools (Code Analysis)
+Use these for deeper code understanding beyond text search:
+
+- **ast_search**: Find functions/classes/imports by structure (better than grep for code patterns)
+  - `ast_search(pattern="process_", search_type="function")` - find all functions starting with "process_"
+  - `ast_search(pattern="Manager", search_type="class")` - find all Manager classes
+
+- **ast_extract**: Get full code structures with metadata (docstrings, decorators, parameters)
+  - `ast_extract(path="src/", extract_type="function")` - list all functions with details
+  - `ast_extract(path="file.py", pattern="main", extract_type="function")` - get specific function
+
+- **ast_analyze**: Code complexity and quality analysis
+  - `ast_analyze(path="src/", analysis_type="complexity")` - get metrics (lines, functions, complexity)
+  - `ast_analyze(analysis_type="issues")` - find code smells (long functions, too many params)
+
+**When to use grep vs ast_search:**
+- grep: text patterns, strings, comments, quick searches
+- ast_search: function/class definitions, imports, structural patterns
 
 ## Your Limitations
 - Cannot see file changes until you re-read them
@@ -980,6 +1000,34 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         # Add user message
         self.conversation.add_user_message(user_message)
         self._session_dirty = True
+
+        # ========== ROUTING INTEGRATION ==========
+        # Route request to optimal model if routing is enabled
+        if self._routing_enabled and self.router:
+            try:
+                routing_decision = self.route_request(user_message)
+
+                if routing_decision and routing_decision.model_name != self.model:
+                    # Display routing decision
+                    console.print(f"\n[cyan]🔀 Routing Decision[/cyan]")
+                    console.print(f"   Model: [bold]{routing_decision.model_name}[/bold]")
+                    console.print(f"   Reason: {routing_decision.reasoning.primary_reason}")
+                    if routing_decision.task_analysis:
+                        task_type = routing_decision.task_analysis.task_type.value
+                        complexity = routing_decision.task_analysis.complexity.score
+                        console.print(f"   Task: {task_type} (complexity: {complexity}/10)")
+                    if routing_decision.estimated_cost_usd is not None:
+                        console.print(f"   Est. Cost: ${routing_decision.estimated_cost_usd:.4f}")
+                    console.print()
+
+                    # Switch to routed model
+                    self.switch_model(
+                        routing_decision.model_name,
+                        reason=f"Routed: {routing_decision.reasoning.primary_reason}"
+                    )
+            except Exception as e:
+                logger.warning(f"Routing failed, continuing with current model: {e}")
+        # ========== END ROUTING ==========
 
         # Initialize delegation tracker for this request (model orchestration)
         if self._orchestration_enabled and self._orchestration:

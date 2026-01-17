@@ -18,6 +18,59 @@ from ...ast import ASTService, detect_language, SUPPORTED_LANGUAGES
 logger = logging.getLogger(__name__)
 
 
+# Schema for tool registration
+AST_EXTRACT_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "ast_extract",
+        "description": """Extract code structures (functions, classes, imports) with full metadata.
+
+Use ast_extract when you need to:
+- Get the complete definition of a function with its docstring, decorators, and parameters
+- Get a class definition with its methods and base classes
+- List all functions/classes in a file or directory
+- Understand code structure with semantic information
+
+Returns structured data including docstrings, decorators, parameters, return types, etc.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Directory or file to extract from"
+                },
+                "extract_type": {
+                    "type": "string",
+                    "enum": ["function", "class", "import", "all"],
+                    "description": "What to extract: 'function' for functions, 'class' for classes, 'import' for imports, 'all' for everything"
+                },
+                "pattern": {
+                    "type": "string",
+                    "description": "Optional pattern to filter results by name"
+                },
+                "include_docstrings": {
+                    "type": "boolean",
+                    "description": "Include docstrings in results. Default: true"
+                },
+                "include_decorators": {
+                    "type": "boolean",
+                    "description": "Include decorators in results. Default: true"
+                },
+                "include_parameters": {
+                    "type": "boolean",
+                    "description": "Include function parameters. Default: true"
+                },
+                "include_methods": {
+                    "type": "boolean",
+                    "description": "Include class methods. Default: true"
+                }
+            },
+            "required": ["path"]
+        }
+    }
+}
+
+
 class ExtractType(Enum):
     """Types of extraction operations."""
     FUNCTION = "function"

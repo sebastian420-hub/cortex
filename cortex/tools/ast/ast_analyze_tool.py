@@ -18,6 +18,55 @@ from ...ast import ASTService, detect_language, SUPPORTED_LANGUAGES
 logger = logging.getLogger(__name__)
 
 
+# Schema for tool registration
+AST_ANALYZE_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "ast_analyze",
+        "description": """Analyze code for complexity, dependencies, and potential issues.
+
+Use ast_analyze when you need to:
+- Get code complexity metrics (function count, class count, lines, cyclomatic complexity)
+- Analyze dependencies and imports (internal, external, circular dependencies)
+- Find potential issues (long functions, too many parameters, TODO comments, print statements)
+- Calculate maintainability index
+
+Returns detailed metrics and actionable insights about code quality.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "Directory or file to analyze"
+                },
+                "analysis_type": {
+                    "type": "string",
+                    "enum": ["complexity", "dependencies", "issues", "all"],
+                    "description": "Type of analysis: 'complexity' for metrics, 'dependencies' for import analysis, 'issues' for code smells, 'all' for everything"
+                },
+                "max_depth": {
+                    "type": "integer",
+                    "description": "Maximum depth for dependency analysis. Default: 3"
+                },
+                "include_metrics": {
+                    "type": "boolean",
+                    "description": "Include code metrics (lines, functions, classes). Default: true"
+                },
+                "include_dependencies": {
+                    "type": "boolean",
+                    "description": "Include dependency analysis. Default: true"
+                },
+                "include_issues": {
+                    "type": "boolean",
+                    "description": "Include potential issues. Default: true"
+                }
+            },
+            "required": ["path"]
+        }
+    }
+}
+
+
 class ASTAnalyzeTool(Tool):
     """
     Code analysis tool using AST parsing.

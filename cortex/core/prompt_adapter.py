@@ -113,6 +113,9 @@ def get_tool_priority_list(model_name: str) -> list:
         "update_plan",
         "web_search",
         "web_fetch",
+        # AST tools for code analysis
+        "ast_search",
+        "ast_extract",
         "ast_analyze",
     ]
 

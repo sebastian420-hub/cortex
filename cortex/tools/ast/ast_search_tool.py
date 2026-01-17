@@ -19,6 +19,61 @@ from ...ast import ASTService, detect_language, SUPPORTED_LANGUAGES
 logger = logging.getLogger(__name__)
 
 
+# Schema for tool registration
+AST_SEARCH_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "ast_search",
+        "description": """Search code using AST (Abstract Syntax Tree) patterns.
+More precise than grep for finding functions, classes, and imports by structure.
+
+Use ast_search when you need to:
+- Find function definitions by name pattern
+- Find class definitions by name pattern
+- Find import statements
+- Search by code structure rather than text
+
+Use grep instead for: text patterns, strings, comments, or quick text searches.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Pattern to search for (function/class/import name or regex)"
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Directory or file to search in. Default: current directory"
+                },
+                "search_type": {
+                    "type": "string",
+                    "enum": ["smart", "function", "class", "import", "text", "structure"],
+                    "description": "Type of search: 'function' finds function definitions, 'class' finds classes, 'import' finds imports, 'smart' auto-detects"
+                },
+                "file_type": {
+                    "type": "string",
+                    "description": "Filter by file extension (e.g., 'py' for Python, 'js' for JavaScript)"
+                },
+                "output_mode": {
+                    "type": "string",
+                    "enum": ["files_with_matches", "content", "count"],
+                    "description": "Output format: 'content' shows matching code, 'files_with_matches' shows file paths, 'count' shows match counts"
+                },
+                "context": {
+                    "type": "integer",
+                    "description": "Lines of context to show around matches (for content mode)"
+                },
+                "head_limit": {
+                    "type": "integer",
+                    "description": "Maximum number of results to return. Default: 50"
+                }
+            },
+            "required": ["pattern"]
+        }
+    }
+}
+
+
 class SearchType(Enum):
     """Types of search operations."""
     TEXT = "text"           # Traditional text search
