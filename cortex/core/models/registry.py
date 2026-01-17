@@ -7,7 +7,7 @@ Models use this registry to understand their own role and what models they can d
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 
 
 class ModelCapability(str, Enum):
@@ -398,7 +398,7 @@ class ModelRegistry:
         model = self.get_model(name)
         return model is not None and model.enabled
 
-    def validate_delegation(self, from_model: str, to_model: str) -> tuple[bool, str]:
+    def validate_delegation(self, from_model: str, to_model: str) -> Tuple[bool, str]:
         """
         Validate if a delegation from one model to another is allowed.
 

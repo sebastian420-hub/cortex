@@ -21,6 +21,8 @@ class ErrorType:
     NETWORK = "network"
     SECURITY = "security"
     PROVIDER = "provider"
+    CONFIGURATION = "configuration"
+    NOT_IMPLEMENTED = "not_implemented"
 
 
 def retry_with_backoff(

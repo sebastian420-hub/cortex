@@ -1,7 +1,7 @@
 ﻿"""Command execution tools"""
 
 import subprocess
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm
@@ -23,7 +23,7 @@ class ExecuteCommandTool(Tool):
     default_timeout: int = 30
     timeout_category: str = "default"
 
-    def _validate_python_command(self, command: str) -> tuple[bool, str]:
+    def _validate_python_command(self, command: str) -> Tuple[bool, str]:
         """
         Validate Python commands for safety.
 

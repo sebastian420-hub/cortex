@@ -19,6 +19,11 @@ from .progress import (
     show_operation_summary,
     get_tracker,
 )
+from .plan_progress import (
+    PlanProgressDisplay,
+    create_plan_display,
+    show_step_status,
+)
 
 __all__ = [
     "console",
@@ -39,4 +44,8 @@ __all__ = [
     "track_search",
     "show_operation_summary",
     "get_tracker",
+    # Plan progress
+    "PlanProgressDisplay",
+    "create_plan_display",
+    "show_step_status",
 ]

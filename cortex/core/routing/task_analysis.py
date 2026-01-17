@@ -7,7 +7,7 @@ phases, it will be replaced with AI-powered analysis.
 """
 
 import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import logging
@@ -181,7 +181,7 @@ class TaskAnalysisEngine:
         
         return analysis
     
-    def _classify_task(self, user_input: str) -> tuple[TaskType, List[str], float]:
+    def _classify_task(self, user_input: str) -> Tuple[TaskType, List[str], float]:
         """
         Classify task type using keyword matching.
         

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ..utils.errors import create_error_response, create_success_response, ErrorType
 from ..ui.console import console
+from ..ui.plan_progress import PlanProgressDisplay
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +307,7 @@ class PlanningEngine:
         self.max_plan_steps = max_plan_steps
         self.active_plan: Optional[Plan] = None
         self.plans: Dict[str, Plan] = {}
+        self.progress_display = PlanProgressDisplay()
         
     def create_plan(
         self,
@@ -462,12 +464,11 @@ class PlanningEngine:
         
         plan.mark_started()
         steps_executed = 0
-        step_results = [] # Initialize here
-        
-        # Show plan overview
-        console.print(f"\n[bold cyan]📋 Executing Plan: {plan.id}[/bold cyan]")
-        console.print(f"[dim]Goal:[/dim] {plan.goal}")
-        console.print(f"[dim]Total Steps:[/dim] {len(plan.steps)}")
+        step_results = []
+
+        # Show plan overview using progress display
+        self.progress_display.show_plan_overview(plan)
+        self.progress_display.start_progress_bar(len(plan.steps), f"Executing: {plan.goal[:40]}...")
         
         while True:
             # Check if we've reached max steps
@@ -488,12 +489,10 @@ class PlanningEngine:
                 if all_completed:
                     plan.mark_completed()
                     # Show plan completion summary
-                    progress = plan.get_progress()
-                    console.print(f"\n[bold green]✅ Plan Execution Complete[/bold green]")
-                    console.print(f"[dim]Goal:[/dim] {plan.goal}")
-                    console.print(f"[dim]Steps:[/dim] {progress['completed']}/{progress['total']} completed")
-                    console.print(f"[dim]Success Rate:[/dim] {(progress['completed']/progress['total']*100):.1f}%")
-                    
+                    self.progress_display.stop_progress_bar()
+                    self.progress_display.show_plan_complete(plan)
+                    self.progress_display.show_execution_summary(plan, step_results)
+
                     return create_success_response({
                         "message": "Plan execution completed",
                         "plan_id": plan.id,
@@ -516,12 +515,10 @@ class PlanningEngine:
             # Execute the first ready step
             step = ready_steps[0]
             step.mark_started()
-            
+
             # Show step start
             step_number = steps_executed + 1
-            console.print(f"\n[cyan]▶ Step {step_number}/{len(plan.steps)}:[/cyan] {step.description}")
-            if step.tool_name:
-                console.print(f"   [dim]Tool: {step.tool_name}[/dim]")
+            self.progress_display.show_step_start(step, step_number, len(plan.steps))
             
             try:
                 result = self._execute_step(step, plan)
@@ -529,20 +526,19 @@ class PlanningEngine:
                 if result["success"]:
                     step.mark_completed(result.get("content"))
                     logger.info(f"Step {step.id} completed: {step.description}")
-                    # Show step completion
                     outcome = result.get("content") or result.get("outcome") or "Completed"
-                    if len(outcome) > 100:
-                        outcome = outcome[:97] + "..."
-                    console.print(f"   [green]✓ Success:[/green] {outcome}")
+                    self.progress_display.show_step_complete(step, outcome)
+                    self.progress_display.update_progress(1)
                 else:
                     step.mark_failed(result.get("error", "Unknown error"))
                     logger.error(f"Step {step.id} failed: {result.get('error')}")
-                    # Show step failure
                     error_msg = result.get("error", "Unknown error")
-                    console.print(f"   [red]✗ Failed:[/red] {error_msg}")
+                    self.progress_display.show_step_failed(step, error_msg)
                     
                     if stop_on_failure:
                         plan.mark_failed()
+                        self.progress_display.stop_progress_bar()
+                        self.progress_display.show_plan_failed(plan, error_msg)
                         return create_error_response(
                             f"Step {step.id} failed: {result.get('error')}",
                             ErrorType.EXECUTION,
@@ -552,15 +548,16 @@ class PlanningEngine:
                                 "progress": plan.get_progress(),
                             }
                         )
-            
+
             except Exception as e:
                 step.mark_failed(str(e))
                 logger.exception(f"Exception executing step {step.id}")
-                # Show exception error
-                console.print(f"   [red]✗ Exception:[/red] {str(e)}")
-                
+                self.progress_display.show_step_failed(step, f"Exception: {str(e)}")
+
                 if stop_on_failure:
                     plan.mark_failed()
+                    self.progress_display.stop_progress_bar()
+                    self.progress_display.show_plan_failed(plan, str(e))
                     return create_error_response(
                         f"Exception executing step {step.id}: {str(e)}",
                         ErrorType.EXECUTION,
@@ -573,7 +570,9 @@ class PlanningEngine:
             
             step_results.append(result)
             steps_executed += 1
-        
+
+        # Plan execution paused (max_steps reached)
+        self.progress_display.stop_progress_bar()
         return create_success_response({
             "message": f"Plan execution paused after {steps_executed} steps",
             "plan_id": plan.id,
