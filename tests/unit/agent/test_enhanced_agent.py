@@ -77,8 +77,9 @@ class TestEnhancedCortexInitialization:
         
     def test_enhanced_agent_system_prompt_update(self, tmp_project_dir):
         """Test that system prompt is updated with enhanced guidance."""
+        # Use a model that gets DETAILED prompt style to match test expectations
         agent = EnhancedCortex(
-            model="llama3.2",
+            model="claude-3-5-sonnet",
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL
         )
