@@ -17,6 +17,17 @@ from .builder import (
     PromptBuilder,
     ToolFormatter,
 )
+from .adapters import (
+    get_adapter,
+    adapt_prompt_for_model,
+    get_adapter_info,
+    ClaudeAdapter,
+    GPTAdapter,
+    DeepSeekAdapter,
+    OllamaAdapter,
+    MistralAdapter,
+    CodeSpecializedAdapter,
+)
 
 __all__ = [
     # Role-based profiles
@@ -28,4 +39,14 @@ __all__ = [
     # Dynamic prompt builder
     "PromptBuilder",
     "ToolFormatter",
+    # Model adapters
+    "get_adapter",
+    "adapt_prompt_for_model",
+    "get_adapter_info",
+    "ClaudeAdapter",
+    "GPTAdapter",
+    "DeepSeekAdapter",
+    "OllamaAdapter",
+    "MistralAdapter",
+    "CodeSpecializedAdapter",
 ]

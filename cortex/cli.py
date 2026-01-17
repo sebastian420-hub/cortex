@@ -27,6 +27,8 @@ from .agent_enhanced import EnhancedCortex
 from .models import PermissionMode
 from .config import AgentConfig
 from .core.providers import ProviderFactory, ProviderError
+from .core.model_capabilities import get_model_profile, list_all_profiles
+from .core.prompts import get_adapter_info
 from .ui.console import console
 from .ui.repl import REPL
 from .storage.history import get_history_file
@@ -44,7 +46,8 @@ def check_ollama() -> bool:
 
         ollama.list()
         return True
-    except:
+    except (ImportError, ConnectionError, Exception) as e:
+        logger.debug(f"Ollama not available: {e}")
         return False
 
 
@@ -616,6 +619,36 @@ def handle_command(command: str, agent: Cortex, session_manager: SessionManager,
         else:
             console.print(f"Current model: {agent.model}")
             console.print("[dim]Usage: /model <model_name>[/dim]")
+
+    elif cmd.startswith("/profile"):
+        # Show model capability profile
+        parts = cmd.split()
+        model_to_check = parts[1] if len(parts) > 1 else agent.model
+
+        profile = get_model_profile(model_to_check)
+        adapter_info = get_adapter_info(model_to_check)
+
+        # Create a table for the profile
+        table = Table(title=f"Model Profile: {profile.name}", show_header=True, header_style="bold cyan")
+        table.add_column("Property", style="dim")
+        table.add_column("Value")
+
+        table.add_row("Model", model_to_check)
+        table.add_row("Profile Name", profile.name)
+        table.add_row("Context Window", f"{profile.context_window:,} tokens")
+        table.add_row("Prompt Style", profile.prompt_style.value)
+        table.add_row("Tool Following", profile.tool_following.value)
+        table.add_row("Reasoning", profile.reasoning.value)
+        table.add_row("Max Tools", str(profile.max_tools_per_prompt))
+        table.add_row("JSON Mode", "Yes" if profile.supports_json_mode else "No")
+        table.add_row("Streaming", "Yes" if profile.supports_streaming else "No")
+        table.add_row("Vision", "Yes" if profile.supports_vision else "No")
+        table.add_row("Adapter", adapter_info.get("adapter", "none"))
+        if profile.notes:
+            table.add_row("Notes", profile.notes)
+
+        console.print(table)
+        console.print(f"\n[dim]Usage: /profile [model_name] - Check any model's profile[/dim]")
 
     elif cmd.startswith("/mode"):
         parts = cmd.split()

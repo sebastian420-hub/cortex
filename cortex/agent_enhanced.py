@@ -36,6 +36,8 @@ from .core.memory_layers import (
     WorkingMemory,
     EnhancedMemoryBank,
 )
+from .core.prompts import PromptBuilder, adapt_prompt_for_model, get_adapter_info
+from .core.model_capabilities import get_model_profile, PromptStyle
 from .tools import TOOLS, create_tool_instance
 from .ui.console import console
 from .utils.errors import (
@@ -143,12 +145,113 @@ class EnhancedCortex(Cortex):
         return self._load_project_context()
     
     def _update_system_prompt(self) -> None:
-        """Update system prompt with planning and memory guidance."""
+        """Update system prompt with planning and memory guidance, adapted to model capabilities."""
         # Get base system prompt
         base_prompt = super()._get_system_prompt()
-        
-        # Enhanced guidance to append
-        enhanced_guidance = """
+
+        # Get model profile for adaptive guidance
+        profile = get_model_profile(self.model)
+        adapter_info = get_adapter_info(self.model)
+
+        logger.debug(f"EnhancedCortex using model profile: {profile.name}, style: {profile.prompt_style.value}")
+
+        # Generate guidance based on model capability
+        enhanced_guidance = self._get_planning_guidance(profile.prompt_style)
+
+        # Apply model-specific adaptations
+        enhanced_prompt = base_prompt + enhanced_guidance
+        enhanced_prompt = adapt_prompt_for_model(enhanced_prompt, self.model)
+
+        # Update conversation manager's system prompt
+        self.conversation.history[0]["content"] = enhanced_prompt
+
+    def _get_planning_guidance(self, style: PromptStyle) -> str:
+        """Get planning guidance appropriate for model capability level."""
+
+        if style == PromptStyle.EXPLICIT:
+            # Shorter, more explicit guidance for smaller models
+            return """
+
+# PLANNING TOOLS
+
+You have planning tools for complex tasks.
+
+## Available Tools
+
+1. `create_plan(goal, constraints, assumptions)` - Create a plan
+2. `execute_plan(plan_id)` - Run the plan
+3. `monitor_plan(plan_id)` - Check progress
+4. `update_plan(plan_id, action, step_data)` - Modify plan
+
+## When to Use Planning
+
+USE planning when:
+- Task has 4+ steps
+- Multiple files need changes
+- Task is complex
+
+SKIP planning when:
+- Simple single-file change
+- Quick lookup or read
+- Less than 3 tool calls needed
+
+## Memory
+
+The system tracks:
+- Files you've read
+- What worked and what failed
+- Patterns discovered
+
+Use this to avoid repeating mistakes.
+"""
+
+        elif style == PromptStyle.CONCISE:
+            # Medium-length guidance
+            return """
+
+# ENHANCED AGENT: PLANNING & MEMORY
+
+## Planning Tools
+
+| Tool | Purpose | Example |
+|------|---------|---------|
+| `create_plan` | Create structured plan | `create_plan(goal="...", constraints=[...])` |
+| `execute_plan` | Run plan steps | `execute_plan(plan_id="plan_xxx")` |
+| `monitor_plan` | Check status | `monitor_plan(plan_id="plan_xxx")` |
+| `update_plan` | Modify plan | `update_plan(plan_id="...", action="add_step")` |
+
+## When to Plan
+
+**Use planning for:**
+- Tasks with 4+ sequential steps
+- Multi-file coordinated changes
+- Complex debugging or refactoring
+
+**Skip planning for:**
+- Single file changes
+- Quick lookups
+- Simple fixes (< 3 tool calls)
+
+## Memory System
+
+Working Memory: Current files, patterns, decisions
+Session Memory: What worked, what failed, insights
+
+**Tips:**
+- Avoid re-reading files already examined
+- Reuse patterns that worked
+- Learn from failures
+
+## Key Principles
+
+1. Plan before complex work
+2. Communicate your approach
+3. Execute systematically
+4. Adapt when needed
+"""
+
+        else:  # DETAILED - full guidance for capable models
+            return """
 
 # ENHANCED AGENT: PLANNING TOOLS & MEMORY
 
@@ -157,8 +260,6 @@ You have access to **planning tools** that help you tackle complex, multi-step t
 ---
 
 ## PLANNING TOOLS REFERENCE
-
-You have 4 planning tools available:
 
 ### 1. `create_plan` - Create a structured plan
 ```
@@ -172,167 +273,51 @@ create_plan(
 
 ### 2. `execute_plan` - Execute a plan's steps
 ```
-execute_plan(
-    plan_id="plan_xxx",
-    max_steps=10,
-    stop_on_failure=True
-)
+execute_plan(plan_id="plan_xxx", max_steps=10, stop_on_failure=True)
 ```
 **Returns:** `success`, `progress`, `step_results`
 
 ### 3. `monitor_plan` - Check plan status
 ```
-monitor_plan(
-    plan_id="plan_xxx",
-    detail_level="summary"  # or "steps" or "detailed"
-)
+monitor_plan(plan_id="plan_xxx", detail_level="summary")
 ```
-**Returns:** `status`, `progress`, `steps` (if detailed)
+**Returns:** `status`, `progress`, `steps`
 
 ### 4. `update_plan` - Modify an existing plan
 ```
-update_plan(
-    plan_id="plan_xxx",
-    action="add_step",  # or "update_step"
-    step_data={"description": "New step", "tool_name": "read_file"}
-)
+update_plan(plan_id="plan_xxx", action="add_step", step_data={...})
 ```
 
 ---
 
-## WHEN TO USE PLANNING (Decision Framework)
+## WHEN TO USE PLANNING
 
-### USE Planning Tools When:
-
-| Situation | Why Planning Helps |
-|-----------|-------------------|
-| Task involves **4+ sequential steps** | Tracks progress, handles dependencies |
-| **Multiple files** need coordinated changes | Ensures consistency, nothing missed |
-| Task requires **analysis before action** | Separates thinking from doing |
-| You might need to **backtrack or retry** | Plan tracks what worked/failed |
-| User asks for something **complex** | Shows your approach, builds confidence |
-
-**Examples that NEED planning:**
-- "Refactor the authentication system to use JWT"
-- "Add comprehensive error handling across the API"
-- "Implement a new feature with tests and documentation"
-- "Debug why the payment flow is failing"
+### USE Planning When:
+- Task involves **4+ sequential steps**
+- **Multiple files** need coordinated changes
+- Task requires **analysis before action**
+- You might need to **backtrack or retry**
+- User asks for something **complex**
 
 ### SKIP Planning When:
-
-| Situation | Just Act Directly |
-|-----------|-------------------|
-| **Single file** change | Edit directly |
-| **< 3 tool calls** needed | Too simple for planning overhead |
-| **Clear, specific** request | "Fix the typo in line 42" |
-| **Quick lookup** | "What does function X do?" |
-
-**Examples that DON'T need planning:**
-- "Add a docstring to this function"
-- "What files handle authentication?"
-- "Fix the import error in main.py"
+- **Single file** change
+- **< 3 tool calls** needed
+- **Clear, specific** request
+- **Quick lookup**
 
 ---
 
-## PLANNING WORKFLOW (Mental Model)
+## PLANNING WORKFLOW
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  User Request: "Add user authentication with JWT"          │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  STEP 1: Assess Complexity                                  │
-│  - Multiple files affected? YES                             │
-│  - Sequential dependencies? YES                             │
-│  - Could take >3 tool calls? YES                            │
-│  → Decision: USE PLANNING                                   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  STEP 2: Create Plan                                        │
-│  create_plan(                                               │
-│      goal="Add JWT authentication to API",                  │
-│      constraints=["Don't break existing endpoints"],        │
-│      assumptions=["FastAPI backend", "User model exists"]   │
-│  )                                                          │
-│  → Returns: plan_id="plan_abc123", steps=5                  │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  STEP 3: Review & Communicate                               │
-│  "I've created a plan with 5 steps:                         │
-│   1. Analyze current auth structure                         │
-│   2. Install JWT dependencies                               │
-│   3. Create JWT utility module                              │
-│   4. Update user routes with JWT                            │
-│   5. Add tests for JWT auth                                 │
-│   Shall I proceed?"                                         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  STEP 4: Execute Plan                                       │
-│  execute_plan(plan_id="plan_abc123")                        │
-│  → Executes steps, reports progress                         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  STEP 5: Verify & Report                                    │
-│  monitor_plan(plan_id="plan_abc123", detail_level="summary")│
-│  → "Plan completed: 5/5 steps successful"                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## WORKED EXAMPLE
-
-**User:** "Add input validation to all API endpoints"
-
-**Your Response (with planning):**
-
-> This is a multi-file task that will touch several endpoints. Let me create a plan to approach this systematically.
-
-```
-create_plan(
-    goal="Add input validation to all API endpoints",
-    constraints=[
-        "Use pydantic for validation",
-        "Don't change response formats",
-        "Add helpful error messages"
-    ],
-    assumptions=[
-        "FastAPI with pydantic available",
-        "Endpoints in routes/ directory"
-    ]
-)
-```
-
-> I've created a plan with the following steps:
-> 1. Identify all API endpoints needing validation
-> 2. Create validation schemas for each endpoint
-> 3. Apply validators to route handlers
-> 4. Add error handling for validation failures
-> 5. Test validation behavior
->
-> Shall I execute this plan?
-
-*(User confirms)*
-
-```
-execute_plan(plan_id="plan_xxx", max_steps=10)
-```
+1. **Assess Complexity** - Is this multi-step? Multiple files?
+2. **Create Plan** - `create_plan(goal=..., constraints=[...])`
+3. **Communicate** - Show the plan to user
+4. **Execute** - `execute_plan(plan_id=...)`
+5. **Verify** - `monitor_plan(plan_id=...)` and report results
 
 ---
 
 ## MEMORY SYSTEM
-
-Your enhanced memory helps you work smarter:
 
 ### Working Memory (Current Context)
 - Files you've read this session
@@ -359,16 +344,8 @@ Your enhanced memory helps you work smarter:
 4. **Adapt when needed** - If something fails, update the plan
 5. **Learn continuously** - Record insights for future tasks
 
----
-
-**Remember:** Planning tools make you MORE effective, not slower. A good plan prevents wasted effort and builds user confidence.
+**Remember:** Planning tools make you MORE effective. A good plan prevents wasted effort.
 """
-        
-        # Append enhanced guidance to the base prompt
-        enhanced_prompt = base_prompt + enhanced_guidance
-        
-        # Update conversation manager's system prompt
-        self.conversation.history[0]["content"] = enhanced_prompt
     
     def _load_skill(self, skill_name: str) -> Dict[str, Any]:
         """Load a skill by name (for planning engine)."""
@@ -638,28 +615,43 @@ Your enhanced memory helps you work smarter:
             self._is_processing = False
     
     def _get_enhanced_context(self) -> str:
-        """Get enhanced context including state and memory."""
+        """Get enhanced context including state, memory, and model capabilities."""
         context_parts = []
-        
+
+        # Model capability awareness (brief, only for smaller models)
+        profile = get_model_profile(self.model)
+        if profile.prompt_style == PromptStyle.EXPLICIT:
+            context_parts.append("## YOUR CAPABILITIES")
+            context_parts.append(f"Model: {profile.name}")
+            context_parts.append(f"Strengths: {profile.notes}")
+
         # State manager context
         if self.enable_layered_memory:
             state_context = self.state_manager.get_llm_context()
             if state_context:
                 context_parts.append("## CURRENT STATE AND CONTEXT")
                 context_parts.append(state_context)
-        
+
+        # Active plan summary
+        if self.enable_planning and self.planning_engine and self.planning_engine.active_plan:
+            plan = self.planning_engine.active_plan
+            progress = plan.get_progress()
+            context_parts.append("## ACTIVE PLAN")
+            context_parts.append(f"Goal: {plan.goal}")
+            context_parts.append(f"Progress: {progress['completed']}/{progress['total']} steps ({progress['completion_percentage']:.0f}%)")
+
         # Memory bank summary
         if hasattr(self, 'memory_bank') and self.memory_bank:
             memory_summary = self.memory_bank.get_summary()
             if memory_summary:
                 context_parts.append("## SESSION MEMORY")
                 context_parts.append(memory_summary)
-        
+
         # Project context
         if self.project_context:
             context_parts.append("## PROJECT CONTEXT")
             context_parts.append(self.project_context[:1000])  # Limit length
-        
+
         return "\n\n".join(context_parts)
     
     def _extract_insights_from_response(self, response: str) -> None:
