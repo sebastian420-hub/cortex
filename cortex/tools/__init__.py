@@ -50,6 +50,21 @@ from .ask_user_tool import (
 )
 from .registry import ToolRegistry, get_registry, reset_registry
 from ..subagent import TaskTool, TASK_TOOL_SCHEMA
+# Planning tools
+from .planning_tools import (
+    CREATE_PLAN_SCHEMA,
+    EXECUTE_PLAN_SCHEMA,
+    MONITOR_PLAN_SCHEMA,
+    UPDATE_PLAN_SCHEMA,
+)
+# Delegation tools for model orchestration
+from .delegation_tools import (
+    DelegateToModelTool,
+    ReturnToCoordinatorTool,
+    DELEGATE_TO_MODEL_SCHEMA,
+    RETURN_TO_COORDINATOR_SCHEMA,
+    get_delegation_schemas,
+)
 
 if TYPE_CHECKING:
     from ..agent import Cortex
@@ -607,6 +622,14 @@ TOOLS: List[Dict[str, Any]] = [
     TODO_TOOL_SCHEMA,
     # Ask user questions tool
     ASK_USER_TOOL_SCHEMA,
+    # Planning tools for enhanced agent
+    CREATE_PLAN_SCHEMA,
+    EXECUTE_PLAN_SCHEMA,
+    MONITOR_PLAN_SCHEMA,
+    UPDATE_PLAN_SCHEMA,
+    # Delegation tools for model orchestration
+    DELEGATE_TO_MODEL_SCHEMA,
+    RETURN_TO_COORDINATOR_SCHEMA,
 ]
 
 
@@ -726,6 +749,12 @@ __all__ = [
     "TASK_TOOL_SCHEMA",
     "TODO_TOOL_SCHEMA",
     "ASK_USER_TOOL_SCHEMA",
+    "CREATE_PLAN_SCHEMA",
+    "EXECUTE_PLAN_SCHEMA",
+    "MONITOR_PLAN_SCHEMA",
+    "UPDATE_PLAN_SCHEMA",
+    "DELEGATE_TO_MODEL_SCHEMA",
+    "RETURN_TO_COORDINATOR_SCHEMA",
     # Base class
     "Tool",
     # Tool implementations
@@ -751,6 +780,10 @@ __all__ = [
     "TaskTool",
     "TodoWriteTool",
     "AskUserQuestionTool",
+    # Delegation tools for model orchestration
+    "DelegateToModelTool",
+    "ReturnToCoordinatorTool",
+    "get_delegation_schemas",
     # New Phase 1 tools
     "GrepTool",
     "GlobTool",
