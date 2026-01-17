@@ -206,7 +206,7 @@ class WebFetchTool(Tool):
                 try:
                     content = response.text
                     title = parsed.path.split("/")[-1] or "Content"
-                except:
+                except (UnicodeDecodeError, AttributeError):
                     return create_error_response(
                         f"Cannot process content type: {content_type}",
                         ErrorType.VALIDATION,

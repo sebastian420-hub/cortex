@@ -78,7 +78,7 @@ class SearchFilesTool(Tool):
                     cwd=self.project_dir,
                     timeout=10,
                 )
-            except:
+            except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
                 # Fallback to grep
                 result = subprocess.run(
                     f"grep -rn '{query}' .",

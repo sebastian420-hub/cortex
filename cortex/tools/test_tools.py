@@ -43,8 +43,8 @@ class RunTestsTool(Tool):
                                 return "pytest"
                     except ImportError:
                         pass
-            except:
-                pass
+            except (IOError, OSError, KeyError):
+                pass  # Unable to read/parse pyproject.toml
 
         # Check for unittest
         if (self.project_dir / "tests").exists() or (self.project_dir / "test").exists():
@@ -59,8 +59,8 @@ class RunTestsTool(Tool):
         try:
             subprocess.run(["pytest", "--version"], capture_output=True, timeout=2)
             return "pytest"
-        except:
-            pass
+        except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+            pass  # pytest not available
 
         return None
 

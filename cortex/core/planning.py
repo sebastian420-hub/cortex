@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional, Union, Callable
 from pathlib import Path
 
 from ..utils.errors import create_error_response, create_success_response, ErrorType
+from ..ui.console import console
 
 logger = logging.getLogger(__name__)
 
@@ -463,6 +464,11 @@ class PlanningEngine:
         steps_executed = 0
         step_results = [] # Initialize here
         
+        # Show plan overview
+        console.print(f"\n[bold cyan]📋 Executing Plan: {plan.id}[/bold cyan]")
+        console.print(f"[dim]Goal:[/dim] {plan.goal}")
+        console.print(f"[dim]Total Steps:[/dim] {len(plan.steps)}")
+        
         while True:
             # Check if we've reached max steps
             if max_steps is not None and steps_executed >= max_steps:
@@ -481,6 +487,13 @@ class PlanningEngine:
                 )
                 if all_completed:
                     plan.mark_completed()
+                    # Show plan completion summary
+                    progress = plan.get_progress()
+                    console.print(f"\n[bold green]✅ Plan Execution Complete[/bold green]")
+                    console.print(f"[dim]Goal:[/dim] {plan.goal}")
+                    console.print(f"[dim]Steps:[/dim] {progress['completed']}/{progress['total']} completed")
+                    console.print(f"[dim]Success Rate:[/dim] {(progress['completed']/progress['total']*100):.1f}%")
+                    
                     return create_success_response({
                         "message": "Plan execution completed",
                         "plan_id": plan.id,
@@ -504,15 +517,29 @@ class PlanningEngine:
             step = ready_steps[0]
             step.mark_started()
             
+            # Show step start
+            step_number = steps_executed + 1
+            console.print(f"\n[cyan]▶ Step {step_number}/{len(plan.steps)}:[/cyan] {step.description}")
+            if step.tool_name:
+                console.print(f"   [dim]Tool: {step.tool_name}[/dim]")
+            
             try:
                 result = self._execute_step(step, plan)
                 
                 if result["success"]:
                     step.mark_completed(result.get("content"))
                     logger.info(f"Step {step.id} completed: {step.description}")
+                    # Show step completion
+                    outcome = result.get("content") or result.get("outcome") or "Completed"
+                    if len(outcome) > 100:
+                        outcome = outcome[:97] + "..."
+                    console.print(f"   [green]✓ Success:[/green] {outcome}")
                 else:
                     step.mark_failed(result.get("error", "Unknown error"))
                     logger.error(f"Step {step.id} failed: {result.get('error')}")
+                    # Show step failure
+                    error_msg = result.get("error", "Unknown error")
+                    console.print(f"   [red]✗ Failed:[/red] {error_msg}")
                     
                     if stop_on_failure:
                         plan.mark_failed()
@@ -529,6 +556,8 @@ class PlanningEngine:
             except Exception as e:
                 step.mark_failed(str(e))
                 logger.exception(f"Exception executing step {step.id}")
+                # Show exception error
+                console.print(f"   [red]✗ Exception:[/red] {str(e)}")
                 
                 if stop_on_failure:
                     plan.mark_failed()

@@ -349,7 +349,7 @@ Summary:"""
                     if isinstance(result, dict):
                         success = result.get("success", True)
                         content = f"[Tool result: {'success' if success else 'error'}]"
-                except:
+                except (json.JSONDecodeError, TypeError, KeyError):
                     content = "[Tool result]"
 
             line = f"{role.upper()}: {content}"

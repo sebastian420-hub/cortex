@@ -419,7 +419,7 @@ class SessionHealthMonitor:
             if isinstance(content, str):
                 result = json.loads(content)
                 return result.get("success", False)
-        except:
+        except (json.JSONDecodeError, TypeError, KeyError):
             pass
         return False
 

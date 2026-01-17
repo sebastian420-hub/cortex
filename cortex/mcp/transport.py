@@ -63,15 +63,15 @@ class StdioTransport:
         try:
             self.writer.close()
             await self.writer.wait_closed()
-        except:
-            pass
+        except (OSError, ConnectionError, BrokenPipeError):
+            pass  # Connection already closed
 
         # Terminate process
         try:
             self.process.terminate()
             await self.process.wait()
-        except:
-            pass
+        except (ProcessLookupError, OSError):
+            pass  # Process already terminated
 
 
 class SimpleStdioTransport:
@@ -178,8 +178,8 @@ class SimpleStdioTransport:
                 if self.process and self.process.stderr:
                     try:
                         stderr = self.process.stderr.read().decode("utf-8")
-                    except:
-                        pass
+                    except (IOError, OSError, UnicodeDecodeError):
+                        pass  # Unable to read stderr
                 raise TimeoutError(
                     f"No response from MCP server within {timeout}s. stderr: {stderr}"
                 )
@@ -197,8 +197,8 @@ class SimpleStdioTransport:
             if self.process and self.process.stderr:
                 try:
                     stderr = self.process.stderr.read().decode("utf-8")
-                except:
-                    pass
+                except (IOError, OSError, UnicodeDecodeError):
+                    pass  # Unable to read stderr
             raise RuntimeError(f"MCP request failed: {e}. stderr: {stderr}")
 
     def stop(self) -> None:
@@ -207,10 +207,10 @@ class SimpleStdioTransport:
             try:
                 self.process.terminate()
                 self.process.wait(timeout=2)
-            except:
+            except (subprocess.TimeoutExpired, OSError, ProcessLookupError):
                 try:
                     self.process.kill()
-                except:
-                    pass
+                except (OSError, ProcessLookupError):
+                    pass  # Process already terminated
             finally:
                 self.process = None

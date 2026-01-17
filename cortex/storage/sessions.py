@@ -316,7 +316,8 @@ class SessionManager:
                             "project_dir": data.get("project_dir", "Unknown"),
                         }
                     )
-            except:
+            except (json.JSONDecodeError, KeyError, IOError, OSError) as e:
+                logger.debug(f"Failed to load session {session_file}: {e}")
                 continue
 
         # Sort by creation time (newest first)
