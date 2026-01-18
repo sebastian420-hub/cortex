@@ -388,7 +388,7 @@ CI/CD Pipeline Progress:
 ```
 Plugin System Progress:
 [x] PL1.1 - Plugin development guide
-[ ] PL1.2 - Registry API docs
+[x] PL1.2 - Registry API docs
 [x] PL1.3 - Best practices guide
 [x] PL2.1 - Simple plugin example
 [ ] PL2.2 - Complex plugin example
