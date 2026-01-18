@@ -84,14 +84,14 @@
 ### Checklist Summary
 ```
 Performance Optimization Progress:
-[x] P1.1 - Configurable workers (implemented: cortex/agent.py:196-207, cortex/config.py:60-64)
-[x] P1.2 - Batch size implementation (implemented: cortex/agent.py:206, cortex/config.py:63)
-[x] P1.3 - Rate limiting (implemented: cortex/core/rate_limiter.py, cortex/agent.py:209-221)
+[x] P1.1 - Configurable workers (implemented: cortex/agent.py:203, cortex/config.py:62)
+[x] P1.2 - Batch size implementation (implemented: cortex/agent.py:205, cortex/config.py:63)
+[x] P1.3 - Rate limiting (implemented: cortex/core/rate_limiter.py, cortex/agent.py:903-908)
 [ ] P1.4 - Async main loop (pending - synchronous main loop still in use)
 [x] P2.1 - Ripgrep caching (implemented: cortex/tools/grep_tool.py:36, 143-152)
-[ ] P2.2 - Cache warming (pending - feature request for pre-caching)
+[x] P2.2 - Cache warming (implemented: cortex/core/cache_warming.py, cortex/agent.py:235-250, cortex/cli.py)
 [x] P2.3 - Cache monitoring (implemented: cortex/cache/file_cache.py:205-221)
-[ ] P2.4 - Distributed cache (pending - Redis backend not implemented)
+[x] P2.4 - Distributed cache (implemented: cortex/cache/redis_backend.py, cortex/config.py:64-73)
 ```
 
 ---
@@ -506,7 +506,7 @@ Documentation Progress:
 [x] D2.1 - Developer guide
 [x] D2.2 - Integration guide
 [x] D2.3 - Troubleshooting guide
-[ ] D2.4 - Deployment guide
+[x] D2.4 - Deployment guide
 [ ] D3.1 - Missing docstrings
 [ ] D3.2 - Improved type hints
 [x] D3.3 - Type stubs
@@ -558,7 +558,7 @@ Documentation Progress:
 ```
 [x] P1.1 - Configurable workers (cortex/agent.py:203, config.py:62)
 [x] P1.2 - Batch size implementation (cortex/agent.py:205, config.py:63)
-[x] P1.3 - Rate limiting (cortex/core/rate_limiter.py, agent.py:862-867)
+[x] P1.3 - Rate limiting (cortex/core/rate_limiter.py, agent.py:903-908)
 [ ] P1.4 - Async main loop (agent.py needs async _process_message)
 [x] P2.1 - Ripgrep caching (cortex/tools/grep_tool.py:36, 143-152)
 [ ] P2.2 - Cache warming (cortex/cache/file_cache.py needs pre_cache method)
