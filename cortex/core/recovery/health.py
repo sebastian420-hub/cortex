@@ -1,5 +1,6 @@
 """Advanced session health monitoring for corruption detection."""
 
+import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass
