@@ -9,6 +9,8 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
+from .context import count_message_tokens, estimate_tokens
+
 if TYPE_CHECKING:
     from .providers import ModelProvider
 
@@ -140,8 +142,8 @@ class SimpleSummarizer(ConversationSummarizer):
         original_token_count = 0
 
         for msg in messages:
-            msg_content = json.dumps(msg, default=str)
-            original_token_count += estimate_tokens(msg_content)
+            # Use accurate message token counting
+            original_token_count += count_message_tokens(msg, model="gpt-4")
 
             role = msg.get("role", "")
             content = msg.get("content", "")
@@ -270,9 +272,9 @@ class LLMSummarizer(ConversationSummarizer):
         """Use LLM to summarize messages."""
         from .context import estimate_tokens
 
-        # Calculate original tokens
+        # Calculate original tokens using accurate message counting
         original_token_count = sum(
-            estimate_tokens(json.dumps(msg, default=str)) for msg in messages
+            count_message_tokens(msg, model="gpt-4") for msg in messages
         )
 
         # Prepare messages for summarization

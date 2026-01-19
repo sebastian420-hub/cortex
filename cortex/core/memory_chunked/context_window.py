@@ -8,7 +8,7 @@ import time
 
 from .chunk import EditChunk, ChunkType, ChunkCollection
 from .chunking import FileChunker, ChunkingStrategy
-from cortex.core.context import estimate_tokens
+from cortex.core.context import count_message_tokens, estimate_tokens
 
 logger = logging.getLogger(__name__)
 
@@ -519,9 +519,9 @@ class ContextWindowManager:
         """Estimate token count for messages."""
         total = 0
         for msg in messages:
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                total += estimate_tokens(content)
+            # Use accurate message token counting with default model
+            # TODO: Pass actual model name to ContextWindowManager
+            total += count_message_tokens(msg, model="gpt-4")
         return total
 
 
