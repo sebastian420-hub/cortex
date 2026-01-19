@@ -96,6 +96,83 @@ def display_thinking(
             console.print(f"[dim]💭 {preview}[/dim]")
 
 
+def display_reasoning_details(
+    reasoning_details: list, expanded: bool = False, max_preview_length: int = 80
+) -> None:
+    """
+    Display reasoning_details from OpenRouter reasoning models (MiMo, Claude, etc.).
+    
+    Args:
+        reasoning_details: List of reasoning detail objects from API response
+        expanded: If True, show full content. If False, show minimal preview.
+        max_preview_length: Maximum characters for the preview
+    """
+    if not reasoning_details or not isinstance(reasoning_details, list):
+        return
+    
+    if expanded:
+        # Full display with panel
+        for detail in reasoning_details:
+            detail_type = detail.get("type", "")
+            if detail_type == "reasoning.text":
+                content = detail.get("text", "")
+                if content:
+                    console.print(
+                        Panel(
+                            content,
+                            title=f"[bold yellow]💭 {detail_type}[/bold yellow]",
+                            border_style="yellow",
+                            padding=(0, 1),
+                        )
+                    )
+            elif detail_type == "reasoning.summary":
+                summary = detail.get("summary", "")
+                if summary:
+                    console.print(
+                        Panel(
+                            summary,
+                            title=f"[bold yellow]📋 Summary[/bold yellow]",
+                            border_style="yellow",
+                            padding=(0, 1),
+                        )
+                    )
+            elif detail_type == "reasoning.encrypted":
+                console.print(
+                    Panel(
+                        "[dim]Encrypted reasoning data[/dim]",
+                        title=f"[bold yellow]🔒 Encrypted[/bold yellow]",
+                        border_style="yellow",
+                        padding=(0, 1),
+                    )
+                )
+    else:
+        # Minimal preview - show first text or summary
+        for detail in reasoning_details:
+            detail_type = detail.get("type", "")
+            if detail_type == "reasoning.text":
+                content = detail.get("text", "")
+                if content:
+                    lines = content.split("\n")
+                    first_line = lines[0].strip() if lines else ""
+                    if len(first_line) > max_preview_length:
+                        preview = first_line[:max_preview_length] + "..."
+                    else:
+                        preview = first_line
+                    if preview:
+                        console.print(f"[dim]💭 {preview}[/dim]")
+                    break
+            elif detail_type == "reasoning.summary":
+                summary = detail.get("summary", "")
+                if summary:
+                    if len(summary) > max_preview_length:
+                        preview = summary[:max_preview_length] + "..."
+                    else:
+                        preview = summary
+                    if preview:
+                        console.print(f"[dim]📋 {preview}[/dim]")
+                    break
+
+
 def display_progress_summary(
     operation: str, completed: int, total: int = None, details: str = ""
 ) -> None:

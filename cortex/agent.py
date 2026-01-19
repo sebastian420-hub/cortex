@@ -1233,6 +1233,13 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
     
                         display_thinking(reasoning_content, expanded=self.show_thinking)
     
+                    # Display MiMo reasoning details (OpenRouter format)
+                    reasoning_details = response_message.get("reasoning_details")
+                    if reasoning_details and self._is_text_output():
+                        from .ui.display import display_reasoning_details
+
+                        display_reasoning_details(reasoning_details, expanded=self.show_thinking)
+
                     # Check if using tools
                     if response_message.get("tool_calls"):
                         # Don't display content here if tools are present - wait for final response
@@ -1580,6 +1587,15 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
 
                         await asyncio.to_thread(
                             display_thinking, reasoning_content, expanded=self.show_thinking
+                        )
+
+                    # Display MiMo reasoning details (OpenRouter format)
+                    reasoning_details = response_message.get("reasoning_details")
+                    if reasoning_details and self._is_text_output():
+                        from .ui.display import display_reasoning_details
+
+                        await asyncio.to_thread(
+                            display_reasoning_details, reasoning_details, expanded=self.show_thinking
                         )
 
                     # Check if using tools

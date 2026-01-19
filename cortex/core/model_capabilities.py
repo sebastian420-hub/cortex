@@ -59,6 +59,7 @@ class ModelProfile:
     exposes_thinking: bool = False  # Whether model exposes thinking process
     thinking_field: Optional[str] = None  # API field name for thinking content (e.g., "reasoning_content", "reasoning")
     recommended_temperatures: Optional[Dict[str, float]] = None  # Temperature for different tasks
+    reasoning_budget: Optional[Dict[str, int]] = None  # Thinking token budget for different complexity levels
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -435,6 +436,11 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
             "debugging": 0.5,
             "reasoning": 0.7,
             "creative": 0.9,
+        },
+        reasoning_budget={
+            "simple": 2000,
+            "moderate": 4000,
+            "complex": 8000,
         },
     ),
 }

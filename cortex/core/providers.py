@@ -697,6 +697,10 @@ class OpenRouterProvider(ModelProvider):
             if sanitized_tools:
                 kwargs["tools"] = sanitized_tools
 
+            # Add reasoning support for MiMo and other reasoning models
+            if self._should_enable_reasoning(model):
+                kwargs["extra_body"] = self._get_reasoning_config(model, tools)
+            
             response = self.client.chat.completions.create(**kwargs)
 
             # Convert OpenAI format to Cortex internal format
@@ -712,6 +716,11 @@ class OpenRouterProvider(ModelProvider):
                     }
                     for tc in message.tool_calls
                 ]
+            
+            # Extract reasoning_details if available
+            if hasattr(message, "reasoning_details") and message.reasoning_details:
+                result["message"]["reasoning_details"] = message.reasoning_details
+            
             return result
         except Exception as e:
             raise ProviderError(f"OpenRouter API error: {e}") from e
@@ -729,6 +738,10 @@ class OpenRouterProvider(ModelProvider):
             kwargs = {"model": model, "messages": sanitized_messages, "stream": True}
             if sanitized_tools:
                 kwargs["tools"] = sanitized_tools
+
+            # Add reasoning support for MiMo and other reasoning models
+            if self._should_enable_reasoning(model):
+                kwargs["extra_body"] = self._get_reasoning_config(model, tools)
 
             stream = self.client.chat.completions.create(**kwargs)
 
@@ -756,6 +769,9 @@ class OpenRouterProvider(ModelProvider):
                                 }
                                 for tc in delta.tool_calls
                             ]
+                        # Extract reasoning_details if available
+                        if hasattr(delta, "reasoning_details") and delta.reasoning_details:
+                            result["message"]["reasoning_details"] = delta.reasoning_details
                         yield result
         except Exception as e:
             raise ProviderError(f"OpenRouter streaming error: {e}") from e
@@ -804,13 +820,59 @@ class OpenRouterProvider(ModelProvider):
         - OpenAI o1, o3, o1-mini (reasoning field)
         - DeepSeek reasoning models (reasoning_content field)
         - Anthropic Claude with thinking (content blocks)
+        - MiMo-V2-Flash (reasoning_details field)
         """
         model_lower = model.lower()
         thinking_indicators = [
             "o1", "o3", "o1-mini", "reasoner", "thinking",
-            "deepseek", "claude-3.5", "claude-3.7"
+            "deepseek", "claude-3.5", "claude-3.7", "mimo"
         ]
         return any(indicator in model_lower for indicator in thinking_indicators)
+    
+    def _should_enable_reasoning(self, model: str) -> bool:
+        """
+        Determine if reasoning should be enabled for this model.
+        
+        MiMo and other reasoning models benefit from thinking tokens for complex tasks.
+        """
+        # Enable for MiMo models
+        if "mimo" in model.lower():
+            return True
+        
+        # Enable for other reasoning models
+        return self.supports_thinking(model)
+    
+    def _get_reasoning_config(self, model: str, tools: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+        """
+        Get reasoning configuration based on task complexity.
+        
+        Args:
+            model: Model name
+            tools: List of tools being used (indicates task complexity)
+        
+        Returns:
+            Reasoning configuration dict for extra_body
+        """
+        from .model_capabilities import get_model_profile
+        
+        config = {}
+        
+        # Get model profile to access reasoning budget
+        profile = get_model_profile(model)
+        
+        # Determine thinking budget based on task complexity
+        if tools and len(tools) > 0:
+            # Complex tasks with tools (coding, editing, etc.)
+            # Use complex budget from profile or default 8000
+            budget = profile.reasoning_budget.get("complex", 8000) if profile.reasoning_budget else 8000
+        else:
+            # Simple tasks without tools
+            # Use simple budget from profile or default 2000
+            budget = profile.reasoning_budget.get("simple", 2000) if profile.reasoning_budget else 2000
+        
+        config["reasoning"] = {"max_tokens": budget}
+        
+        return config
 
 
 class ProviderFactory:
