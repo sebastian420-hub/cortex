@@ -159,7 +159,7 @@ class TestTaskToolExecution:
             result = tool.execute(description="Find all Python files")
 
             assert result["success"] is True
-            assert "task_id" in result  # Result fields are at top level
+            assert "task_id" in result["data"]  # Result fields are now under "data"
 
             # Check context was created with default tools (now includes grep/glob)
             context = mock_run.call_args[0][0]
@@ -374,14 +374,14 @@ class TestTaskToolIntegration:
 
             result = tool.execute(description="Count Python files")
 
-            # Result fields are at top level (not nested under "data")
+            # Result fields are now under "data"
             assert result["success"] is True
-            assert "task_id" in result
-            assert "result" in result
-            assert result["result"] == "Found 5 Python files"
-            assert "iterations_used" in result
-            assert "tools_called" in result
-            assert "duration_seconds" in result
+            assert "task_id" in result["data"]
+            assert "result" in result["data"]
+            assert result["data"]["result"] == "Found 5 Python files"
+            assert "iterations_used" in result["data"]
+            assert "tools_called" in result["data"]
+            assert "duration_seconds" in result["data"]
 
     def test_cleanup_after_task(self, tmp_path):
         """Test that tasks are cleaned up after completion"""
@@ -396,7 +396,7 @@ class TestTaskToolIntegration:
             mock_run.return_value = {"final_response": "Done"}
 
             result = tool.execute(description="Quick task")
-            task_id = result["task_id"]  # task_id at top level
+            task_id = result["data"]["task_id"]  # task_id at top level
 
             # Task should be cleaned up
             assert task_id not in tool.active_tasks

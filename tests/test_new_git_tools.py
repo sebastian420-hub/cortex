@@ -23,7 +23,7 @@ def test_git_show_tool(git_repo):
     tool = create_tool_instance("git_show", git_repo, PermissionMode.NORMAL, console)
     result = tool.execute(ref="HEAD")
     assert result["success"]
-    assert "Initial commit" in result["output"]
+    assert "Initial commit" in result["data"]["output"]
 
 
 def test_git_checkout_tool(git_repo):

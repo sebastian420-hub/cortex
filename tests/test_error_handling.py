@@ -73,12 +73,13 @@ def test_success_response_format():
     # Check required fields
     assert "success" in success
     assert success["success"] is True
-    assert "content" in success
-    assert "lines" in success
+    assert "data" in success
+    assert "content" in success["data"]
+    assert "lines" in success["data"]
 
     # Check values
-    assert success["content"] == "test"
-    assert success["lines"] == 10
+    assert success["data"]["content"] == "test"
+    assert success["data"]["lines"] == 10
 
 def test_error_recovery_flows(tmp_path):
     """Test loop guard intervention on errors"""
@@ -232,7 +233,7 @@ def test_error_handling_in_search_operations(tmp_path):
 
     # Should return success with empty results, not an error
     assert result["success"] is True
-    assert result["match_count"] == 0
+    assert result["data"]["match_count"] == 0
 
 def test_error_recovery_suggestions():
     """Test that error responses include recovery suggestions where applicable"""
@@ -371,7 +372,7 @@ def test_error_handling_integration(tmp_path):
     success_result = read_tool.execute(path="test.txt")
 
     assert success_result["success"] is True
-    assert "content" in success_result
+    assert "content" in success_result["data"]
 
 def test_error_metrics_and_monitoring():
     """Test that error metrics can be extracted for monitoring"""

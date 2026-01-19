@@ -135,8 +135,8 @@ class TestWebFetchMocked:
         result = tool.execute(url="https://example.com", use_cache=False)
 
         assert result["success"] is True
-        assert "content" in result
-        assert result["url"] == "https://example.com"
+        assert "content" in result["data"]
+        assert result["data"]["url"] == "https://example.com"
 
     @patch("cortex.tools.web_tools.requests")
     def test_web_fetch_json_content(self, mock_requests, temp_project):
@@ -164,7 +164,7 @@ class TestWebFetchMocked:
         result = tool.execute(url="https://api.example.com/data", use_cache=False)
 
         assert result["success"] is True
-        assert "key" in result["content"]
+        assert "key" in result["data"]["content"]
 
     @patch("cortex.tools.web_tools.requests")
     def test_web_fetch_timeout(self, mock_requests, temp_project):
@@ -216,7 +216,7 @@ class TestWebFetchMocked:
         result = tool.execute(url="https://example.com", use_cache=False)
 
         assert result["success"] is True
-        assert result.get("redirected") is True or "different-host.com" in result.get("url", "")
+        assert result["data"].get("redirected") is True or "different-host.com" in result["data"].get("url", "")
 
 
 class TestWebSearchToolBasics:
@@ -305,7 +305,7 @@ class TestWebSearchMocked:
         result = tool.execute(query="test search")
 
         assert result["success"] is True
-        assert "results" in result
+        assert "results" in result["data"]
 
     @patch("cortex.tools.web_tools.DDGS")
     def test_web_search_no_results(self, mock_ddgs, temp_project):
@@ -330,7 +330,7 @@ class TestWebSearchMocked:
         result = tool.execute(query="xyznonexistentquery123")
 
         assert result["success"] is True
-        assert result["result_count"] == 0
+        assert result["data"]["result_count"] == 0
 
     @patch("cortex.tools.web_tools.requests")
     def test_web_search_domain_filter(self, mock_requests, temp_project):

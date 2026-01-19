@@ -92,7 +92,7 @@ class TestEditToolMultiLine:
         )
 
         assert result["success"] is True
-        assert result["replacements"] == 1
+        assert result["data"]["replacements"] == 1
         
         # Verify content
         content = (temp_edit_project / "multiline.py").read_text()
@@ -138,7 +138,7 @@ class TestEditToolMultiLine:
         )
 
         assert result["success"] is True
-        assert result["replacements"] == 3
+        assert result["data"]["replacements"] == 3
 
 
 # ============================================================================
@@ -310,7 +310,7 @@ class TestEditToolPermissions:
             )
 
         assert result["success"] is True
-        assert result["replacements"] == 1
+        assert result["data"]["replacements"] == 1
 
     def test_normal_mode_user_rejection(self, temp_edit_project, mock_console):
         """Test NORMAL mode when user rejects the change."""
@@ -347,7 +347,7 @@ class TestEditToolPermissions:
         )
 
         assert result["success"] is True
-        assert result["replacements"] == 1
+        assert result["data"]["replacements"] == 1
         # Verify file was actually modified
         content = (temp_edit_project / "unix_endings.txt").read_text()
         assert "Modified Line 1" in content
@@ -682,10 +682,10 @@ class TestEditToolIntegration:
 
         # Check success response structure
         assert result["success"] is True
-        assert "file" in result
-        assert "replacements" in result
-        assert "old_string_length" in result
-        assert "new_string_length" in result
+        assert "file" in result["data"]
+        assert "replacements" in result["data"]
+        assert "old_string_length" in result["data"]
+        assert "new_string_length" in result["data"]
 
 
 # ============================================================================
@@ -856,7 +856,7 @@ class TestEditToolPerformance:
         )
 
         assert result["success"] is True
-        assert result["replacements"] == 100
+        assert result["data"]["replacements"] == 100
 
     def test_diff_truncation(self, temp_edit_project, mock_console):
         """Test that diff output is truncated for large changes."""

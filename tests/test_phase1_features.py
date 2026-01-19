@@ -172,8 +172,8 @@ class TestTodoWriteTool:
         )
 
         assert result["success"] is True
-        assert "progress" in result
-        assert result["progress"]["total"] == 1
+        assert "progress" in result["data"]
+        assert result["data"]["progress"]["total"] == 1
 
 
 # ============ Ask User Tool Tests ============

@@ -448,8 +448,8 @@ class TestPlanningEngine:
         assert step1.status == PlanStepStatus.COMPLETED
         assert step2.status == PlanStepStatus.COMPLETED
         assert plan.status == "completed"
-        assert len(results["step_results"]) == 3  # Analysis step + 2 tool steps
-        assert all(r["success"] for r in results["step_results"])
+        assert len(results["data"]["step_results"]) == 3  # Analysis step + 2 tool steps
+        assert all(r["success"] for r in results["data"]["step_results"])
     
     def test_save_and_load_plan(self, tmp_path):
         """Test saving and loading a plan to/from file."""

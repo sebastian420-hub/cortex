@@ -49,7 +49,7 @@ def test_agent_execute_tool_string_args(tmp_path):
 
     assert result["success"] is True
     # Content now includes line numbers (cat -n style)
-    assert "Hello" in result["content"]
+    assert "Hello" in result["data"]["content"]
 
 
 def test_agent_clear_conversation(tmp_path):

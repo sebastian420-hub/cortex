@@ -106,8 +106,8 @@ class TestGrepTool:
 
         result = tool.execute(pattern="def hello")
         assert result["success"] is True
-        assert result["match_count"] > 0
-        assert any("main.py" in r for r in result["results"])
+        assert result["data"]["match_count"] > 0
+        assert any("main.py" in r for r in result["data"]["results"])
 
     def test_search_files_with_matches_mode(self, temp_project):
         """Test files_with_matches output mode."""
@@ -118,7 +118,7 @@ class TestGrepTool:
         result = tool.execute(pattern="def", output_mode="files_with_matches")
         assert result["success"] is True
         # Should find matches in multiple files
-        files = result["results"]
+        files = result["data"]["results"]
         assert len(files) >= 2
 
     def test_search_content_mode(self, temp_project):
@@ -129,7 +129,7 @@ class TestGrepTool:
 
         result = tool.execute(pattern="Calculator", output_mode="content")
         assert result["success"] is True
-        assert any("class Calculator" in r for r in result["results"])
+        assert any("class Calculator" in r for r in result["data"]["results"])
 
     def test_search_count_mode(self, temp_project):
         """Test count output mode."""
@@ -150,7 +150,7 @@ class TestGrepTool:
         result = tool.execute(pattern="def", glob="*.py", output_mode="files_with_matches")
         assert result["success"] is True
         # All results should be .py files
-        for file in result["results"]:
+        for file in result["data"]["results"]:
             assert file.endswith(".py")
 
     def test_search_case_insensitive(self, temp_project):
@@ -170,7 +170,7 @@ class TestGrepTool:
 
         result = tool.execute(pattern="nonexistent_string_xyz123")
         assert result["success"] is True
-        assert result["match_count"] == 0
+        assert result["data"]["match_count"] == 0
 
     def test_search_invalid_path(self, temp_project):
         """Test search with invalid path."""
@@ -203,8 +203,8 @@ class TestGlobTool:
 
         result = tool.execute(pattern="*.py")
         assert result["success"] is True
-        assert result["count"] >= 2
-        for f in result["files"]:
+        assert result["data"]["count"] >= 2
+        for f in result["data"]["files"]:
             assert f.endswith(".py")
 
     def test_recursive_glob(self, temp_project):
@@ -217,7 +217,7 @@ class TestGlobTool:
         assert result["success"] is True
         # Should find files in subdirectories too
         assert (
-            result["count"] >= 4
+            result["data"]["count"] >= 4
         )  # main.py, utils.py, src/app.py, src/config.py, tests/test_main.py
 
     def test_glob_specific_directory(self, temp_project):
@@ -228,7 +228,7 @@ class TestGlobTool:
 
         result = tool.execute(pattern="*.py", path="src")
         assert result["success"] is True
-        assert result["count"] == 2  # app.py and config.py
+        assert result["data"]["count"] == 2  # app.py and config.py
 
     def test_glob_no_matches(self, temp_project):
         """Test glob with no matches."""
@@ -238,7 +238,7 @@ class TestGlobTool:
 
         result = tool.execute(pattern="*.nonexistent")
         assert result["success"] is True
-        assert result["count"] == 0
+        assert result["data"]["count"] == 0
 
     def test_glob_invalid_path(self, temp_project):
         """Test glob with invalid path."""
@@ -268,9 +268,9 @@ class TestGlobTool:
         # utils.py should be first (most recently modified)
         # Note: On some systems, file times may not update fast enough
         # so we just verify that sorting works (files are returned)
-        assert len(result["files"]) >= 2
+        assert len(result["data"]["files"]) >= 2
         # The most recently modified file should be in the results
-        assert "utils.py" in result["files"]
+        assert "utils.py" in result["data"]["files"]
 
 
 class TestEditTool:
@@ -286,7 +286,7 @@ class TestEditTool:
             file_path="main.py", old_string="Hello, World!", new_string="Hello, Universe!"
         )
         assert result["success"] is True
-        assert result["replacements"] == 1
+        assert result["data"]["replacements"] == 1
 
         # Verify the change
         content = (temp_project / "main.py").read_text()
@@ -306,7 +306,7 @@ class TestEditTool:
             file_path="repeated.py", old_string="foo", new_string="qux", replace_all=True
         )
         assert result["success"] is True
-        assert result["replacements"] == 3
+        assert result["data"]["replacements"] == 3
 
         content = (temp_project / "repeated.py").read_text()
         assert "foo" not in content
@@ -378,8 +378,8 @@ class TestReadFileTool:
 
         result = tool.execute(path="main.py")
         assert result["success"] is True
-        assert "content" in result
-        assert result["total_lines"] > 0
+        assert "content" in result["data"]
+        assert result["data"]["total_lines"] > 0
 
     def test_read_with_offset(self, temp_project):
         """Test reading with offset."""
@@ -389,7 +389,7 @@ class TestReadFileTool:
 
         result = tool.execute(path="main.py", offset=5)
         assert result["success"] is True
-        assert result["offset"] == 5
+        assert result["data"]["offset"] == 5
 
     def test_read_with_limit(self, temp_project):
         """Test reading with limit."""
@@ -399,7 +399,7 @@ class TestReadFileTool:
 
         result = tool.execute(path="main.py", limit=3)
         assert result["success"] is True
-        assert result["lines_returned"] == 3
+        assert result["data"]["lines_returned"] == 3
 
     def test_read_with_offset_and_limit(self, temp_project):
         """Test reading with both offset and limit."""
@@ -409,8 +409,8 @@ class TestReadFileTool:
 
         result = tool.execute(path="main.py", offset=2, limit=5)
         assert result["success"] is True
-        assert result["offset"] == 2
-        assert result["lines_returned"] <= 5
+        assert result["data"]["offset"] == 2
+        assert result["data"]["lines_returned"] <= 5
 
     def test_read_file_not_found(self, temp_project):
         """Test reading non-existent file."""
@@ -431,7 +431,7 @@ class TestReadFileTool:
         result = tool.execute(path="main.py")
         assert result["success"] is True
         # Content should have line number format
-        content = result["content"]
+        content = result["data"]["content"]
         assert "\t" in content  # Tab separator between line number and content
 
 

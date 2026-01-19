@@ -18,8 +18,8 @@ def test_read_file_tool(tmp_path, monkeypatch):
 
     assert result["success"] is True
     # Content now includes line numbers (cat -n style)
-    assert "Hello, World!" in result["content"]
-    assert result["total_lines"] == 1
+    assert "Hello, World!" in result["data"]["content"]
+    assert result["data"]["total_lines"] == 1
 
 
 def test_write_file_tool(tmp_path, monkeypatch):
@@ -90,7 +90,7 @@ def test_tool_result_validation(tmp_path):
 
     # Success response should have success=True
     assert result["success"] is True
-    assert "content" in result
+    assert "content" in result["data"]
 
     # Test error response structure
     result = tool.execute(path="nonexistent.txt")
@@ -127,9 +127,9 @@ def test_list_files_tool(tmp_path):
     result = tool.execute(path=".")
 
     assert result["success"] is True
-    assert result["count"] == 2  # .hidden should be excluded
-    assert "file1.txt" in result["files"]
-    assert "file2.py" in result["files"]
+    assert result["data"]["count"] == 2  # .hidden should be excluded
+    assert "file1.txt" in result["data"]["files"]
+    assert "file2.py" in result["data"]["files"]
 
 
 def test_git_status_tool(tmp_path, monkeypatch):
@@ -147,7 +147,7 @@ def test_git_status_tool(tmp_path, monkeypatch):
     result = tool.execute()
 
     assert result["success"] is True
-    assert "test.txt" in result["output"]
+    assert "test.txt" in result["data"]["output"]
 
 
 # ============================================================================

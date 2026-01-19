@@ -57,8 +57,8 @@ def test_success_response_format():
     success = create_success_response({"content": "test", "lines": 10})
 
     assert success["success"] is True
-    assert success["content"] == "test"
-    assert success["lines"] == 10
+    assert success["data"]["content"] == "test"
+    assert success["data"]["lines"] == 10
 
 
 def test_error_type_constants():

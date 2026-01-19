@@ -14,12 +14,14 @@ from cortex.core.providers import ProviderError
 def mock_deepseek_provider():
     """Mock DeepSeek provider"""
     provider = Mock()
+    # DeepSeek provider returns {"message": {...}} format
     provider.chat.return_value = {
         "message": {"role": "assistant", "content": "Test response from DeepSeek"}
     }
-    provider.stream_chat.return_value = iter(
-        [{"message": {"content": "Test"}}, {"message": {"content": " response"}}]
-    )
+    provider.stream_chat.return_value = iter([
+        {"message": {"content": "Test"}},
+        {"message": {"content": " response"}}
+    ])
     provider.supports_streaming.return_value = True
     provider.normalize_model_name.return_value = "deepseek-chat"
     provider.validate_api_key.return_value = True
@@ -30,12 +32,14 @@ def mock_deepseek_provider():
 def mock_anthropic_provider():
     """Mock Anthropic provider"""
     provider = Mock()
+    # Anthropic provider returns {"message": {...}} format
     provider.chat.return_value = {
         "message": {"role": "assistant", "content": "Test response from Claude"}
     }
-    provider.stream_chat.return_value = iter(
-        [{"message": {"content": "Test"}}, {"message": {"content": " response"}}]
-    )
+    provider.stream_chat.return_value = iter([
+        {"message": {"content": "Test"}},
+        {"message": {"content": " response"}}
+    ])
     provider.supports_streaming.return_value = True
     provider.normalize_model_name.return_value = "claude-3-haiku-20240307"
     provider.validate_api_key.return_value = True
@@ -119,6 +123,7 @@ def test_agent_tool_calling_with_cloud_provider(tmp_path, mock_deepseek_provider
     config = AgentConfig(model="deepseek-chat")
 
     # Mock provider to return tool call
+    # Match actual DeepSeek provider format: {"message": {...}}
     mock_deepseek_provider.chat.return_value = {
         "message": {
             "role": "assistant",
