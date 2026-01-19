@@ -157,4 +157,4 @@ def create_success_response(data: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Standardized success response dictionary with success=True
     """
-    return {"success": True, **data}
+    return {"success": True, "data": data}

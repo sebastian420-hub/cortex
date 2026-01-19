@@ -1,10 +1,11 @@
 ﻿"""Main Cortex class"""
 
+import asyncio
 import json
 import logging
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List, Callable, Union
 from datetime import datetime
 
 from rich.console import Console
@@ -19,6 +20,8 @@ from .core.conversation import ConversationManager
 from .core.parallel import ParallelToolExecutor, ToolCall
 from .core.streaming import stream_model_response, display_streaming_response
 from .core.providers import ProviderFactory, ProviderError
+from .core.rate_limiter import get_rate_limiter, RateLimitConfig
+from .cache.file_cache import get_file_cache
 
 # Import routing system (optional, gracefully handle if not available)
 try:
@@ -193,14 +196,65 @@ class Cortex:
 
         # Initialize parallel tool executor
         parallel_config = self.config.get_parallel_execution_config()
+        max_workers = parallel_config.get("max_workers", 0)
+        # Auto-detect if set to 0 or "auto"
+        if max_workers == 0 or max_workers == "auto":
+            import os
+            max_workers = min(4, os.cpu_count() or 2)
         self.parallel_executor = ParallelToolExecutor(
             execute_fn=self.execute_tool,
-            max_workers=parallel_config.get("max_workers", 4),
+            max_workers=max_workers,
             enabled=parallel_config.get("enabled", True),
+            batch_size=parallel_config.get("batch_size", 10),
         )
+
+        # Initialize rate limiter (if enabled)
+        rate_limit_config = self.config.rate_limit
+        self.rate_limiter_enabled = rate_limit_config.get("enabled", False)
+        if self.rate_limiter_enabled:
+            rate_limit_cfg = RateLimitConfig(
+                requests_per_minute=rate_limit_config.get("requests_per_minute", 60),
+                tokens_per_minute=rate_limit_config.get("tokens_per_minute", 100000),
+                burst_multiplier=rate_limit_config.get("burst_multiplier", 1.5),
+            )
+            self.rate_limiter = get_rate_limiter(rate_limit_cfg)
+            logger.info(f"Rate limiting enabled: {rate_limit_config.get('requests_per_minute')} RPM, {rate_limit_config.get('tokens_per_minute')} TPM")
+        else:
+            self.rate_limiter = None
 
         # Initialize timeout configuration
         self._timeout_config = self.config.get_timeout_config()
+
+        # Initialize file cache and cache warming (if enabled)
+        cache_warming_config = self.config.cache_warming
+        
+        # Prepare cache configuration (support Redis)
+        cache_config = {**self.config.file_cache}
+        
+        # Add Redis settings if Redis cache is enabled
+        if self.config.redis_cache.get("enabled", False):
+            cache_config["use_redis"] = True
+            cache_config["redis_host"] = self.config.redis_cache.get("host", "localhost")
+            cache_config["redis_port"] = self.config.redis_cache.get("port", 6379)
+            cache_config["redis_db"] = self.config.redis_cache.get("db", 0)
+            cache_config["redis_password"] = self.config.redis_cache.get("password")
+            cache_config["redis_ttl"] = self.config.redis_cache.get("ttl", 3600)
+            cache_config["redis_fallback"] = self.config.redis_cache.get("fallback_to_local", True)
+        
+        self.file_cache = get_file_cache(cache_config)
+        
+        if cache_warming_config.get("enabled", False):
+            try:
+                cache_stats = self.file_cache.pre_cache(
+                    patterns=cache_warming_config.get("patterns"),
+                    source=cache_warming_config.get("source", "git_history"),
+                    max_files=cache_warming_config.get("max_files", 50),
+                    directory=Path(cache_warming_config.get("directory")) if cache_warming_config.get("directory") else None,
+                )
+                if cache_stats["cached"] > 0:
+                    logger.info(f"Cache warming complete: {cache_stats['cached']} files cached")
+            except Exception as e:
+                logger.warning(f"Cache warming failed: {e}")
 
         # Initialize model provider
         provider_override = getattr(self.config, "provider", None)
@@ -823,6 +877,47 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             formatted = self.formatter.format_error(message, "warning")
             self.formatter.write(formatted)
 
+    def _estimate_api_call_tokens(
+        self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
+    ) -> int:
+        """
+        Estimate token count for API call for rate limiting.
+        
+        Uses simple approximation: ~4 characters per token for English text.
+        For code, this may underestimate, but it's conservative for rate limiting.
+        
+        Args:
+            messages: List of message dictionaries
+            tools: List of tool definitions
+            
+        Returns:
+            Estimated token count
+        """
+        # Count characters in messages
+        char_count = 0
+        for msg in messages:
+            if isinstance(msg, dict):
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    char_count += len(content)
+                # Also count in tool calls/results
+                if "tool_calls" in msg:
+                    for call in msg.get("tool_calls", []):
+                        if isinstance(call, dict):
+                            char_count += len(str(call))
+                if "tool_result" in msg:
+                    char_count += len(str(msg.get("tool_result", "")))
+        
+        # Count characters in tool definitions
+        for tool in tools or []:
+            char_count += len(str(tool))
+        
+        # Approximate: 4 characters per token (conservative for rate limiting)
+        tokens = max(1, int(char_count / 4))
+        
+        logger.debug(f"Estimated {tokens} tokens for API call ({char_count} chars)")
+        return tokens
+
     @retry_with_backoff(max_retries=3, exceptions=(Exception,))
     def _call_model(
         self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
@@ -837,6 +932,13 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     # Try to repair critical issues automatically
                     messages = self._repair_messages_for_api(messages, critical_issues)
                     logger.warning(f"Repaired {len(critical_issues)} critical message validation issues before API call")
+
+            # Apply rate limiting if enabled
+            if self.rate_limiter:
+                # Estimate tokens for rate limiting
+                token_count = self._estimate_api_call_tokens(messages, tools)
+                if not self.rate_limiter.acquire(token_count=token_count, blocking=True):
+                    logger.warning("Rate limiter blocked API call (should not happen with blocking=True)")
 
             # Normalize model name for provider
             normalized_model = self.provider.normalize_model_name(self.model)
@@ -1294,6 +1396,411 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             self._is_processing = False
             # Reset agent focus to EXPLORING when done
             self.state_manager.set_focus(AgentFocus.EXPLORING)
+
+    async def _process_message_async(
+        self, user_message: str, use_streaming: bool = False
+    ) -> None:
+        """Process a user message asynchronously through the agent loop with hook support.
+        
+        This is the async version of _process_message. It provides non-blocking execution
+        while maintaining all the same functionality including:
+        - Hook support
+        - Routing integration
+        - Tool execution (parallel and async-compatible)
+        - Loop guards
+        - Error handling
+        - Rate limiting
+        
+        Args:
+            user_message: The user's message to process
+            use_streaming: Whether to use streaming responses
+        """
+        # Check for shutdown request
+        if self._shutdown_requested:
+            return
+
+        # Dispatch UserPromptSubmit hook
+        prompt_event = UserPromptSubmitEvent(
+            prompt=user_message, conversation_length=len(self.conversation.get_history())
+        )
+        prompt_result = self.hook_manager.dispatch(prompt_event)
+
+        # Handle hook actions
+        if prompt_result.action == HookAction.ABORT:
+            self._output_error(prompt_result.message or "Blocked by hook", "prompt_blocked")
+            return
+        elif prompt_result.action == HookAction.MODIFY and prompt_result.modified_data:
+            # Use modified prompt from hook
+            user_message = prompt_result.modified_data.get("prompt", user_message)
+
+        # Add user message
+        self.conversation.add_user_message(user_message)
+        self._session_dirty = True
+
+        # ========== ROUTING INTEGRATION ==========
+        # Route request to optimal model if routing is enabled
+        if self._routing_enabled and self.router:
+            try:
+                routing_decision = self.route_request(user_message)
+
+                if routing_decision and routing_decision.model_name != self.model:
+                    # Display routing decision
+                    console.print(f"\n[cyan]🔀 Routing Decision[/cyan]")
+                    console.print(f"   Model: [bold]{routing_decision.model_name}[/bold]")
+                    console.print(f"   Reason: {routing_decision.reasoning.primary_reason}")
+                    if routing_decision.task_analysis:
+                        task_type = routing_decision.task_analysis.task_type.value
+                        complexity = routing_decision.task_analysis.complexity.score
+                        console.print(f"   Task: {task_type} (complexity: {complexity}/10)")
+                    if routing_decision.estimated_cost_usd is not None:
+                        console.print(f"   Est. Cost: ${routing_decision.estimated_cost_usd:.4f}")
+                    console.print()
+
+                    # Switch to routed model
+                    self.switch_model(
+                        routing_decision.model_name,
+                        reason=f"Routed: {routing_decision.reasoning.primary_reason}"
+                    )
+            except Exception as e:
+                logger.warning(f"Routing failed, continuing with current model: {e}")
+        # ========== END ROUTING ==========
+
+        # Initialize delegation tracker for this request (model orchestration)
+        if self._orchestration_enabled and self._orchestration:
+            self._delegation_tracker = self._orchestration.start_request(self.model)
+
+        # Set processing flag
+        self._is_processing = True
+        # Set agent focus to EXECUTING mode
+        self.state_manager.set_focus(AgentFocus.EXECUTING)
+        
+        # Agent loop - use while True with explicit break for dynamic iteration extension
+        max_iterations = self.config.max_iterations
+        iteration = 0
+
+        try:
+            while True:
+                iteration += 1
+                # Track iteration in state manager
+                self.state_manager.increment_iteration()
+
+                # Check for shutdown request
+                if self._shutdown_requested:
+                    self._output_warning("Shutdown requested. Cleaning up...")
+                    await asyncio.to_thread(self._cleanup)
+                    self._is_processing = False
+                    return
+
+                # Check if we've exceeded max iterations (before processing)
+                if iteration > max_iterations:
+                    # Check if callback is set
+                    if self._on_max_iterations_reached:
+                        additional = await asyncio.to_thread(
+                            self._on_max_iterations_reached, iteration, max_iterations
+                        )
+                        if additional is not None and additional > 0:
+                            # Extend max_iterations and continue
+                            max_iterations += additional
+                            console.print(
+                                f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})"
+                            )
+                            continue  # Continue the loop with extended limit
+                        else:
+                            # Callback returned 0 or None - stop
+                            self._output_warning("Reached maximum iterations")
+                            self._is_processing = False
+                            return
+                    else:
+                        # No callback - default behavior (stop)
+                        self._output_warning("Reached maximum iterations")
+                        self._is_processing = False
+                        return
+
+                self.loop_guard.increment_iteration()
+                console.print(f"[dim]{'-' * 60}[/dim]")
+
+                try:
+                    # Get conversation history
+                    messages = self.conversation.get_history()
+
+                    # Get tools from registry (includes delegation tools)
+                    tools = await asyncio.to_thread(get_registry().get_all_schemas)
+
+                    # Show thinking indicator
+                    with console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                        if (
+                            use_streaming
+                            and stream_model_response
+                            and self.provider.supports_streaming()
+                        ):
+                            # Streaming mode - async
+                            normalized_model = self.provider.normalize_model_name(self.model)
+                            stream = await asyncio.to_thread(
+                                stream_model_response,
+                                self.provider,
+                                normalized_model,
+                                messages,
+                                tools,
+                            )
+                            response_message = await asyncio.to_thread(
+                                display_streaming_response, stream
+                            )
+                        else:
+                            # Non-streaming mode - call async model if available
+                            response = await self._call_model_async(messages, tools)
+                            response_message = response["message"]
+
+                    # Add assistant response
+                    self.conversation.add_assistant_message(
+                        content=response_message.get("content", ""),
+                        tool_calls=response_message.get("tool_calls"),
+                        reasoning_content=response_message.get("reasoning_content"),
+                    )
+
+                    # Create automatic checkpoint if needed
+                    session_id = f"session_{self.session_start.strftime('%Y%m%d_%H%M%S')}"
+                    if self.checkpoint_manager.should_checkpoint(
+                        session_id, len(self.conversation.get_history())
+                    ):
+                        health_report = await asyncio.to_thread(
+                            self.health_monitor.analyze_health, self.conversation.get_history()
+                        )
+                        await asyncio.to_thread(
+                            self.checkpoint_manager.create_checkpoint,
+                            session_id,
+                            self.conversation.get_history(),
+                            health_score=health_report.overall_score,
+                        )
+
+                    # Display thinking/reasoning if enabled and present
+                    reasoning_content = response_message.get("reasoning_content")
+                    if reasoning_content and self._is_text_output():
+                        from .ui.display import display_thinking
+
+                        await asyncio.to_thread(
+                            display_thinking, reasoning_content, expanded=self.show_thinking
+                        )
+
+                    # Check if using tools
+                    if response_message.get("tool_calls"):
+                        # Create ToolCall objects for batch execution
+                        tool_calls_to_run = []
+                        for i, tool_call_data in enumerate(response_message["tool_calls"]):
+                            tool_calls_to_run.append(
+                                ToolCall(
+                                    id=tool_call_data.get("id", f"call_{iteration}_{i}"),
+                                    name=tool_call_data["function"]["name"],
+                                    arguments=tool_call_data["function"]["arguments"],
+                                    index=i,
+                                )
+                            )
+
+                        # Execute tools in batch (async-compatible)
+                        batch_result = await self._execute_tools_async(tool_calls_to_run)
+
+                        # Process results
+                        for tool_result in batch_result.results:
+                            # Check for shutdown request before each tool
+                            if self._shutdown_requested:
+                                self._output_warning("Shutdown requested. Stopping tool execution...")
+                                await asyncio.to_thread(self._cleanup)
+                                return
+
+                            tool_name = tool_result.name
+                            arguments = next(
+                                (
+                                    tc.arguments
+                                    for tc in tool_calls_to_run
+                                    if tc.id == tool_result.id
+                                ),
+                                {},
+                            )
+                            result = tool_result.result
+
+                            # Output tool result (for JSON modes)
+                            self._output_tool_result(tool_name, result)
+                            
+                            # Track tool execution in state manager
+                            self.state_manager.record_tool_execution(tool_name, arguments, result)
+
+                            # Check for delegation actions (model orchestration)
+                            if tool_name in ("delegate_to_model", "return_to_coordinator"):
+                                if await asyncio.to_thread(self._handle_delegation_action, result):
+                                    # Model was switched - add result and continue with new model
+                                    self.conversation.add_tool_result(tool_result.id, result)
+                                    # Don't return - let the loop continue with the new model
+                                    continue
+
+                            # Validate result
+                            if not await asyncio.to_thread(self._validate_tool_result, tool_name, result):
+                                self._output_warning(f"Invalid tool result format from {tool_name}")
+                                result = await asyncio.to_thread(
+                                    create_error_response,
+                                    "Tool returned invalid result format",
+                                    ErrorType.EXECUTION,
+                                    {"tool_name": tool_name},
+                                )
+
+                            # Add result to conversation
+                            self.conversation.add_tool_result(tool_result.id, result)
+
+                            # Parse arguments for loop guards
+                            parsed_arguments = arguments
+                            if isinstance(arguments, str):
+                                try:
+                                    parsed_arguments = json.loads(arguments)
+                                except json.JSONDecodeError:
+                                    parsed_arguments = {}
+
+                            # Check loop guards
+                            if not self._is_tool_result_success(result):
+                                self.loop_guard.record_error(result)
+                                if self.loop_guard.check_repeated_error(result):
+                                    recovery_action = self.loop_guard.get_recovery_action(
+                                        result, tool_name, parsed_arguments
+                                    )
+                                    if recovery_action:
+                                        from .core.recovery_strategies import RecoveryStrategy
+
+                                        if recovery_action.strategy != RecoveryStrategy.ESCALATE:
+                                            self._output_warning(
+                                                f"Recovery triggered: {recovery_action.message}"
+                                            )
+                                            if recovery_action.suggested_prompt:
+                                                self.conversation.add_user_message(
+                                                    f"[Recovery Guidance] {recovery_action.suggested_prompt}"
+                                                )
+                                            continue
+                                    self._output_error(
+                                        "Repeated error detected. Stopping to prevent infinite loop.",
+                                        "loop_guard",
+                                    )
+                                    return
+
+                            self.loop_guard.record_tool_call(tool_name, parsed_arguments)
+                            self.loop_guard.record_operation(tool_name, parsed_arguments)
+
+                            if self.loop_guard.check_stuck_state():
+                                self._output_error(
+                                    "Agent appears stuck. Stopping to prevent infinite loop.",
+                                    "loop_guard",
+                                )
+                                return
+
+                            if self.loop_guard.check_repeated_tool_call(tool_name, parsed_arguments):
+                                self._output_error(
+                                    "Same tool called repeatedly. Stopping to prevent infinite loop.",
+                                    "loop_guard",
+                                )
+                                return
+
+                    else:
+                        # No more tools - final response
+                        final_text = response_message.get("content", "")
+                        reasoning = response_message.get("reasoning_content", "")
+
+                        if final_text:
+                            self._output_response({"content": final_text}, is_final=True)
+                            return
+                        elif reasoning:
+                            # Model had reasoning but no content - this can happen with some models
+                            # The thinking was already displayed above, so just exit cleanly
+                            return
+                        else:
+                            # Truly empty response - this shouldn't happen
+                            self._output_warning("Model returned empty response. Exiting.")
+                            return
+
+                except KeyboardInterrupt:
+                    # User interrupted the current operation
+                    self._output_warning("Interrupted by user")
+                    return
+                except (ModelError, ProviderError) as e:
+                    import traceback
+
+                    error_msg = str(e)
+                    error_context = {"traceback": traceback.format_exc()}
+
+                    # Check for specific error types and provide recovery hints
+                    if "Invalid assistant message" in error_msg:
+                        # This is the specific error we're trying to prevent
+                        error_msg += "\n\n[Recovery Hint] This error indicates corrupted conversation history. " \
+                                   "Try clearing the session with '/clear' or starting a new session."
+                        error_context["recovery_suggestion"] = "clear_session"
+                    elif "rate limit" in error_msg.lower():
+                        error_msg += "\n\n[Recovery Hint] Rate limit exceeded. Wait a moment and try again."
+                        error_context["recovery_suggestion"] = "wait_and_retry"
+                    elif "authentication" in error_msg.lower() or "api key" in error_msg.lower():
+                        error_msg += "\n\n[Recovery Hint] Check your API key configuration."
+                        error_context["recovery_suggestion"] = "check_api_key"
+
+                    self._output_error(error_msg, "model_error", error_context)
+                    return
+                except Exception as e:
+                    import traceback
+
+                    self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
+                    return
+        finally:
+            self._is_processing = False
+            # Reset agent focus to EXPLORING when done
+            self.state_manager.set_focus(AgentFocus.EXPLORING)
+
+    async def _call_model_async(
+        self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Call model asynchronously via provider with retry logic.
+        
+        This async version uses asyncio.to_thread for CPU-bound operations
+        and maintains the same retry logic as the sync version.
+        """
+        try:
+            # Apply rate limiting if enabled (async version)
+            if self.rate_limiter:
+                # Estimate tokens for rate limiting
+                token_count = self._estimate_api_call_tokens(messages, tools)
+                if not self.rate_limiter.acquire(token_count=token_count, blocking=True):
+                    logger.warning("Rate limiter blocked API call (should not happen with blocking=True)")
+
+            # Normalize model name for provider
+            normalized_model = self.provider.normalize_model_name(self.model)
+            
+            # Call provider asynchronously
+            # Most provider calls are I/O-bound, so we can use to_thread
+            return await asyncio.to_thread(
+                self.provider.chat,
+                model=normalized_model,
+                messages=messages,
+                tools=tools,
+            )
+        except Exception as e:
+            logger.error(f"Error in async model call: {e}")
+            raise
+
+    async def _execute_tools_async(
+        self, tool_calls_to_run: List[ToolCall]
+    ) -> Any:
+        """Execute tools asynchronously.
+        
+        This method maintains compatibility with the sync version while
+        allowing async execution of tools where possible.
+        """
+        # Check if we should run tools in parallel
+        execution_mode = self.parallel_executor._get_execution_mode(tool_calls_to_run)
+        
+        if execution_mode.value == "parallel":
+            # For parallel execution, we use the existing parallel executor
+            # which is already optimized for concurrent execution
+            return await asyncio.to_thread(
+                self.parallel_executor.execute_batch,
+                tool_calls_to_run,
+            )
+        else:
+            # For serialized execution, also use to_thread
+            return await asyncio.to_thread(
+                self.parallel_executor.execute_batch,
+                tool_calls_to_run,
+            )
 
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         """Get current conversation history"""

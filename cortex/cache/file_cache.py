@@ -4,10 +4,11 @@ import os
 import threading
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from collections import OrderedDict
 from datetime import datetime
+import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +232,216 @@ class FileCache:
         with self._lock:
             return key in self._cache
 
+    def pre_cache(
+        self,
+        patterns: Optional[List[str]] = None,
+        source: str = "git_history",
+        max_files: int = 50,
+        directory: Optional[Path] = None,
+    ) -> Dict[str, Any]:
+        """
+        Pre-cache files based on patterns or git history.
+
+        Args:
+            patterns: List of glob patterns to match files (e.g., ["*.py", "*.md"])
+            source: Source for file selection:
+                - "git_history": Use git history (most recent commits)
+                - "git_tracked": All git-tracked files matching patterns
+                - "directory": All files in directory matching patterns
+            max_files: Maximum number of files to pre-cache
+            directory: Directory to search (defaults to current directory)
+
+        Returns:
+            Dictionary with cache statistics:
+            - "cached": number of files successfully cached
+            - "skipped": number of files skipped
+            - "errors": number of errors encountered
+            - "files": list of files that were cached
+        """
+        if not self.enabled:
+            return {"cached": 0, "skipped": 0, "errors": 1, "files": []}
+
+        if directory is None:
+            directory = Path.cwd()
+
+        stats = {"cached": 0, "skipped": 0, "errors": 0, "files": []}
+
+        try:
+            if source == "git_history":
+                files = self._get_files_from_git_history(directory, max_files, patterns)
+            elif source == "git_tracked":
+                files = self._get_git_tracked_files(directory, max_files, patterns)
+            elif source == "directory":
+                files = self._get_files_from_directory(directory, max_files, patterns)
+            else:
+                logger.warning(f"Unknown source: {source}")
+                return {"cached": 0, "skipped": 0, "errors": 1, "files": []}
+
+            logger.info(f"Pre-caching {len(files)} files from {source}")
+
+            for filepath in files:
+                try:
+                    # Check if file exists and is readable
+                    if not filepath.exists():
+                        stats["skipped"] += 1
+                        continue
+
+                    # Check file size (don't cache huge files)
+                    file_size = filepath.stat().st_size
+                    if file_size > self.max_size_bytes:
+                        logger.debug(f"Skipping large file: {filepath} ({file_size} bytes)")
+                        stats["skipped"] += 1
+                        continue
+
+                    # Read and cache
+                    content = filepath.read_text(encoding="utf-8")
+                    if self.set(filepath, content):
+                        stats["cached"] += 1
+                        stats["files"].append(str(filepath))
+                        logger.debug(f"Pre-cached: {filepath}")
+                    else:
+                        stats["skipped"] += 1
+
+                except (OSError, UnicodeDecodeError) as e:
+                    logger.debug(f"Error reading {filepath}: {e}")
+                    stats["errors"] += 1
+
+        except Exception as e:
+            logger.error(f"Error during pre-caching: {e}")
+            stats["errors"] += 1
+
+        logger.info(
+            f"Pre-caching complete: {stats['cached']} cached, "
+            f"{stats['skipped']} skipped, {stats['errors']} errors"
+        )
+
+        return stats
+
+    def _get_files_from_git_history(
+        self, directory: Path, max_files: int, patterns: Optional[List[str]]
+    ) -> List[Path]:
+        """Get recently modified files from git history."""
+        try:
+            # Get recently modified files from git
+            cmd = [
+                "git",
+                "log",
+                "--name-only",
+                "--pretty=format:",
+                "--since=1.month",
+                directory,
+            ]
+            result = subprocess.run(
+                cmd,
+                cwd=directory,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            files = []
+            seen = set()
+
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line and line not in seen:
+                    filepath = directory / line
+                    if filepath.exists() and patterns_match(filepath, patterns):
+                        files.append(filepath)
+                        seen.add(line)
+
+                    if len(files) >= max_files:
+                        break
+
+            return files
+
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            logger.debug(f"Git history failed: {e}")
+            return []
+
+    def _get_git_tracked_files(
+        self, directory: Path, max_files: int, patterns: Optional[List[str]]
+    ) -> List[Path]:
+        """Get all git-tracked files."""
+        try:
+            cmd = ["git", "ls-files"]
+            result = subprocess.run(
+                cmd,
+                cwd=directory,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            files = []
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line:
+                    filepath = directory / line
+                    if filepath.exists() and patterns_match(filepath, patterns):
+                        files.append(filepath)
+
+                    if len(files) >= max_files:
+                        break
+
+            return files
+
+        except (subprocess.TimeoutExpired, subprocess.SubprocessError) as e:
+            logger.debug(f"Git ls-files failed: {e}")
+            return []
+
+    def _get_files_from_directory(
+        self, directory: Path, max_files: int, patterns: Optional[List[str]]
+    ) -> List[Path]:
+        """Get files from directory matching patterns."""
+        files = []
+
+        if patterns:
+            for pattern in patterns:
+                for filepath in directory.rglob(pattern):
+                    if filepath.exists() and filepath.is_file():
+                        files.append(filepath)
+                        if len(files) >= max_files:
+                            return files
+        else:
+            # Get all files (non-recursive)
+            for filepath in directory.iterdir():
+                if filepath.is_file():
+                    files.append(filepath)
+                    if len(files) >= max_files:
+                        return files
+
+        return files
+
+
+def patterns_match(filepath: Path, patterns: Optional[List[str]]) -> bool:
+    """
+    Check if filepath matches any of the patterns.
+
+    Args:
+        filepath: Path to check
+        patterns: List of glob patterns (e.g., ["*.py", "*.md"])
+
+    Returns:
+        True if matches any pattern or no patterns specified
+    """
+    if patterns is None or len(patterns) == 0:
+        return True
+
+    filename = filepath.name
+    for pattern in patterns:
+        # Simple glob matching
+        if filepath.match(pattern) or filename.endswith(pattern.lstrip("*")):
+            return True
+
+        # Check if pattern matches with wildcard
+        if "*" in pattern:
+            import fnmatch
+            if fnmatch.fnmatch(filename, pattern):
+                return True
+
+    return False
+
 
 # Global cache instance
 _file_cache: Optional[FileCache] = None
@@ -246,20 +457,58 @@ def get_file_cache(config: Optional[Dict[str, Any]] = None) -> FileCache:
             - enabled: bool (default True)
             - max_entries: int (default 100)
             - max_size_mb: float (default 50.0)
+            - use_redis: bool (default False) - Use Redis backend
+            - redis_host: str (default "localhost") - Redis host
+            - redis_port: int (default 6379) - Redis port
+            - redis_db: int (default 0) - Redis database
+            - redis_password: str (optional) - Redis password
+            - redis_ttl: int (default 3600) - Redis TTL in seconds
+            - redis_fallback: bool (default True) - Fall back to local on Redis failure
 
     Returns:
-        FileCache instance
+        FileCache or RedisFileCache instance
     """
     global _file_cache
 
     with _cache_lock:
         if _file_cache is None:
             config = config or {}
-            _file_cache = FileCache(
-                max_entries=config.get("max_entries", 100),
-                max_size_mb=config.get("max_size_mb", 50.0),
-                enabled=config.get("enabled", True),
-            )
+
+            # Check if Redis backend is requested
+            if config.get("use_redis", False):
+                try:
+                    from .redis_backend import RedisFileCache
+
+                    _file_cache = RedisFileCache(
+                        host=config.get("redis_host", "localhost"),
+                        port=config.get("redis_port", 6379),
+                        db=config.get("redis_db", 0),
+                        password=config.get("redis_password"),
+                        ttl=config.get("redis_ttl", 3600),
+                        max_entries=config.get("max_entries", 100),
+                        max_size_mb=config.get("max_size_mb", 50.0),
+                        enabled=config.get("enabled", True),
+                        fallback_to_local=config.get("redis_fallback", True),
+                    )
+                    logger.info("Using Redis cache backend")
+
+                except Exception as e:
+                    logger.warning(f"Failed to create Redis cache: {e}")
+                    logger.warning("Falling back to local file cache")
+
+                    # Fall back to local cache
+                    _file_cache = FileCache(
+                        max_entries=config.get("max_entries", 100),
+                        max_size_mb=config.get("max_size_mb", 50.0),
+                        enabled=config.get("enabled", True),
+                    )
+            else:
+                # Use local file cache
+                _file_cache = FileCache(
+                    max_entries=config.get("max_entries", 100),
+                    max_size_mb=config.get("max_size_mb", 50.0),
+                    enabled=config.get("enabled", True),
+                )
         return _file_cache
 
 

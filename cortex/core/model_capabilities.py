@@ -56,6 +56,8 @@ class ModelProfile:
     supports_function_calling: bool = True
     recommended_temperature: float = 0.7
     notes: str = ""
+    exposes_thinking: bool = False  # Whether model exposes thinking process
+    thinking_field: Optional[str] = None  # API field name for thinking content (e.g., "reasoning_content", "reasoning")
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -72,6 +74,8 @@ class ModelProfile:
             "supports_function_calling": self.supports_function_calling,
             "recommended_temperature": self.recommended_temperature,
             "notes": self.notes,
+            "exposes_thinking": self.exposes_thinking,
+            "thinking_field": self.thinking_field,
         }
 
 

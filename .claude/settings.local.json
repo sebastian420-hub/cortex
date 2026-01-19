@@ -5,7 +5,13 @@
       "Bash(python:*)",
       "Bash(wc:*)",
       "Bash(find:*)",
-      "Bash(dir \"C:\\\\Users\\\\lwinz\\\\.cortex\")"
+      "Bash(dir \"C:\\\\Users\\\\lwinz\\\\.cortex\")",
+      "WebSearch",
+      "Bash(ls -la \"C:\\\\Users\\\\lwinz\\\\OneDrive\\\\Desktop\\\\LocalTerminalAgent\\\\cortex\\\\core\\\\prompts\"\" 2>/dev/null || echo \"Directory may not exist yet \")",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(git add:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -19,6 +19,19 @@ from .memory import (
     create_memory_bank,
     extract_memories_from_messages,
 )
+from .memory_chunked.chunk import (
+    EditChunk,
+    ChunkType,
+    ChunkCollection,
+)
+from .memory_chunked.chunking import (
+    FileChunker,
+    ChunkingStrategy,
+)
+from .memory_chunked.context_window import (
+    ContextWindowManager,
+    TokenBudget,
+)
 from .transaction import (
     TransactionManager,
     Transaction,
@@ -49,6 +62,14 @@ __all__ = [
     "MemorySource",
     "create_memory_bank",
     "extract_memories_from_messages",
+    # Chunked Editing
+    "EditChunk",
+    "ChunkType",
+    "ChunkCollection",
+    "FileChunker",
+    "ChunkingStrategy",
+    "ContextWindowManager",
+    "TokenBudget",
     # Transactions
     "TransactionManager",
     "Transaction",

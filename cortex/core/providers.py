@@ -80,6 +80,30 @@ class ModelProvider(ABC):
         sanitized_tools = sanitize_object(tools) if tools else None
         return sanitized_messages, sanitized_tools
 
+    def extract_thinking_content(self, response: Any) -> Optional[str]:
+        """
+        Extract thinking/reasoning content from provider response.
+        
+        Args:
+            response: Raw provider response
+            
+        Returns:
+            Thinking content string if available, None otherwise
+        """
+        return None
+    
+    def supports_thinking(self, model: str) -> bool:
+        """
+        Check if this model supports thinking process output.
+        
+        Args:
+            model: Model name
+            
+        Returns:
+            True if model can expose thinking content
+        """
+        return False
+
 
 class OllamaProvider(ModelProvider):
     """Provider for local Ollama models"""
@@ -140,6 +164,57 @@ class OllamaProvider(ModelProvider):
     def validate_api_key(self) -> bool:
         """Ollama doesn't need API keys"""
         return True
+
+    def extract_thinking_content(self, response: Any) -> Optional[str]:
+        """
+        Extract thinking/reasoning content from Ollama response.
+        
+        Ollama models might return thinking in custom message fields.
+        This is model-dependent and may require specific model configurations.
+        """
+        # Check for thinking in message object
+        if isinstance(response, dict):
+            message = response.get('message', {})
+            
+            # Try common thinking field names
+            thinking = message.get('thinking') or message.get('reasoning')
+            if thinking:
+                return thinking
+            
+            # Some models might have thinking in content field
+            content = message.get('content', '')
+            if content and isinstance(content, str):
+                # Check if content starts with thinking tags or patterns
+                stripped = content.strip()
+                if stripped.startswith("<thinking>") or stripped.startswith("<tool_call>"):
+                    # This might be thinking content
+                    return None  # Don't extract from content to avoid duplication
+            
+        # For non-dict responses (like ollama chat response object)
+        elif hasattr(response, 'get'):
+            try:
+                message = response.get('message', {})
+                thinking = message.get('thinking') or message.get('reasoning')
+                if thinking:
+                    return thinking
+            except Exception:
+                pass
+        
+        return None
+    
+    def supports_thinking(self, model: str) -> bool:
+        """
+        Check if Ollama model supports thinking process output.
+        
+        Some Ollama models like deepseek-r1 and specialized reasoning models
+        may expose thinking content. This method identifies these models.
+        """
+        model_lower = model.lower()
+        thinking_indicators = [
+            "deepseek-r1", "deepseek-reasoner", "reasoner",
+            "thinking", "r1", "qwen2.5-32b-thought"
+        ]
+        return any(indicator in model_lower for indicator in thinking_indicators)
 
 
 class DeepSeekProvider(ModelProvider):
@@ -289,6 +364,34 @@ class DeepSeekProvider(ModelProvider):
         if model.lower() == "deepseek":
             return "deepseek-chat"
         return model
+
+    def extract_thinking_content(self, response: Any) -> Optional[str]:
+        """
+        Extract thinking/reasoning content from DeepSeek response.
+        
+        DeepSeek returns reasoning_content field in message object.
+        """
+        # For non-streaming responses
+        if hasattr(response, 'choices') and response.choices:
+            message = response.choices[0].message
+            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+                return message.reasoning_content
+        # For streaming chunks (delta)
+        elif hasattr(response, 'choices') and response.choices and hasattr(response.choices[0], 'delta'):
+            delta = response.choices[0].delta
+            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                return delta.reasoning_content
+        return None
+    
+    def supports_thinking(self, model: str) -> bool:
+        """
+        Check if DeepSeek model supports thinking process output.
+        
+        DeepSeek reasoner models expose reasoning_content.
+        Some other DeepSeek models may also support it.
+        """
+        model_lower = model.lower()
+        return "reasoner" in model_lower or "deepseek" in model_lower
 
     def validate_api_key(self) -> bool:
         """Validate DeepSeek API key is set"""
@@ -508,6 +611,48 @@ class AnthropicProvider(ModelProvider):
         """Validate Anthropic API key is set"""
         return os.getenv("ANTHROPIC_API_KEY") is not None
 
+    def extract_thinking_content(self, response: Any) -> Optional[str]:
+        """
+        Extract thinking/reasoning content from Anthropic response.
+        
+        Anthropic returns thinking as special content blocks when using
+        thinking mode (available in Claude 3.5+).
+        """
+        try:
+            # Anthropic returns content as a list of blocks
+            if hasattr(response, 'content') and response.content:
+                thinking_parts = []
+                
+                for content_block in response.content:
+                    # Check if this is a thinking block (Anthropic API)
+                    if hasattr(content_block, 'type') and content_block.type == "thinking":
+                        if hasattr(content_block, 'thinking') and content_block.thinking:
+                            thinking_parts.append(content_block.thinking)
+                    # Check for text blocks that might contain thinking
+                    elif hasattr(content_block, 'type') and content_block.type == "text":
+                        # Check if it has thinking attribute (some Anthropic models)
+                        if hasattr(content_block, 'thinking') and content_block.thinking:
+                            thinking_parts.append(content_block.thinking)
+                
+                return "\n".join(thinking_parts) if thinking_parts else None
+        except Exception:
+            # Be defensive - if structure is unexpected, just return None
+            pass
+        return None
+    
+    def supports_thinking(self, model: str) -> bool:
+        """
+        Check if Anthropic model supports thinking process output.
+        
+        Thinking mode is available in Claude 3.5+ (Claude 3.5 Sonnet, Claude 3.7 Sonnet).
+        """
+        model_lower = model.lower()
+        return (
+            "claude-3.5" in model_lower or 
+            "claude-3.7" in model_lower or
+            "claude-3.6" in model_lower  # Future-proofing
+        )
+
 
 class OpenRouterProvider(ModelProvider):
     """Provider for OpenRouter (OpenAI-compatible)"""
@@ -625,6 +770,47 @@ class OpenRouterProvider(ModelProvider):
     def validate_api_key(self) -> bool:
         """Validate OpenRouter API key is set"""
         return os.getenv("OPENROUTER_API_KEY") is not None
+
+    def extract_thinking_content(self, response: Any) -> Optional[str]:
+        """
+        Extract thinking/reasoning content from OpenRouter response.
+        
+        OpenRouter supports OpenAI-compatible reasoning models (o1, o3, etc.).
+        It may also route requests to DeepSeek reasoning models.
+        """
+        # For non-streaming responses
+        if hasattr(response, 'choices') and response.choices:
+            message = response.choices[0].message
+            # Try OpenAI reasoning field (for o1, o3, o1-mini)
+            if hasattr(message, 'reasoning') and message.reasoning:
+                return message.reasoning
+            # Try reasoning_content (for DeepSeek via OpenRouter)
+            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+                return message.reasoning_content
+        # For streaming chunks (delta)
+        elif hasattr(response, 'choices') and response.choices and hasattr(response.choices[0], 'delta'):
+            delta = response.choices[0].delta
+            if hasattr(delta, 'reasoning') and delta.reasoning:
+                return delta.reasoning
+            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                return delta.reasoning_content
+        return None
+    
+    def supports_thinking(self, model: str) -> bool:
+        """
+        Check if OpenRouter model supports thinking process output.
+        
+        OpenRouter provides access to various reasoning models including:
+        - OpenAI o1, o3, o1-mini (reasoning field)
+        - DeepSeek reasoning models (reasoning_content field)
+        - Anthropic Claude with thinking (content blocks)
+        """
+        model_lower = model.lower()
+        thinking_indicators = [
+            "o1", "o3", "o1-mini", "reasoner", "thinking",
+            "deepseek", "claude-3.5", "claude-3.7"
+        ]
+        return any(indicator in model_lower for indicator in thinking_indicators)
 
 
 class ProviderFactory:

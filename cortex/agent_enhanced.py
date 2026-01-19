@@ -7,6 +7,7 @@ This module extends the base Cortex agent with:
 4. Better context management and state tracking
 """
 
+import asyncio
 import json
 import logging
 import time
@@ -613,6 +614,32 @@ update_plan(plan_id="plan_xxx", action="add_step", step_data={...})
         
         finally:
             self._is_processing = False
+    
+    async def process_with_planning_async(
+        self, user_message: str, use_streaming: bool = False
+    ) -> None:
+        """Async version of process_with_planning.
+        
+        This async wrapper provides non-blocking execution while maintaining
+        all the enhanced planning functionality. It uses asyncio.to_thread
+        for the synchronous implementation to avoid blocking the event loop.
+        
+        Note: The EnhancedCortex implementation is complex and uses many
+        synchronous operations. This async wrapper uses to_thread for
+        coarse-grained async compatibility. Future optimization could make
+        the inner loops fully async.
+        
+        Args:
+            user_message: The user's message to process
+            use_streaming: Whether to use streaming responses
+        """
+        # Run the sync version in a thread to avoid blocking the event loop
+        # This is a pragmatic approach given the complexity of the sync implementation
+        await asyncio.to_thread(
+            self.process_with_planning,
+            user_message,
+            use_streaming,
+        )
     
     def _get_enhanced_context(self) -> str:
         """Get enhanced context including state, memory, and model capabilities."""

@@ -4,6 +4,7 @@ import sys
 import os
 import argparse
 import signal
+import asyncio
 from pathlib import Path
 from typing import Optional
 import logging
@@ -224,6 +225,13 @@ Examples:
     )
 
     parser.add_argument(
+        "--async",
+        dest="use_async",
+        action="store_true",
+        help="Use async execution for non-blocking operation (experimental)"
+    )
+
+    parser.add_argument(
         "--project-dir",
         type=str,
         default=None,
@@ -433,11 +441,22 @@ Examples:
     if args.prompt:
         # One-shot mode
         console.print(Panel(f"[cyan]Task:[/cyan] {args.prompt}", title="One-shot Mode"))
-        # Use enhanced processing if available
-        if hasattr(agent, 'process_with_planning'):
-            agent.process_with_planning(args.prompt, use_streaming=args.streaming)
+        
+        # Run in async mode if requested
+        if args.use_async:
+            if hasattr(agent, 'process_with_planning_async'):
+                asyncio.run(agent.process_with_planning_async(args.prompt, use_streaming=args.streaming))
+            elif hasattr(agent, '_process_message_async'):
+                asyncio.run(agent._process_message_async(args.prompt, use_streaming=args.streaming))
+            else:
+                console.print("[yellow]Warning: Async mode not available. Using sync mode.[/yellow]")
+                agent._process_message(args.prompt, use_streaming=args.streaming)
         else:
-            agent._process_message(args.prompt, use_streaming=args.streaming)
+            # Use enhanced processing if available
+            if hasattr(agent, 'process_with_planning'):
+                agent.process_with_planning(args.prompt, use_streaming=args.streaming)
+            else:
+                agent._process_message(args.prompt, use_streaming=args.streaming)
 
         # Save session if requested
         if args.save_session:
@@ -450,10 +469,12 @@ Examples:
             )
     else:
         # Interactive mode
-        run_interactive(agent, session_manager, use_streaming=args.streaming)
+        run_interactive(agent, session_manager, use_streaming=args.streaming, use_async=args.use_async)
 
 
-def run_interactive(agent: Cortex, session_manager: SessionManager, use_streaming: bool = False):
+def run_interactive(
+    agent: Cortex, session_manager: SessionManager, use_streaming: bool = False, use_async: bool = False
+):
     """Run interactive REPL session"""
 
     # Set up REPL
@@ -538,11 +559,24 @@ def run_interactive(agent: Cortex, session_manager: SessionManager, use_streamin
                 continue
 
             # Process with agent
-            # Use enhanced processing if available
-            if hasattr(agent, 'process_with_planning'):
-                agent.process_with_planning(user_input, use_streaming=use_streaming)
+            if use_async:
+                # Async mode
+                if hasattr(agent, 'process_with_planning_async'):
+                    asyncio.run(agent.process_with_planning_async(user_input, use_streaming=use_streaming))
+                elif hasattr(agent, '_process_message_async'):
+                    asyncio.run(agent._process_message_async(user_input, use_streaming=use_streaming))
+                else:
+                    console.print("[yellow]Warning: Async mode not available. Using sync mode.[/yellow]")
+                    if hasattr(agent, 'process_with_planning'):
+                        agent.process_with_planning(user_input, use_streaming=use_streaming)
+                    else:
+                        agent._process_message(user_input, use_streaming=use_streaming)
             else:
-                agent._process_message(user_input, use_streaming=use_streaming)
+                # Sync mode - Use enhanced processing if available
+                if hasattr(agent, 'process_with_planning'):
+                    agent.process_with_planning(user_input, use_streaming=use_streaming)
+                else:
+                    agent._process_message(user_input, use_streaming=use_streaming)
 
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully

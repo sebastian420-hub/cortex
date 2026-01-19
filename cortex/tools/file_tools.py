@@ -17,6 +17,8 @@ from ..utils.errors import (
     ErrorType,
 )
 from ..cache import get_file_cache, invalidate_file
+from ..core.memory_chunked.chunking import should_chunk_file, FileChunker, ChunkingStrategy
+from ..core.memory_chunked.chunk import create_file_chunk
 
 
 class ReadFileTool(Tool):
@@ -26,6 +28,67 @@ class ReadFileTool(Tool):
     MAX_LINE_LENGTH = 2000
     # Default line limit
     DEFAULT_LIMIT = 2000
+    # File size warning threshold (1MB)
+    LARGE_FILE_WARNING_BYTES = 1_000_000
+    # Maximum file size before requiring explicit confirmation (10MB)
+    MAX_FILE_SIZE_BYTES = 10_000_000
+
+    # Binary file signatures (magic numbers)
+    BINARY_SIGNATURES = [
+        b'\x89PNG',      # PNG
+        b'\xff\xd8\xff', # JPEG
+        b'GIF87a',       # GIF
+        b'GIF89a',       # GIF
+        b'PK\x03\x04',   # ZIP/DOCX/XLSX
+        b'%PDF',         # PDF
+        b'\x7fELF',      # ELF executable
+        b'MZ',           # Windows executable
+        b'\x00\x00\x01\x00',  # ICO
+        b'RIFF',         # RIFF (WAV, AVI)
+        b'\x1f\x8b',     # GZIP
+        b'BZh',          # BZIP2
+        b'\xfd7zXZ',     # XZ
+        b'SQLite',       # SQLite
+    ]
+
+    # Binary file extensions
+    BINARY_EXTENSIONS = {
+        '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.tiff',
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz',
+        '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.a',
+        '.pyc', '.pyo', '.class', '.jar', '.war',
+        '.mp3', '.mp4', '.avi', '.mkv', '.mov', '.wav', '.flac',
+        '.woff', '.woff2', '.ttf', '.otf', '.eot',
+        '.db', '.sqlite', '.sqlite3',
+    }
+
+    def _is_binary_file(self, path: Path) -> tuple[bool, str]:
+        """
+        Check if a file is binary using magic numbers and extension.
+
+        Returns:
+            Tuple of (is_binary, reason)
+        """
+        # Check extension first (fast)
+        if path.suffix.lower() in self.BINARY_EXTENSIONS:
+            return True, f"Binary extension: {path.suffix}"
+
+        # Check magic numbers (more reliable)
+        try:
+            with open(path, 'rb') as f:
+                header = f.read(16)
+                for sig in self.BINARY_SIGNATURES:
+                    if header.startswith(sig):
+                        return True, f"Binary signature detected"
+
+                # Check for null bytes (common in binaries)
+                if b'\x00' in header:
+                    return True, "Contains null bytes"
+        except Exception:
+            pass
+
+        return False, ""
 
     def execute(
         self,
@@ -66,6 +129,41 @@ class ReadFileTool(Tool):
                     ErrorType.VALIDATION,
                     {"path": path},
                     retryable=True,
+                )
+
+            # Check file size and warn if large
+            file_size = full_path.stat().st_size
+            if file_size > self.MAX_FILE_SIZE_BYTES:
+                size_mb = file_size / 1_000_000
+                return create_error_response(
+                    f"File is very large ({size_mb:.1f} MB). Use offset and limit parameters to read specific portions.",
+                    ErrorType.VALIDATION,
+                    {
+                        "path": path,
+                        "size_bytes": file_size,
+                        "size_mb": round(size_mb, 2),
+                        "hint": f"Try: read_file(path='{path}', offset=0, limit=500) to read first 500 lines",
+                    },
+                )
+
+            if file_size > self.LARGE_FILE_WARNING_BYTES and self.console:
+                size_mb = file_size / 1_000_000
+                self.console.print(
+                    f"[yellow]Warning:[/yellow] Large file ({size_mb:.1f} MB). "
+                    f"Consider using offset/limit for better performance."
+                )
+
+            # Check for binary file
+            is_binary, binary_reason = self._is_binary_file(full_path)
+            if is_binary:
+                return create_error_response(
+                    f"Cannot read binary file: {path}",
+                    ErrorType.VALIDATION,
+                    {
+                        "path": path,
+                        "reason": binary_reason,
+                        "hint": "Binary files cannot be displayed as text. Use appropriate tools for this file type.",
+                    },
                 )
 
             # Try to get from cache first
@@ -172,6 +270,109 @@ class ReadFileTool(Tool):
         except Exception as e:
             return create_error_response(
                 str(e), ErrorType.EXECUTION, {"path": path}, retryable=True
+            )
+
+    def read_file_chunked(self, path: str, chunk_strategy: str = "smart") -> Dict[str, Any]:
+        """
+        Read and chunk a file for memory-efficient editing.
+        
+        Args:
+            path: Relative path to the file
+            chunk_strategy: Strategy for chunking ('smart', 'fixed_size', 'function_based')
+        
+        Returns:
+            Standardized response with chunk information
+        """
+        try:
+            full_path = validate_path(self.project_dir, path)
+            
+            if not full_path.exists():
+                return create_error_response(
+                    f"File not found: {path}",
+                    ErrorType.NOT_FOUND,
+                    {"path": path}
+                )
+            
+            if self.console:
+                self.console.print(f"[cyan]Chunking:[/cyan] {path}")
+            
+            # Read file content
+            raw_content = full_path.read_text(encoding="utf-8")
+            
+            # Check if chunking is needed
+            if not should_chunk_file(raw_content, path):
+                if self.console:
+                    self.console.print(f"[dim]File is small, chunking not needed[/dim]")
+                return create_success_response(
+                    {
+                        "path": path,
+                        "chunked": False,
+                        "reason": "File is too small for chunking",
+                        "size": len(raw_content),
+                    }
+                )
+            
+            # Determine chunking strategy
+            strategy_map = {
+                "smart": ChunkingStrategy.SMART,
+                "fixed_size": ChunkingStrategy.FIXED_SIZE,
+                "function_based": ChunkingStrategy.FUNCTION_BASED,
+                "section": ChunkingStrategy.SECTION_BASED,
+            }
+            strategy = strategy_map.get(chunk_strategy, ChunkingStrategy.SMART)
+            
+            # Create chunker and chunk the file
+            chunker = FileChunker(
+                max_chunk_size=2000,
+                strategy=strategy
+            )
+            chunks = chunker.chunk_file(raw_content, path)
+            
+            # Prepare chunk information
+            chunk_info = []
+            for chunk in chunks:
+                chunk_info.append({
+                    "id": chunk.chunk_id,
+                    "type": chunk.chunk_type.value,
+                    "tokens": chunk.token_estimate,
+                    "bytes": chunk.current_length,
+                    "metadata": chunk.metadata,
+                })
+            
+            # Show chunk info in console
+            if self.console:
+                self.console.print(
+                    f"[green]✓[/green] Created {len(chunks)} chunks "
+                    f"({sum(c.token_estimate for c in chunks)} tokens total)"
+                )
+                for i, chunk in enumerate(chunks[:10], 1):
+                    self.console.print(
+                        f"  [dim]{i}. {chunk.chunk_id} - {chunk.chunk_type.value} "
+                        f"({chunk.token_estimate} tokens)[/dim]"
+                    )
+                if len(chunks) > 10:
+                    self.console.print(f"[dim]  ... and {len(chunks) - 10} more[/dim]")
+            
+            return create_success_response(
+                {
+                    "path": path,
+                    "chunked": True,
+                    "total_chunks": len(chunks),
+                    "total_tokens": sum(c.token_estimate for c in chunks),
+                    "strategy": chunk_strategy,
+                    "chunks": chunk_info,
+                    "size": len(raw_content),
+                }
+            )
+            
+        except SecurityError as e:
+            return create_permission_denial(str(e), {"path": path})
+        except Exception as e:
+            return create_error_response(
+                f"Failed to chunk file: {str(e)}",
+                ErrorType.EXECUTION,
+                {"path": path, "error": str(e)},
+                retryable=True,
             )
 
 

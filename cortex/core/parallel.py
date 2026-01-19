@@ -109,6 +109,7 @@ class ParallelToolExecutor:
         execute_fn: Callable[[str, Dict[str, Any]], Dict[str, Any]],
         max_workers: int = 4,
         enabled: bool = True,
+        batch_size: int = 10,
     ):
         """
         Initialize ParallelToolExecutor.
@@ -117,10 +118,12 @@ class ParallelToolExecutor:
             execute_fn: Function to execute a single tool (name, args) -> result
             max_workers: Maximum number of concurrent workers
             enabled: Whether parallel execution is enabled
+            batch_size: Maximum number of tools to execute in a single parallel batch
         """
         self.execute_fn = execute_fn
         self.max_workers = max_workers
         self.enabled = enabled
+        self.batch_size = batch_size
 
         self._executor: Optional[ThreadPoolExecutor] = None
         self._lock = threading.Lock()
@@ -239,44 +242,48 @@ class ParallelToolExecutor:
         pre_hook: Optional[Callable[[ToolCall], bool]],
         post_hook: Optional[Callable[[ToolCall, ToolResult], None]],
     ) -> List[ToolResult]:
-        """Execute tools in parallel."""
+        """Execute tools in parallel with batch size limiting."""
         executor = self._get_executor()
-        futures: Dict[Future, ToolCall] = {}
-
-        for call in tool_calls:
-            # Check pre-hook
-            if pre_hook and not pre_hook(call):
-                # Skip this tool
-                continue
-
-            future = executor.submit(self._execute_single, call)
-            futures[future] = call
-
         results = []
-        for future in as_completed(futures):
-            call = futures[future]
-            try:
-                result = future.result()
-                results.append(result)
 
-                # Call post-hook
-                if post_hook:
-                    post_hook(call, result)
+        # Process in batches to limit concurrent operations
+        for i in range(0, len(tool_calls), self.batch_size):
+            batch = tool_calls[i : i + self.batch_size]
+            futures: Dict[Future, ToolCall] = {}
 
-            except Exception as e:
-                logger.error(f"Error executing {call.name}: {e}")
-                error_result = ToolResult(
-                    id=call.id,
-                    name=call.name,
-                    result={"error": str(e)},
-                    index=call.index,
-                    success=False,
-                    error=str(e),
-                )
-                results.append(error_result)
+            for call in batch:
+                # Check pre-hook
+                if pre_hook and not pre_hook(call):
+                    # Skip this tool
+                    continue
 
-                if post_hook:
-                    post_hook(call, error_result)
+                future = executor.submit(self._execute_single, call)
+                futures[future] = call
+
+            for future in as_completed(futures):
+                call = futures[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+
+                    # Call post-hook
+                    if post_hook:
+                        post_hook(call, result)
+
+                except Exception as e:
+                    logger.error(f"Error executing {call.name}: {e}")
+                    error_result = ToolResult(
+                        id=call.id,
+                        name=call.name,
+                        result={"error": str(e)},
+                        index=call.index,
+                        success=False,
+                        error=str(e),
+                    )
+                    results.append(error_result)
+
+                    if post_hook:
+                        post_hook(call, error_result)
 
         return results
 

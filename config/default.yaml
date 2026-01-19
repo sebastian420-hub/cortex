@@ -18,5 +18,24 @@ auto_save: false
 # Parallel execution settings
 parallel_execution:
   enabled: true
-  max_workers: 4
+  # max_workers: Number of concurrent workers for parallel tool execution
+  # Set to 0 or "auto" for automatic detection (min(4, cpu_count))
+  # Recommended: 2-8 depending on your hardware
+  max_workers: 0  # 0 = auto-detect based on CPU count
+  # batch_size: Maximum tools to execute in a single parallel batch
   batch_size: 10
+
+# Tool configuration
+tools:
+  # List of plugin modules to load
+  # plugins:
+  #   - "my_plugins.custom_tools"
+  #   - "examples.plugins.simple_tool"
+
+  # Tools to disable
+  # disabled:
+  #   - "web_search"
+  #   - "web_fetch"
+
+  # Tools to explicitly enable (re-enable defaults)
+  # enabled: []

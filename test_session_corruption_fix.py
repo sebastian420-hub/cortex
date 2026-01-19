@@ -6,6 +6,7 @@ This tests the prevention of "Invalid assistant message" errors and session reco
 
 import sys
 import os
+import json
 from pathlib import Path
 
 # Add the cortex package to the path

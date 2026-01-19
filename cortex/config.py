@@ -63,6 +63,36 @@ DEFAULT_PARALLEL_EXECUTION = {
     "batch_size": 10,
 }
 
+# Default rate limiting settings
+DEFAULT_RATE_LIMIT = {
+    "enabled": False,  # Disabled by default for backward compatibility
+    "requests_per_minute": 60,
+    "tokens_per_minute": 100000,
+    "burst_multiplier": 1.5,
+}
+
+# Default cache warming settings
+DEFAULT_CACHE_WARMING = {
+    "enabled": False,  # Disabled by default for backward compatibility
+    "source": "git_history",  # "git_history", "git_tracked", "directory"
+    "patterns": ["*.py", "*.md", "*.yaml", "*.yml"],  # File patterns to cache
+    "max_files": 50,  # Maximum files to pre-cache
+    "directory": None,  # Directory to search (None = current directory)
+}
+
+# Default Redis cache settings
+DEFAULT_REDIS_CACHE = {
+    "enabled": False,  # Disabled by default (requires Redis installation)
+    "host": "localhost",
+    "port": 6379,
+    "db": 0,
+    "password": None,
+    "ttl": 3600,  # 1 hour
+    "max_entries": 100,
+    "max_size_mb": 50.0,
+    "fallback_to_local": True,  # Fall back to local cache on Redis failure
+}
+
 # Default routing settings
 DEFAULT_ROUTING = {
     "enabled": False,  # Disabled by default for backward compatibility
@@ -121,10 +151,16 @@ class AgentConfig:
         error_recovery: Optional[Dict[str, Any]] = None,
         # File cache settings (new)
         file_cache: Optional[Dict[str, Any]] = None,
+        # Cache warming settings (new)
+        cache_warming: Optional[Dict[str, Any]] = None,
+        # Redis cache settings (new)
+        redis_cache: Optional[Dict[str, Any]] = None,
         # Transaction settings (new)
         transactions: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
+        # Rate limiting settings (new)
+        rate_limit: Optional[Dict[str, Any]] = None,
         # Routing settings (new)
         routing: Optional[Dict[str, Any]] = None,
         **kwargs,
@@ -178,11 +214,20 @@ class AgentConfig:
         # File cache settings (merge with defaults)
         self.file_cache = {**DEFAULT_FILE_CACHE, **(file_cache or {})}
 
+        # Cache warming settings (merge with defaults)
+        self.cache_warming = {**DEFAULT_CACHE_WARMING, **(cache_warming or {})}
+
+        # Redis cache settings (merge with defaults)
+        self.redis_cache = {**DEFAULT_REDIS_CACHE, **(redis_cache or {})}
+
         # Transaction settings (merge with defaults)
         self.transactions = {**DEFAULT_TRANSACTIONS, **(transactions or {})}
 
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
+
+        # Rate limiting settings (merge with defaults)
+        self.rate_limit = {**DEFAULT_RATE_LIMIT, **(rate_limit or {})}
 
         # Routing settings (merge with defaults)
         self.routing = {**DEFAULT_ROUTING, **(routing or {})}
