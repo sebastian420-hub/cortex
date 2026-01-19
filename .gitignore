@@ -54,6 +54,7 @@ Thumbs.db
 
 # Session and debug files
 *.session.json
+planning_demo_summary.md
 BUG_FIX_PLAN.md
 CACHE_WARMING_COMPLETE_REPORT.md
 CORTES_STATUS_ANALYSIS_PLAN.md
