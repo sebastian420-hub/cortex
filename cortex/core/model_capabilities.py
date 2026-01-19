@@ -58,6 +58,7 @@ class ModelProfile:
     notes: str = ""
     exposes_thinking: bool = False  # Whether model exposes thinking process
     thinking_field: Optional[str] = None  # API field name for thinking content (e.g., "reasoning_content", "reasoning")
+    recommended_temperatures: Optional[Dict[str, float]] = None  # Temperature for different tasks
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -413,6 +414,29 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=50,
         notes="Fine-tuned Llama 3.1 for function calling",
     ),
+    # MiMo Models (Xiaomi)
+    "mimo-v2-flash": ModelProfile(
+        name="MiMo-V2-Flash",
+        context_window=256000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=64,
+        supports_streaming=True,
+        supports_vision=False,
+        supports_function_calling=True,
+        recommended_temperature=0.3,
+        notes="Use JSON schema enforcement; supports reasoning mode via enable_thinking",
+        exposes_thinking=True,
+        thinking_field="reasoning_content",
+        recommended_temperatures={
+            "coding_planning": 0.3,
+            "debugging": 0.5,
+            "reasoning": 0.7,
+            "creative": 0.9,
+        },
+    ),
 }
 
 # Default profile for unknown models
@@ -516,6 +540,27 @@ def supports_json_mode(model_name: str) -> bool:
 def list_all_profiles() -> List[str]:
     """List all available model profile names."""
     return list(MODEL_PROFILES.keys())
+
+
+def get_temperature_for_task(model_name: str, task_type: str) -> float:
+    """
+    Get recommended temperature for a specific task type.
+    
+    Args:
+        model_name: Model identifier
+        task_type: "coding_planning", "debugging", "reasoning", "creative"
+    
+    Returns:
+        Recommended temperature
+    """
+    profile = get_model_profile(model_name)
+    
+    # Use model-specific temperature mapping if available
+    if hasattr(profile, 'recommended_temperatures') and profile.recommended_temperatures:
+        return profile.recommended_temperatures.get(task_type, profile.recommended_temperature)
+    
+    # Default fallback
+    return profile.recommended_temperature
 
 
 def get_models_by_capability(

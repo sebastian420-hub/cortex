@@ -7,6 +7,7 @@ optimized for different model capabilities.
 import json
 import logging
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
@@ -244,6 +245,10 @@ class PromptBuilder:
         self.project_dir = project_dir or Path(".")
         self.profile = get_model_profile(model_name)
         self.tool_formatter = ToolFormatter(self.profile)
+        
+        # Date and knowledge cutoff (MiMo and similar models need this)
+        self.knowledge_cutoff = "December 2024"
+        self.current_date = datetime.now().strftime("%B %d, %Y")
 
         logger.debug(f"PromptBuilder initialized for {model_name} with style {self.profile.prompt_style}")
 
@@ -275,34 +280,40 @@ class PromptBuilder:
         # 1. Core identity and instructions
         sections.append(self._build_core_section())
 
-        # 2. Tool documentation (adapted to model)
+        # 2. Output schema (for models that support JSON mode)
+        if self.profile.supports_json_mode:
+            schema_section = self._build_output_schema_section()
+            if schema_section:
+                sections.append(schema_section)
+
+        # 3. Tool documentation (adapted to model)
         if tools:
             tool_section = self.tool_formatter.format_tools(tools)
             sections.append(tool_section)
             # Add tool usage guide
             sections.append(self._build_tool_guide())
 
-        # 3. Planning guidance (if enabled)
+        # 4. Planning guidance (if enabled)
         if enable_planning:
             sections.append(self._build_planning_section())
 
-        # 4. Memory guidance (if enabled)
+        # 5. Memory guidance (if enabled)
         if enable_memory:
             sections.append(self._build_memory_section())
 
-        # 5. State context (if available)
+        # 6. State context (if available)
         if state_context:
             sections.append(f"## Current State\n\n{state_context}")
 
-        # 6. Project context (if available)
+        # 7. Project context (if available)
         if project_context:
             sections.append(f"## Project Context\n\n{project_context}")
 
-        # 7. Custom instructions (if provided)
+        # 8. Custom instructions (if provided)
         if custom_instructions:
             sections.append(f"## Additional Instructions\n\n{custom_instructions}")
 
-        # 8. Model-specific adaptations
+        # 9. Model-specific adaptations
         adaptation = self._build_model_adaptation()
         if adaptation:
             sections.append(adaptation)
@@ -336,7 +347,7 @@ Key behaviors:
 - Ask if requirements are unclear"""
 
         else:  # DETAILED
-            return """# Cortex AI Assistant
+            core_prompt = """# Cortex AI Assistant
 
 You are Cortex, a highly capable AI assistant specialized in software development and coding tasks. You have access to a comprehensive set of tools for file operations, code search, command execution, and more.
 
@@ -355,6 +366,21 @@ You are Cortex, a highly capable AI assistant specialized in software developmen
 3. Plan your approach for complex tasks
 4. Execute changes incrementally
 5. Verify results and handle errors gracefully"""
+
+            # Add date/cutoff for models that need it (MiMo and similar)
+            if self.profile.exposes_thinking or "mimo" in self.model_name.lower():
+                date_section = f"""
+
+## Date & Knowledge
+
+Today's date: {self.current_date}
+Knowledge cutoff: {self.knowledge_cutoff}
+
+For events after the cutoff, use reasoning based on prior patterns. When uncertain, state it clearly."""
+
+                core_prompt += date_section
+
+            return core_prompt
 
     def _build_tool_guide(self) -> str:
         """Build tool usage guide section."""
@@ -563,9 +589,56 @@ This context is automatically provided. Use it to:
 - Reuse patterns that worked
 - Stay focused on the current goal"""
 
+    def _build_output_schema_section(self) -> str:
+        """Add JSON schema enforcement for models that support it."""
+        return """## Output Format
+
+ALL responses MUST be valid JSON matching this schema:
+
+```json
+{
+  "mode": "plan" | "run_command" | "edit_file" | "answer" | "reasoning",
+  "reasoning": "brief chain-of-thought (< 150 words)",
+  "commands": [
+    {
+      "cmd": "shell command",
+      "cwd": "working directory",
+      "explanation": "why this is needed"
+    }
+  ],
+  "edits": [
+    {
+      "file": "relative/path/to/file",
+      "action": "create" | "modify" | "delete",
+      "content": "file content or patch"
+    }
+  ],
+  "answer": "natural language response"
+}
+```
+
+**Mode semantics**:
+- `plan`: Multiple steps needed; return commands + edits without executing yet; ask for approval
+- `run_command`: Execute shell command immediately (only if safety checks pass)
+- `edit_file`: Modify a single file (propose change, await approval unless auto-approved)
+- `answer`: Return only natural language answer in the "answer" field
+- `reasoning`: Thinking-heavy response; return chain-of-thought in "reasoning"
+
+**Security Constraints**:
+- NEVER run destructive commands without explicit approval (rm -rf, > /dev/null, network changes)
+- ALWAYS validate file paths; reject attempts to write outside allowed directories
+- ALWAYS explain your reasoning in < 150 words
+- Always output valid JSON; never output raw shell or code without the schema wrapper
+"""
+
     def _build_model_adaptation(self) -> str:
         """Build model-specific adaptation notes."""
         notes = []
+
+        # Add model name header for MiMo models
+        if self.model_name.startswith("mimo"):
+            notes.append("## MiMo Model Notes")
+            notes.append("")
 
         # Add notes based on capability levels
         if self.profile.tool_following == CapabilityLevel.MODERATE:
@@ -576,12 +649,19 @@ This context is automatically provided. Use it to:
 
         if self.profile.reasoning == CapabilityLevel.MODERATE:
             notes.append("Break complex problems into smaller steps.")
+        
+        if self.profile.reasoning == CapabilityLevel.EXCELLENT:
+            notes.append("Think through problems explicitly and step by step before acting.")
 
         if not self.profile.supports_json_mode:
             notes.append("Format tool arguments carefully as JSON objects.")
 
         if notes:
             header = "## Model-Specific Notes\n\n" if self.profile.prompt_style == PromptStyle.DETAILED else "## Notes\n\n"
+            if self.model_name.startswith("mimo"):
+                # Remove the header since we added MiMo-specific header
+                notes_to_join = notes
+                return "\n".join(notes_to_join)
             return header + "\n".join(f"- {note}" for note in notes)
 
         return ""
