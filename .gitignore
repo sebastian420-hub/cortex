@@ -52,3 +52,30 @@ Thumbs.db
 .env
 .env.local
 
+# Session and debug files
+*.session.json
+BUG_FIX_PLAN.md
+CACHE_WARMING_COMPLETE_REPORT.md
+CORTES_STATUS_ANALYSIS_PLAN.md
+CORTEX_IMPROVEMENT_PROGRESS.md
+CORTEX_QUICK_STATUS_REPORT.md
+CORTEX_STATUS_CHECKLIST.md
+CURRENT_PROGRESS_REPORT.md
+IMPLEMENTATION_COMPLETE.md
+MEMORY_MANAGEMENT_SUMMARY.md
+RESEARCH_MEMORY_MANAGEMENT.md
+SESSION_CACHE_WARMING_COMPLETE.md
+SESSION_COMPLETE_REPORT.md
+SUMMARY_THIS_SESSION.md
+WORKING_TREE_ANALYSIS.md
+check_tools.py
+debug_*.py
+demo_*.py
+diagnose_*.py
+fix_*.py
+planning_*.py
+replicate_test.py
+run_single_test.py
+test_*.py
+nul
+
