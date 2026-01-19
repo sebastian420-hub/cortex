@@ -65,7 +65,8 @@ from .core.memory import (
     extract_memories_from_messages,
 )
 from .core.memory_layers import StateManager, AgentFocus
-from .core.prompt_adapter import adapt_system_prompt, get_profile_info
+from .core.prompt_adapter import get_profile_info
+from .core.prompts import adapt_prompt_for_model
 from .tools import TOOLS, create_tool_instance, get_registry
 from .ui.console import console
 from .utils.errors import retry_with_backoff, ModelError, create_error_response, create_success_response, ErrorType
@@ -802,8 +803,8 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         if orchestration_prompt:
             base_prompt += f"\n\n{orchestration_prompt}"
 
-        # Adapt prompt based on model capabilities
-        adapted_prompt = adapt_system_prompt(base_prompt, self.model)
+        # Adapt prompt based on model capabilities (now uses MiMo adapter)
+        adapted_prompt = adapt_prompt_for_model(base_prompt, self.model)
 
         # Log profile info for debugging
         profile_info = get_profile_info(self.model)
