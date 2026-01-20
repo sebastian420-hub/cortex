@@ -4,7 +4,7 @@ import difflib
 from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .modes import should_show_panels, is_minimal_mode, is_debug_mode
 
@@ -321,3 +321,74 @@ def display_operation_complete(
             parts.append(f"[dim]({duration_ms/1000:.1f}s)[/dim]")
 
     console.print(" ".join(parts))
+
+
+def display_tool_execution(
+    tool_name: str,
+    arguments: Dict[str, Any],
+    result: Dict[str, Any],
+    duration_ms: float,
+    show_arguments: bool = False,
+) -> None:
+    """
+    Display tool execution with mode awareness.
+    
+    Args:
+        tool_name: Name of the tool executed
+        arguments: Tool arguments
+        result: Tool result dictionary
+        duration_ms: Execution duration in milliseconds
+        show_arguments: Force showing arguments (for debug mode)
+    """
+    success = result.get("success", False)
+    
+    if is_minimal_mode():
+        # Minimal mode: simple icon and duration
+        icon = "⚙️"
+        color = "dim"
+        if duration_ms > 0:
+            if duration_ms < 1000:
+                console.print(f"[{color}]{icon} {tool_name} ({duration_ms:.0f}ms)[/{color}]")
+            else:
+                console.print(f"[{color}]{icon} {tool_name} ({duration_ms/1000:.1f}s)[/{color}]")
+        else:
+            console.print(f"[{color}]{icon} {tool_name}[/{color}]")
+    
+    elif is_debug_mode():
+        # Debug mode: detailed information
+        icon = "✓" if success else "✗"
+        color = "green" if success else "red"
+        
+        console.print(f"[{color}][TOOL] {tool_name} {icon}[/{color}]")
+        console.print(f"  [dim]Duration: {duration_ms:.2f}ms[/dim]")
+        
+        if show_arguments or is_debug_mode():
+            # Show arguments in debug mode
+            try:
+                import json
+                args_preview = json.dumps(arguments, indent=2)
+                # Limit preview length
+                if len(args_preview) > 500:
+                    args_preview = args_preview[:500] + "..."
+                console.print(f"  [dim]Arguments: {args_preview}[/dim]")
+            except:
+                console.print(f"  [dim]Arguments: {str(arguments)[:200]}[/dim]")
+        
+        # Show error if any
+        if "error" in result:
+            console.print(f"  [red]Error: {result.get('error')}[/red]")
+        
+        # Show metadata if available
+        if "metadata" in result:
+            console.print(f"  [dim]Metadata: {result.get('metadata')}[/dim]")
+    
+    else:
+        # Normal mode: current behavior (tools display their own output)
+        # We could optionally show a simple execution message here
+        icon = "⚙️"
+        color = "dim"
+        if duration_ms > 0:
+            if duration_ms < 1000:
+                console.print(f"[{color}]{icon} {tool_name} ({duration_ms:.0f}ms)[/{color}]")
+            else:
+                console.print(f"[{color}]{icon} {tool_name} ({duration_ms/1000:.1f}s)[/{color}]")

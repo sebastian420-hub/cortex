@@ -853,7 +853,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             formatted = self.formatter.format_response(response)
             self.formatter.write(formatted)
 
-    def _output_tool_result(self, tool_name: str, result: Dict[str, Any]) -> None:
+    def _output_tool_result(self, tool_name: str, result: Dict[str, Any], arguments: Optional[Dict[str, Any]] = None) -> None:
         """Output a tool result using the appropriate formatter."""
         if not self._is_text_output():
             formatted = self.formatter.format_tool_result(tool_name, result)
@@ -1035,6 +1035,10 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         if post_result.action == HookAction.MODIFY and post_result.modified_data:
             if "result" in post_result.modified_data:
                 result = post_result.modified_data["result"]
+
+        # Add duration to result for display
+        if isinstance(result, dict):
+            result["duration_ms"] = duration_ms
 
         return result
 

@@ -8,6 +8,7 @@ from .display import (
     display_thinking,
     display_progress_summary,
     display_operation_complete,
+    display_tool_execution,
 )
 from .repl import REPL
 from .progress import (
@@ -45,6 +46,7 @@ __all__ = [
     "display_thinking",
     "display_progress_summary",
     "display_operation_complete",
+    "display_tool_execution",
     # REPL
     "REPL",
     # Progress tracking
