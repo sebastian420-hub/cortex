@@ -36,6 +36,12 @@ class REPL:
             """Ctrl+L to clear screen"""
             console.clear()
 
+        @bindings.add('c-t')
+        def toggle_ui_mode_handler(event):
+            """Ctrl+T to toggle UI mode"""
+            from .modes import toggle_ui_mode
+            toggle_ui_mode()
+
         self.key_bindings = bindings
 
     def prompt(self, message: str = "> ") -> str:
@@ -44,13 +50,17 @@ class REPL:
 
     def show_banner(self, project_name: str, model: str, permission_mode: str) -> None:
         """Show welcome banner"""
+        from .modes import get_ui_mode
+        
+        ui_mode = get_ui_mode()
         banner = Panel(
             f"[bright_cyan]Cortex[/bright_cyan] - Unified Agent for Coding, Cybersecurity, and Personal Assistance\n\n"
             f"Project: [cyan]{project_name}[/cyan]\n"
             f"Model: [cyan]{model}[/cyan]\n"
-            f"Mode: [cyan]{permission_mode}[/cyan]\n\n"
+            f"Mode: [cyan]{permission_mode}[/cyan]\n"
+            f"UI: [cyan]{ui_mode.value}[/cyan]\n\n"
             f"[dim]Type your requests in natural language or /help for commands[/dim]\n"
-            f"[dim]Press Ctrl+D to exit, Ctrl+L to clear screen[/dim]",
+            f"[dim]Press Ctrl+D to exit, Ctrl+L to clear screen, Ctrl+T to toggle UI mode[/dim]",
             title="Cortex",
             title_align="right",
             border_style="cyan",
@@ -64,6 +74,7 @@ class REPL:
   /help              Show this help
   /clear             Clear conversation history
   /mode [normal|auto|plan]  Change permission mode
+  /ui [minimal|normal|debug] Change UI mode
   /project           Show project info
   /save [name]       Save current session
   /load [name]       Load a saved session
@@ -93,5 +104,6 @@ class REPL:
   - Press Ctrl+C to interrupt
   - Press Ctrl+D to exit
   - Press Ctrl+L to clear screen
+  - Press Ctrl+T to toggle UI mode (minimal/normal/debug)
 """
         console.print(Panel(help_text, title="Help"))

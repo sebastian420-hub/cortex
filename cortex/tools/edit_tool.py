@@ -19,6 +19,7 @@ from ..utils.errors import (
     ErrorType,
 )
 from ..cache import invalidate_file
+from ..ui.modes import is_minimal_mode
 
 
 class EditTool(Tool):
@@ -270,15 +271,40 @@ class EditTool(Tool):
                 diff_text += f"\n... ({len(diff) - 50} more lines)"
 
             # Use Syntax for diff highlighting
-            syntax = Syntax(diff_text, "diff", theme="monokai")
-            self.console.print(
-                Panel(syntax, title=f"Changes to {file_path}", border_style="yellow")
-            )
+            if is_minimal_mode():
+                # Minimal mode: simple diff display
+                self.console.print(f"[yellow][DIFF] {file_path}[/yellow]")
+                diff_lines = diff_text.split("\n")
+                # Show first few diff lines
+                for line in diff_lines[:10]:
+                    if line.startswith("+"):
+                        self.console.print(f"  [green]{line}[/green]")
+                    elif line.startswith("-"):
+                        self.console.print(f"  [red]{line}[/red]")
+                    elif line.startswith("@@"):
+                        self.console.print(f"  [cyan]{line}[/cyan]")
+                    else:
+                        self.console.print(f"  {line}")
+                if len(diff_lines) > 10:
+                    self.console.print(f"[dim]  ... ({len(diff_lines) - 10} more diff lines)[/dim]")
+            else:
+                syntax = Syntax(diff_text, "diff", theme="monokai")
+                self.console.print(
+                    Panel(syntax, title=f"Changes to {file_path}", border_style="yellow")
+                )
         else:
             # Fallback: show simple before/after
-            text = Text()
-            text.append("- ", style="red")
-            text.append(old_string[:100] + ("..." if len(old_string) > 100 else ""), style="red")
-            text.append("\n+ ", style="green")
-            text.append(new_string[:100] + ("..." if len(new_string) > 100 else ""), style="green")
-            self.console.print(Panel(text, title="Changes", border_style="yellow"))
+            if is_minimal_mode():
+                # Minimal mode: simple display
+                self.console.print(f"[yellow][DIFF] {file_path}[/yellow]")
+                old_preview = old_string[:50] + ("..." if len(old_string) > 50 else "")
+                new_preview = new_string[:50] + ("..." if len(new_string) > 50 else "")
+                self.console.print(f"  [red]- {old_preview}[/red]")
+                self.console.print(f"  [green]+ {new_preview}[/green]")
+            else:
+                text = Text()
+                text.append("- ", style="red")
+                text.append(old_string[:100] + ("..." if len(old_string) > 100 else ""), style="red")
+                text.append("\n+ ", style="green")
+                text.append(new_string[:100] + ("..." if len(new_string) > 100 else ""), style="green")
+                self.console.print(Panel(text, title="Changes", border_style="yellow"))

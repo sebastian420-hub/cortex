@@ -861,6 +861,7 @@ class OpenRouterProvider(ModelProvider):
         profile = get_model_profile(model)
         
         # Determine thinking budget based on task complexity
+        # Note: Some models may ignore max_tokens but it's good to provide
         if tools and len(tools) > 0:
             # Complex tasks with tools (coding, editing, etc.)
             # Use complex budget from profile or default 8000
@@ -870,6 +871,8 @@ class OpenRouterProvider(ModelProvider):
             # Use simple budget from profile or default 2000
             budget = profile.reasoning_budget.get("simple", 2000) if profile.reasoning_budget else 2000
         
+        # OpenRouter reasoning format for MiMo and similar models
+        # Uses "reasoning": {"max_tokens": budget} format
         config["reasoning"] = {"max_tokens": budget}
         
         return config

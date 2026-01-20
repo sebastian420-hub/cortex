@@ -19,6 +19,7 @@ from ..utils.errors import (
 from ..cache import get_file_cache, invalidate_file
 from ..core.memory_chunked.chunking import should_chunk_file, FileChunker, ChunkingStrategy
 from ..core.memory_chunked.chunk import create_file_chunk
+from ..ui.modes import is_minimal_mode
 
 
 class ReadFileTool(Tool):
@@ -108,12 +109,20 @@ class ReadFileTool(Tool):
             Standardized response with file content
         """
         if self.console:
-            if offset > 0 or limit > 0:
-                self.console.print(
-                    f"[cyan]Reading:[/cyan] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})"
-                )
+            if is_minimal_mode():
+                # Minimal mode: simpler message
+                if offset > 0 or limit > 0:
+                    self.console.print(f"[dim][FILE] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})[/dim]")
+                else:
+                    self.console.print(f"[dim][FILE] {path}[/dim]")
             else:
-                self.console.print(f"[cyan]Reading:[/cyan] {path}")
+                # Normal/debug mode: current display
+                if offset > 0 or limit > 0:
+                    self.console.print(
+                        f"[cyan]Reading:[/cyan] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})"
+                    )
+                else:
+                    self.console.print(f"[cyan]Reading:[/cyan] {path}")
 
         try:
             full_path = validate_path(self.project_dir, path)
@@ -228,19 +237,34 @@ class ReadFileTool(Tool):
 
             # Show preview in console
             if self.console:
-                ext = full_path.suffix.lstrip(".") or "txt"
-                preview_lines = truncated_lines[:15]
-                preview = "\n".join(preview_lines)
-                if len(truncated_lines) > 15:
-                    preview += f"\n... ({len(truncated_lines) - 15} more lines shown)"
+                if is_minimal_mode():
+                    # Minimal mode: clean display without panel
+                    line_count = len(truncated_lines)
+                    total_display = f" of {total_lines}" if was_truncated else ""
+                    cache_indicator = " [dim](cached)[/dim]" if from_cache else ""
+                    self.console.print(f"[cyan][FILE] {path}{cache_indicator} ({line_count} lines{total_display})[/cyan]")
+                    if truncated_lines:
+                        # Show first few lines
+                        preview_lines = truncated_lines[:min(3, len(truncated_lines))]
+                        for i, line in enumerate(preview_lines, start=start_line + 1):
+                            self.console.print(f"  {i:3d}: {line}")
+                        if len(truncated_lines) > 3:
+                            self.console.print(f"[dim]  ... ({len(truncated_lines) - 3} more lines)[/dim]")
+                else:
+                    # Normal/debug mode: panel display with syntax highlighting
+                    ext = full_path.suffix.lstrip(".") or "txt"
+                    preview_lines = truncated_lines[:15]
+                    preview = "\n".join(preview_lines)
+                    if len(truncated_lines) > 15:
+                        preview += f"\n... ({len(truncated_lines) - 15} more lines shown)"
 
-                syntax = Syntax(
-                    preview, ext, theme="monokai", line_numbers=True, start_line=start_line + 1
-                )
-                cache_indicator = " [dim](cached)[/dim]" if from_cache else ""
-                self.console.print(
-                    Panel(syntax, title=f"{path}{cache_indicator}", border_style="cyan")
-                )
+                    syntax = Syntax(
+                        preview, ext, theme="monokai", line_numbers=True, start_line=start_line + 1
+                    )
+                    cache_indicator = " [dim](cached)[/dim]" if from_cache else ""
+                    self.console.print(
+                        Panel(syntax, title=f"{path}{cache_indicator}", border_style="cyan")
+                    )
 
                 if was_truncated:
                     self.console.print(
@@ -342,7 +366,7 @@ class ReadFileTool(Tool):
             # Show chunk info in console
             if self.console:
                 self.console.print(
-                    f"[green]✓[/green] Created {len(chunks)} chunks "
+                    f"[green][OK][/green] Created {len(chunks)} chunks "
                     f"({sum(c.token_estimate for c in chunks)} tokens total)"
                 )
                 for i, chunk in enumerate(chunks[:10], 1):
@@ -404,7 +428,10 @@ class WriteFileTool(Tool):
             )
 
         if self.console:
-            self.console.print(f"[yellow]📝 Writing:[/yellow] {path}")
+            if is_minimal_mode():
+                self.console.print(f"[yellow][FILE] {path}[/yellow]")
+            else:
+                self.console.print(f"[yellow]📝 Writing:[/yellow] {path}")
 
         try:
             full_path = validate_path(self.project_dir, path)
@@ -413,34 +440,54 @@ class WriteFileTool(Tool):
             if full_path.exists():
                 old_content = full_path.read_text(encoding="utf-8")
                 if self.console:
-                    self.console.print(
-                        Panel(
-                            f"[red]- Old ({len(old_content)} bytes)[/red]\n"
-                            f"[green]+ New ({len(content)} bytes)[/green]",
-                            title="📊 Changes",
+                    if is_minimal_mode():
+                        self.console.print(f"[yellow][DIFF] {path} ({len(old_content)} → {len(content)} bytes)[/yellow]")
+                    else:
+                        self.console.print(
+                            Panel(
+                                f"[red]- Old ({len(old_content)} bytes)[/red]\n"
+                                f"[green]+ New ({len(content)} bytes)[/green]",
+                                title="[DIFF] Changes",
+                            )
                         )
-                    )
 
             # Show preview of new content
             if self.console:
-                ext = full_path.suffix.lstrip(".") or "txt"
-                content_lines = content.split("\n")
-                preview_lines = content_lines[:20]
-                preview = "\n".join(preview_lines)
-                if len(content_lines) > 20:
-                    more_lines = len(content_lines) - 20
-                    preview += f"\n... ({more_lines} more lines)"
+                if is_minimal_mode():
+                    # Minimal mode: simple preview
+                    content_lines = content.split("\n")
+                    line_count = len(content_lines)
+                    self.console.print(f"[cyan][FILE] {path} ({line_count} lines)[/cyan]")
+                    if content_lines:
+                        # Show first few lines
+                        preview_lines = content_lines[:min(3, len(content_lines))]
+                        for i, line in enumerate(preview_lines, 1):
+                            self.console.print(f"  {i:3d}: {line}")
+                        if line_count > 3:
+                            self.console.print(f"[dim]  ... ({line_count - 3} more lines)[/dim]")
+                else:
+                    # Normal/debug mode: panel display
+                    ext = full_path.suffix.lstrip(".") or "txt"
+                    content_lines = content.split("\n")
+                    preview_lines = content_lines[:20]
+                    preview = "\n".join(preview_lines)
+                    if len(content_lines) > 20:
+                        more_lines = len(content_lines) - 20
+                        preview += f"\n... ({more_lines} more lines)"
 
-                syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
-                self.console.print(
-                    Panel(syntax, title=f"New content: {path}", border_style="yellow")
-                )
+                    syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
+                    self.console.print(
+                        Panel(syntax, title=f"New content: {path}", border_style="yellow")
+                    )
 
             # Ask for approval
             if self.permission_mode == PermissionMode.NORMAL and self.console:
                 if not Confirm.ask(f"[bold]Write to {path}?[/bold]"):
                     if self.console:
-                        self.console.print("[red]✗[/red] Cancelled by user")
+                        if is_minimal_mode():
+                            self.console.print("[red][X] Cancelled by user[/red]")
+                        else:
+                            self.console.print("[red]✗[/red] Cancelled by user")
                     return create_permission_denial(
                         "Cancelled by user", "write_file", {"path": path}
                     )
@@ -477,7 +524,10 @@ class WriteFileTool(Tool):
             invalidate_file(full_path)
 
             if self.console:
-                self.console.print(f"[green]✓[/green] Wrote {len(content)} bytes to {path}")
+                if is_minimal_mode():
+                    self.console.print(f"[green][OK] Wrote {len(content)} bytes to {path}[/green]")
+                else:
+                    self.console.print(f"[green]✓[/green] Wrote {len(content)} bytes to {path}")
 
             return create_success_response({"bytes_written": len(content)})
 

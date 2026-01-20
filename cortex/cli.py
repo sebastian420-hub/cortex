@@ -32,6 +32,7 @@ from .core.model_capabilities import get_model_profile, list_all_profiles
 from .core.prompts import get_adapter_info
 from .ui.console import console
 from .ui.repl import REPL
+from .ui.modes import UIMode, set_ui_mode
 from .storage.history import get_history_file
 from .storage.sessions import SessionManager
 from .output import OutputFormat
@@ -252,6 +253,13 @@ Examples:
         "--hooks-config", type=str, default=None, help="Path to hooks configuration file (YAML)"
     )
 
+    parser.add_argument(
+        "--ui-mode",
+        choices=["minimal", "normal", "debug"],
+        default=None,
+        help="UI display mode: minimal (Claude Code style), normal (rich panels), debug (development details)"
+    )
+
     args = parser.parse_args()
 
     # Handle list-providers command
@@ -347,6 +355,15 @@ Examples:
         output_format = OutputFormat(args.output_format)
     elif config.output_format:
         output_format = OutputFormat(config.output_format)
+
+    # Set UI mode
+    if args.ui_mode:
+        ui_mode = UIMode(args.ui_mode)
+        set_ui_mode(ui_mode)
+        console.print(f"[dim]UI mode: {ui_mode.value}[/dim]")
+    else:
+        # Default to minimal mode (Claude Code style)
+        set_ui_mode(UIMode.MINIMAL)
 
     # Set up hook manager
     hook_manager = HookManager()
@@ -615,6 +632,7 @@ def run_interactive(
 def handle_command(command: str, agent: Cortex, session_manager: SessionManager, repl: REPL):
     """Handle special commands"""
     from datetime import datetime
+    from .ui.modes import UIMode, set_ui_mode, get_ui_mode
 
     logger = logging.getLogger(__name__) # Initialize logger here
     logger.debug(f"Handling command: '{command}'")
@@ -698,6 +716,24 @@ def handle_command(command: str, agent: Cortex, session_manager: SessionManager,
         else:
             console.print(f"Current mode: {agent.permission_mode}")
             
+    elif cmd.startswith("/ui"):
+        parts = cmd.split()
+        if len(parts) > 1:
+            mode_str = parts[1]
+            try:
+                mode = UIMode(mode_str)
+                set_ui_mode(mode)
+                console.print(f"[green]✓[/green] UI mode changed to: {mode.value}")
+            except ValueError:
+                console.print(f"[red]Invalid UI mode. Use: minimal, normal, or debug[/red]")
+        else:
+            current_mode = get_ui_mode()
+            console.print(f"Current UI mode: {current_mode.value}")
+            console.print(f"[dim]Usage: /ui <minimal|normal|debug>[/dim]")
+            console.print(f"[dim]  minimal: Claude Code style (clean, no panels)[/dim]")
+            console.print(f"[dim]  normal: Rich panels and detailed displays[/dim]")
+            console.print(f"[dim]  debug: Development details and timing[/dim]")
+
     elif cmd == "/project":
         info = f"""
 [bold]Project Information[/bold]

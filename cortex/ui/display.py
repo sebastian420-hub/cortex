@@ -6,6 +6,8 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from typing import Optional
 
+from .modes import should_show_panels, is_minimal_mode, is_debug_mode
+
 console = Console()
 
 
@@ -21,7 +23,25 @@ def show_file_diff(old_content: str, new_content: str, path: str) -> None:
     diff_text = "".join(diff)
 
     if diff_text:
-        console.print(Panel(diff_text, title=f"📊 Diff: {path}", border_style="yellow"))
+        if is_minimal_mode():
+            # Minimal mode: show diff without panel
+            console.print(f"[yellow][DIFF] {path}[/yellow]")
+            diff_lines = diff_text.split("\n")
+            # Only show first few diff lines in minimal mode
+            for line in diff_lines[:10]:
+                if line.startswith("+"):
+                    console.print(f"  [green]{line}[/green]")
+                elif line.startswith("-"):
+                    console.print(f"  [red]{line}[/red]")
+                elif line.startswith("@@"):
+                    console.print(f"  [cyan]{line}[/cyan]")
+                else:
+                    console.print(f"  {line}")
+            if len(diff_lines) > 10:
+                console.print(f"[dim]  ... ({len(diff_lines) - 10} more diff lines)[/dim]")
+        else:
+            # Normal/debug mode: panel display
+            console.print(Panel(diff_text, title=f"[DIFF] {path}", border_style="yellow"))
     else:
         console.print(f"[dim]No changes in {path}[/dim]")
 
@@ -30,14 +50,28 @@ def show_file_preview(content: str, path: str, max_lines: int = 20) -> None:
     """Show a syntax-highlighted preview of file content"""
     ext = path.split(".")[-1] if "." in path else "txt"
     content_lines = content.split("\n")
-    preview_lines = content_lines[:max_lines]
-    preview = "\n".join(preview_lines)
-    if len(content_lines) > max_lines:
-        more_lines = len(content_lines) - max_lines
-        preview += f"\n... ({more_lines} more lines)"
+    line_count = len(content_lines)
+    
+    if is_minimal_mode():
+        # Minimal mode: clean display without panel
+        console.print(f"[cyan][FILE] {path} ({line_count} lines)[/cyan]")
+        if content_lines:
+            # Show first few lines
+            preview_lines = content_lines[:min(3, len(content_lines))]
+            for i, line in enumerate(preview_lines, 1):
+                console.print(f"  {i:3d}: {line}")
+            if line_count > 3:
+                console.print(f"[dim]  ... ({line_count - 3} more lines)[/dim]")
+    else:
+        # Normal/debug mode: panel display with syntax highlighting
+        preview_lines = content_lines[:max_lines]
+        preview = "\n".join(preview_lines)
+        if len(content_lines) > max_lines:
+            more_lines = len(content_lines) - max_lines
+            preview += f"\n... ({more_lines} more lines)"
 
-    syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
-    console.print(Panel(syntax, title=f"📄 {path}", border_style="cyan"))
+        syntax = Syntax(preview, ext, theme="monokai", line_numbers=True)
+        console.print(Panel(syntax, title=f"[FILE] {path}", border_style="cyan"))
 
 
 def warn_large_file(size: int, threshold: int = 100000) -> bool:
@@ -70,30 +104,46 @@ def display_thinking(
     if not content:
         return
 
-    if expanded:
-        # Full display with panel
-        console.print(
-            Panel(
-                content,
-                title="[bold yellow]💭 Thinking[/bold yellow]",
-                border_style="yellow",
-                padding=(0, 1),
-            )
-        )
-    else:
-        # Minimal one-liner preview (no panel, no box)
-        lines = content.split("\n")
-        first_line = lines[0].strip() if lines else ""
-
-        # Truncate if too long
-        if len(first_line) > max_preview_length:
-            preview = first_line[:max_preview_length] + "..."
+    if is_minimal_mode():
+        # In minimal mode, never show panels
+        if expanded:
+            # Show full thinking content without panel
+            console.print(f"[dim][THINK] Thinking:[/dim]")
+            lines = content.split("\n")
+            for line in lines:
+                console.print(f"[dim]  {line}[/dim]")
         else:
-            preview = first_line
-
-        # Simple dim one-liner
-        if preview:
-            console.print(f"[dim]💭 {preview}[/dim]")
+            # Minimal one-liner preview
+            lines = content.split("\n")
+            first_line = lines[0].strip() if lines else ""
+            if len(first_line) > max_preview_length:
+                preview = first_line[:max_preview_length] + "..."
+            else:
+                preview = first_line
+            if preview:
+                console.print(f"[dim][THINK] {preview}[/dim]")
+    else:
+        # Normal/debug mode
+        if expanded:
+            # Full display with panel
+            console.print(
+                Panel(
+                    content,
+                    title="[bold yellow][THINK] Thinking[/bold yellow]",
+                    border_style="yellow",
+                    padding=(0, 1),
+                )
+            )
+        else:
+            # Minimal one-liner preview (no panel, no box)
+            lines = content.split("\n")
+            first_line = lines[0].strip() if lines else ""
+            if len(first_line) > max_preview_length:
+                preview = first_line[:max_preview_length] + "..."
+            else:
+                preview = first_line
+            if preview:
+                console.print(f"[dim][THINK] {preview}[/dim]")
 
 
 def display_reasoning_details(
@@ -110,67 +160,114 @@ def display_reasoning_details(
     if not reasoning_details or not isinstance(reasoning_details, list):
         return
     
-    if expanded:
-        # Full display with panel
-        for detail in reasoning_details:
-            detail_type = detail.get("type", "")
-            if detail_type == "reasoning.text":
-                content = detail.get("text", "")
-                if content:
-                    console.print(
-                        Panel(
-                            content,
-                            title=f"[bold yellow]💭 {detail_type}[/bold yellow]",
-                            border_style="yellow",
-                            padding=(0, 1),
-                        )
-                    )
-            elif detail_type == "reasoning.summary":
-                summary = detail.get("summary", "")
-                if summary:
-                    console.print(
-                        Panel(
-                            summary,
-                            title=f"[bold yellow]📋 Summary[/bold yellow]",
-                            border_style="yellow",
-                            padding=(0, 1),
-                        )
-                    )
-            elif detail_type == "reasoning.encrypted":
-                console.print(
-                    Panel(
-                        "[dim]Encrypted reasoning data[/dim]",
-                        title=f"[bold yellow]🔒 Encrypted[/bold yellow]",
-                        border_style="yellow",
-                        padding=(0, 1),
-                    )
-                )
+    if is_minimal_mode():
+        # In minimal mode, never show panels
+        if expanded:
+            # Show all reasoning details without panels
+            for detail in reasoning_details:
+                detail_type = detail.get("type", "")
+                if detail_type == "reasoning.text":
+                    content = detail.get("text", "")
+                    if content:
+                        console.print(f"[dim][THINK] Thinking:[/dim]")
+                        lines = content.split("\n")
+                        for line in lines:
+                            console.print(f"[dim]  {line}[/dim]")
+                elif detail_type == "reasoning.summary":
+                    summary = detail.get("summary", "")
+                    if summary:
+                        console.print(f"[dim][SUM] Summary: {summary}[/dim]")
+                elif detail_type == "reasoning.encrypted":
+                    console.print(f"[dim][LOCK] Encrypted reasoning data[/dim]")
+        else:
+            # Minimal preview - show first text or summary
+            for detail in reasoning_details:
+                detail_type = detail.get("type", "")
+                if detail_type == "reasoning.text":
+                    content = detail.get("text", "")
+                    if content:
+                        lines = content.split("\n")
+                        first_line = lines[0].strip() if lines else ""
+                        if len(first_line) > max_preview_length:
+                            preview = first_line[:max_preview_length] + "..."
+                        else:
+                            preview = first_line
+                        if preview:
+                            console.print(f"[dim][THINK] {preview}[/dim]")
+                        break
+                elif detail_type == "reasoning.summary":
+                    summary = detail.get("summary", "")
+                    if summary:
+                        if len(summary) > max_preview_length:
+                            preview = summary[:max_preview_length] + "..."
+                        else:
+                            preview = summary
+                        if preview:
+                            console.print(f"[dim][SUM] {preview}[/dim]")
+                        break
     else:
-        # Minimal preview - show first text or summary
-        for detail in reasoning_details:
-            detail_type = detail.get("type", "")
-            if detail_type == "reasoning.text":
-                content = detail.get("text", "")
-                if content:
-                    lines = content.split("\n")
-                    first_line = lines[0].strip() if lines else ""
-                    if len(first_line) > max_preview_length:
-                        preview = first_line[:max_preview_length] + "..."
-                    else:
-                        preview = first_line
-                    if preview:
-                        console.print(f"[dim]💭 {preview}[/dim]")
-                    break
-            elif detail_type == "reasoning.summary":
-                summary = detail.get("summary", "")
-                if summary:
-                    if len(summary) > max_preview_length:
-                        preview = summary[:max_preview_length] + "..."
-                    else:
-                        preview = summary
-                    if preview:
-                        console.print(f"[dim]📋 {preview}[/dim]")
-                    break
+        # Normal/debug mode
+        if expanded:
+            # Full display with panel
+            for detail in reasoning_details:
+                detail_type = detail.get("type", "")
+                if detail_type == "reasoning.text":
+                    content = detail.get("text", "")
+                    if content:
+                        console.print(
+                            Panel(
+                                content,
+                                title=f"[bold yellow][THINK] {detail_type}[/bold yellow]",
+                                border_style="yellow",
+                                padding=(0, 1),
+                            )
+                        )
+                elif detail_type == "reasoning.summary":
+                    summary = detail.get("summary", "")
+                    if summary:
+                        console.print(
+                            Panel(
+                                summary,
+                                title=f"[bold yellow][SUM] Summary[/bold yellow]",
+                                border_style="yellow",
+                                padding=(0, 1),
+                            )
+                        )
+                elif detail_type == "reasoning.encrypted":
+                    console.print(
+                        Panel(
+                            "[dim]Encrypted reasoning data[/dim]",
+                            title=f"[bold yellow][LOCK] Encrypted[/bold yellow]",
+                            border_style="yellow",
+                            padding=(0, 1),
+                        )
+                    )
+        else:
+            # Minimal preview - show first text or summary
+            for detail in reasoning_details:
+                detail_type = detail.get("type", "")
+                if detail_type == "reasoning.text":
+                    content = detail.get("text", "")
+                    if content:
+                        lines = content.split("\n")
+                        first_line = lines[0].strip() if lines else ""
+                        if len(first_line) > max_preview_length:
+                            preview = first_line[:max_preview_length] + "..."
+                        else:
+                            preview = first_line
+                        if preview:
+                            console.print(f"[dim][THINK] {preview}[/dim]")
+                        break
+                elif detail_type == "reasoning.summary":
+                    summary = detail.get("summary", "")
+                    if summary:
+                        if len(summary) > max_preview_length:
+                            preview = summary[:max_preview_length] + "..."
+                        else:
+                            preview = summary
+                        if preview:
+                            console.print(f"[dim][SUM] {preview}[/dim]")
+                        break
 
 
 def display_progress_summary(
@@ -209,7 +306,7 @@ def display_operation_complete(
         summary: Brief summary of results
         duration_ms: Duration in milliseconds
     """
-    icon = "✓" if success else "✗"
+    icon = "[OK]" if success else "[X]"
     color = "green" if success else "red"
 
     parts = [f"[{color}]{icon}[/{color}] {operation}"]

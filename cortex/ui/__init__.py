@@ -24,6 +24,17 @@ from .plan_progress import (
     create_plan_display,
     show_step_status,
 )
+from .modes import (
+    UIMode,
+    UIManager,
+    ui_manager,
+    get_ui_mode,
+    set_ui_mode,
+    toggle_ui_mode,
+    should_show_panels,
+    is_minimal_mode,
+    is_debug_mode,
+)
 
 __all__ = [
     "console",
@@ -48,4 +59,14 @@ __all__ = [
     "PlanProgressDisplay",
     "create_plan_display",
     "show_step_status",
+    # UI modes
+    "UIMode",
+    "UIManager",
+    "ui_manager",
+    "get_ui_mode",
+    "set_ui_mode",
+    "toggle_ui_mode",
+    "should_show_panels",
+    "is_minimal_mode",
+    "is_debug_mode",
 ]
