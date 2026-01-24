@@ -168,8 +168,7 @@ class ConsolidatedDisplay:
             console_instance: Optional Rich console to use
         """
         self.console = console_instance or console
-        self.ui_mode = get_ui_mode()
-        
+
         # Operation tracking
         self._operations: Dict[str, Operation] = {}
         self._operation_groups: Dict[str, List[Operation]] = {}
@@ -185,8 +184,8 @@ class ConsolidatedDisplay:
         self._progress_tracker = OperationTracker(self.console)
         self._plan_display = PlanProgressDisplay(self.console)
         
-        # Threading
-        self._lock = threading.Lock()
+        # Threading - use RLock to prevent deadlock when update_operation_status is called from within track_operations
+        self._lock = threading.RLock()
 
         # Context stats for footer
         self._context_stats: Optional[Dict[str, Any]] = None
@@ -199,28 +198,33 @@ class ConsolidatedDisplay:
     def track_operations(self, tool_calls: List[Any], agent_description: str = "Processing"):
         """
         Context manager for tracking operations.
-        
+
         Args:
             tool_calls: List of tool calls being executed
             agent_description: Description of what the agent is doing
         """
+        # Lock only for critical section (setup)
         with self._lock:
             self._is_tracking = True
             self._start_time = time.time()
-            
+
             # Create operations from tool calls
             self._create_operations(tool_calls)
-            
+
             # Group operations
             self._operation_groups = self._grouper.group_operations(list(self._operations.values()))
-            
-            # Start live display
-            self._start_live_display(agent_description)
-            
-            try:
-                yield self
-            finally:
-                self._stop_live_display()
+
+        # Start live display outside lock to avoid blocking
+        self._start_live_display(agent_description)
+
+        try:
+            yield self
+        finally:
+            # Stop display and cleanup
+            self._stop_live_display()
+
+            # Lock only for cleanup
+            with self._lock:
                 self._is_tracking = False
     
     def is_tracking(self) -> bool:
@@ -328,21 +332,27 @@ class ConsolidatedDisplay:
     
     def _start_live_display(self, agent_description: str):
         """Start the live display."""
-        if self.ui_mode == UIMode.MINIMAL:
+        ui_mode = get_ui_mode()  # Get current UI mode dynamically
+        if ui_mode == UIMode.MINIMAL:
             # Minimal mode: simple status line
             self.console.print(f"[cyan]🔍 {agent_description}...[/cyan]")
-        elif self.ui_mode == UIMode.NORMAL:
+        elif ui_mode == UIMode.NORMAL:
             # Normal mode: detailed progress display
             self._create_detailed_display(agent_description)
-        # Debug mode: show everything (default behavior)
+        elif ui_mode == UIMode.DEBUG:
+            # Debug mode: detailed display with extra information
+            self._create_detailed_display(agent_description)
     
     def _stop_live_display(self):
         """Stop the live display and show final summary."""
-        if self.ui_mode == UIMode.MINIMAL:
+        ui_mode = get_ui_mode()  # Get current UI mode dynamically
+        if ui_mode == UIMode.MINIMAL:
             self._show_minimal_summary()
-        elif self.ui_mode == UIMode.NORMAL:
+        elif ui_mode == UIMode.NORMAL:
             self._show_detailed_summary()
-        
+        elif ui_mode == UIMode.DEBUG:
+            self._show_detailed_summary()  # Same as normal but could add more debug info
+
         # Ensure live display is properly stopped
         if self._live_display:
             try:
@@ -368,7 +378,8 @@ class ConsolidatedDisplay:
     
     def _build_display_content(self, agent_description: str):
         """Build the content for the live display."""
-        if self.ui_mode == UIMode.MINIMAL:
+        ui_mode = get_ui_mode()  # Get current UI mode dynamically
+        if ui_mode == UIMode.MINIMAL:
             return self._build_minimal_display(agent_description)
         else:
             return self._build_detailed_display(agent_description)
@@ -528,10 +539,9 @@ class ConsolidatedDisplay:
         completed = sum(1 for op in self._operations.values() if op.status == OperationStatus.COMPLETED)
         failed = sum(1 for op in self._operations.values() if op.status == OperationStatus.FAILED)
         total = len(self._operations)
-        
-        if self._live_display:
-            self._live_display.stop()
-        
+
+        # Note: live display is stopped in _stop_live_display, not here to avoid double stop
+
         # Show summary table
         summary_table = Table(title="Operation Summary", show_header=False, border_style="green")
         summary_table.add_column("Metric", style="dim")
