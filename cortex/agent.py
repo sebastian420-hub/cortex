@@ -1429,13 +1429,23 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                         # No more tools - final response
                         final_text = response_message.get("content", "")
                         reasoning = response_message.get("reasoning_content", "")
-    
+
                         if final_text:
                             self._output_response({"content": final_text}, is_final=True)
                             return
                         elif reasoning:
-                            # Model had reasoning but no content - this can happen with some models
-                            # The thinking was already displayed above, so just exit cleanly
+                            # Model had reasoning but no content - check if it's confused about tools
+                            tool_syntax_patterns = ['<tool_call>', '</tool_call>', 'function_call', 'tool_use']
+                            has_tool_syntax = any(pattern in reasoning.lower() for pattern in tool_syntax_patterns)
+
+                            if has_tool_syntax:
+                                self._output_warning(
+                                    "Model attempted to use tools in reasoning but didn't properly format tool calls. "
+                                    "This may be a provider issue or model incompatibility."
+                                )
+                            else:
+                                # Normal reasoning-only response (thinking was already displayed)
+                                logger.debug("Reasoning-only response received, exiting cleanly")
                             return
                         else:
                             # Truly empty response - this shouldn't happen
@@ -1799,8 +1809,18 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                             self._output_response({"content": final_text}, is_final=True)
                             return
                         elif reasoning:
-                            # Model had reasoning but no content - this can happen with some models
-                            # The thinking was already displayed above, so just exit cleanly
+                            # Model had reasoning but no content - check if it's confused about tools
+                            tool_syntax_patterns = ['<tool_call>', '</tool_call>', 'function_call', 'tool_use']
+                            has_tool_syntax = any(pattern in reasoning.lower() for pattern in tool_syntax_patterns)
+
+                            if has_tool_syntax:
+                                self._output_warning(
+                                    "Model attempted to use tools in reasoning but didn't properly format tool calls. "
+                                    "This may be a provider issue or model incompatibility."
+                                )
+                            else:
+                                # Normal reasoning-only response (thinking was already displayed)
+                                logger.debug("Reasoning-only response received, exiting cleanly")
                             return
                         else:
                             # Truly empty response - this shouldn't happen

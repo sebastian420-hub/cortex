@@ -71,13 +71,29 @@ class ConversationManager:
         # Validate that assistant messages have at least content or tool_calls
         # This prevents "Invalid assistant message" API errors
         if not content and not tool_calls:
-            logger.warning("Attempted to add invalid assistant message (no content or tool_calls). "
-                          "Converting reasoning_content to content if available.")
-            # If we have reasoning_content, convert it to content
+            # Check if this is reasoning-only response or truly invalid
             if reasoning_content:
+                # Check if reasoning contains tool syntax (indicates model confusion)
+                tool_syntax_patterns = ['<tool_call>', '</tool_call>', 'function_call', 'tool_use', '<function_call>']
+                has_tool_syntax = any(pattern in reasoning_content.lower() for pattern in tool_syntax_patterns)
+
+                if has_tool_syntax:
+                    logger.warning(
+                        "Model returned reasoning with tool syntax but no actual tool_calls. "
+                        "This may indicate a provider parsing issue or model confusion. "
+                        f"Reasoning preview: {reasoning_content[:150]}..."
+                    )
+                else:
+                    # Normal reasoning-only response (e.g., model thinking without output yet)
+                    logger.debug("Reasoning-only assistant message (no content or tool_calls). "
+                                "Converting reasoning_content to content.")
+
+                # Convert reasoning to content for valid message structure
                 content = f"[Reasoning: {reasoning_content[:200]}{'...' if len(reasoning_content) > 200 else ''}]"
             else:
-                # Fallback: create minimal content to prevent API errors
+                # Truly empty response - this shouldn't happen
+                logger.warning("Attempted to add completely empty assistant message (no content, tool_calls, or reasoning). "
+                              "Adding placeholder content to prevent API errors.")
                 content = "[Empty assistant response]"
 
         msg: Dict[str, Any] = {"role": "assistant"}
