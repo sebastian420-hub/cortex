@@ -107,6 +107,15 @@ DEFAULT_ROUTING = {
     "log_file": None,
 }
 
+# Default context compression/summarization settings
+DEFAULT_CONTEXT_COMPRESSION = {
+    "summarization_threshold": 0.75,  # Trigger at 75% (was 0.8)
+    "compression_ratio": 0.2,  # Target 20% of original
+    "preserve_tool_results": True,
+    "preserve_errors": True,
+    "large_file_threshold": 5000,  # Tokens threshold for large file warnings
+}
+
 
 class AgentConfig:
     """

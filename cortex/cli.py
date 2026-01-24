@@ -745,6 +745,35 @@ Tokens: {agent.conversation.get_token_count()}
 """
         console.print(Panel(info, title="Project"))
 
+    elif cmd == "/stats":
+        # Show detailed session statistics
+        from rich.table import Table
+
+        stats = agent.conversation.get_truncation_stats()
+
+        table = Table(title="Session Statistics", show_header=True, header_style="bold cyan")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green", justify="right")
+
+        # Token statistics
+        table.add_row("Current Tokens", f"{stats['current_token_count']:,}")
+        table.add_row("Max Tokens", f"{stats['max_tokens']:,}")
+        table.add_row("Utilization", f"{stats['token_utilization']:.1f}%")
+        table.add_row("Remaining", f"{stats['tokens_remaining']:,}")
+        table.add_row("", "")
+
+        # Message statistics
+        table.add_row("Messages", str(stats['current_message_count']))
+        table.add_row("Avg Tokens/Msg", f"{stats['avg_tokens_per_message']:.0f}")
+        table.add_row("", "")
+
+        # Optimization statistics
+        table.add_row("Truncations", str(stats['truncation_count']))
+        table.add_row("Summarizations", str(stats['summarization_count']))
+        table.add_row("Messages Removed", str(stats['total_messages_removed']))
+
+        console.print(table)
+
     elif cmd.startswith("/save"):
         parts = cmd.split()
         session_name = (

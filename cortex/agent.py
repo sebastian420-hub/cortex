@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable, Union
@@ -13,6 +14,9 @@ from rich.panel import Panel
 from rich.markdown import Markdown
 
 logger = logging.getLogger(__name__)
+
+# Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
+SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
 
 from .models import PermissionMode
 from .config import AgentConfig
@@ -69,6 +73,7 @@ from .core.prompt_adapter import get_profile_info
 from .core.prompts import adapt_prompt_for_model
 from .tools import TOOLS, create_tool_instance, get_registry
 from .ui.console import console
+from .ui.consolidated_display import get_consolidated_display, create_consolidated_console, OperationStatus
 from .utils.errors import retry_with_backoff, ModelError, create_error_response, create_success_response, ErrorType
 
 # Hook system imports
@@ -1042,6 +1047,44 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
 
         return result
 
+    def _get_agent_description(self, tool_calls: List[ToolCall]) -> str:
+        """Get a descriptive agent message for the operation."""
+        if not tool_calls:
+            return "Processing"
+        
+        # Count operations by type
+        operation_counts = {}
+        for tool_call in tool_calls:
+            tool_name = tool_call.name.lower()
+            if "read" in tool_name:
+                operation_counts["read"] = operation_counts.get("read", 0) + 1
+            elif "write" in tool_name or "edit" in tool_name:
+                operation_counts["write"] = operation_counts.get("write", 0) + 1
+            elif "search" in tool_name or "grep" in tool_name:
+                operation_counts["search"] = operation_counts.get("search", 0) + 1
+            elif "execute" in tool_name:
+                operation_counts["execute"] = operation_counts.get("execute", 0) + 1
+            else:
+                operation_counts["other"] = operation_counts.get("other", 0) + 1
+        
+        # Create descriptive message
+        if len(operation_counts) == 1:
+            op_type = list(operation_counts.keys())[0]
+            count = list(operation_counts.values())[0]
+            if op_type == "read":
+                return f"Reading {count} file{'s' if count > 1 else ''}"
+            elif op_type == "write":
+                return f"Writing {count} file{'s' if count > 1 else ''}"
+            elif op_type == "search":
+                return f"Searching for {count} pattern{'s' if count > 1 else ''}"
+            elif op_type == "execute":
+                return f"Executing {count} command{'s' if count > 1 else ''}"
+            else:
+                return f"Processing {count} operation{'s' if count > 1 else ''}"
+        else:
+            total = sum(operation_counts.values())
+            return f"Processing {total} operations"
+
     def _is_tool_result_success(self, result: Dict[str, Any]) -> bool:
         """Check if tool result indicates success"""
         return result.get("success", False) and "error" not in result
@@ -1196,7 +1239,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     # Get tools from registry (includes delegation tools)
                     tools = get_registry().get_all_schemas()
 
-                    with console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                    with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
                         if (
                             use_streaming
                             and stream_model_response
@@ -1250,17 +1293,38 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                         # Create ToolCall objects for batch execution
                         tool_calls_to_run = []
                         for i, tool_call_data in enumerate(response_message["tool_calls"]):
+                            # Parse arguments from JSON string to dict
+                            try:
+                                parsed_arguments = json.loads(tool_call_data["function"]["arguments"])
+                            except (json.JSONDecodeError, KeyError, TypeError):
+                                # Fallback to empty dict if parsing fails
+                                parsed_arguments = {}
+
                             tool_calls_to_run.append(
                                 ToolCall(
                                     id=tool_call_data.get("id", f"call_{iteration}_{i}"),
                                     name=tool_call_data["function"]["name"],
-                                    arguments=tool_call_data["function"]["arguments"],
+                                    arguments=parsed_arguments,
                                     index=i,
                                 )
                             )
     
-                        # Execute tools in batch
-                        batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
+                        # Execute tools in batch with consolidated display
+                        consolidated_display = get_consolidated_display()
+                        agent_description = self._get_agent_description(tool_calls_to_run)
+                        
+                        with consolidated_display.track_operations(tool_calls_to_run, agent_description):
+                            batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
+                            
+                            # Update operation status as tools complete
+                            for tool_result in batch_result.results:
+                                operation_id = f"op_{tool_result.index}_{tool_result.name}"
+                                status = OperationStatus.COMPLETED if tool_result.success else OperationStatus.FAILED
+                                result_text = tool_result.result.get("content", "") if tool_result.success else tool_result.result.get("error", "")
+                                
+                                consolidated_display.update_operation_status(
+                                    operation_id, status, result=result_text, error=tool_result.error
+                                )
     
                         # Process results
                         for tool_result in batch_result.results:
@@ -1539,7 +1603,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                     tools = await asyncio.to_thread(get_registry().get_all_schemas)
 
                     # Show thinking indicator
-                    with console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                    with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
                         if (
                             use_streaming
                             and stream_model_response
@@ -1607,11 +1671,18 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                         # Create ToolCall objects for batch execution
                         tool_calls_to_run = []
                         for i, tool_call_data in enumerate(response_message["tool_calls"]):
+                            # Parse arguments from JSON string to dict
+                            try:
+                                parsed_arguments = json.loads(tool_call_data["function"]["arguments"])
+                            except (json.JSONDecodeError, KeyError, TypeError):
+                                # Fallback to empty dict if parsing fails
+                                parsed_arguments = {}
+
                             tool_calls_to_run.append(
                                 ToolCall(
                                     id=tool_call_data.get("id", f"call_{iteration}_{i}"),
                                     name=tool_call_data["function"]["name"],
-                                    arguments=tool_call_data["function"]["arguments"],
+                                    arguments=parsed_arguments,
                                     index=i,
                                 )
                             )

@@ -25,7 +25,7 @@ class ConversationManager:
         on_truncation: Optional[Callable[[int, int], None]] = None,
         summarizer: Optional["ConversationSummarizer"] = None,
         enable_summarization: bool = True,
-        summarization_threshold: float = 0.8,
+        summarization_threshold: float = 0.75,
     ):
         """
         Initialize conversation manager.
@@ -139,6 +139,20 @@ class ConversationManager:
         """Optimize conversation history if it exceeds token limit."""
         current_tokens = get_conversation_tokens(self.history, self.model)
 
+        # Calculate utilization and issue progressive warnings
+        utilization = current_tokens / self.max_tokens if self.max_tokens > 0 else 0
+
+        # Progressive warnings at 70%, 80%, 90%
+        if utilization >= 0.9 and not getattr(self, '_warned_90', False):
+            logger.warning(f"⚠️ Context window at {utilization*100:.1f}% capacity!")
+            self._warned_90 = True
+        elif utilization >= 0.8 and not getattr(self, '_warned_80', False):
+            logger.warning(f"Context window at {utilization*100:.1f}% capacity")
+            self._warned_80 = True
+        elif utilization >= 0.7 and not getattr(self, '_warned_70', False):
+            logger.info(f"Context window at {utilization*100:.1f}% capacity")
+            self._warned_70 = True
+
         # Check if we need to optimize
         if current_tokens <= self.max_tokens:
             return
@@ -238,18 +252,24 @@ class ConversationManager:
 
     def get_truncation_stats(self) -> Dict[str, Any]:
         """
-        Get truncation and summarization statistics.
+        Get truncation and summarization statistics with token details.
 
         Returns:
             Dict with truncation and summarization metrics
         """
+        current_tokens = self.get_token_count()
+        current_messages = len(self.history)
+
         return {
             "truncation_count": self.truncation_count,
             "total_messages_removed": self.total_messages_removed,
             "summarization_count": len(self.summaries),
-            "current_message_count": len(self.history),
-            "current_token_count": self.get_token_count(),
+            "current_message_count": current_messages,
+            "current_token_count": current_tokens,
             "max_tokens": self.max_tokens,
+            "token_utilization": (current_tokens / self.max_tokens) * 100 if self.max_tokens > 0 else 0,
+            "tokens_remaining": self.max_tokens - current_tokens if self.max_tokens > current_tokens else 0,
+            "avg_tokens_per_message": current_tokens / max(1, current_messages),
             "keep_recent": self.keep_recent,
             "summarization_enabled": self.enable_summarization,
         }

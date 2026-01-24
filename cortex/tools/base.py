@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, TYPE_CHECKING
 from pathlib import Path
 from ..models import PermissionMode
+from ..ui.consolidated_display import create_consolidated_console
 
 if TYPE_CHECKING:
     from ..utils.timeouts import TimeoutConfig
@@ -57,6 +58,23 @@ class Tool(ABC):
             tool_name = re.sub(r"(?<!^)(?=[A-Z])", "_", tool_name).lower()
             return self._timeout_config.get_timeout(tool_name, operation)
         return self.default_timeout
+
+    def estimate_content_tokens(self, content: str, model: Optional[str] = None) -> int:
+        """
+        Estimate tokens in content using the agent's model.
+
+        Args:
+            content: The text content to estimate tokens for
+            model: Optional model name (if None, uses default)
+
+        Returns:
+            Estimated token count
+        """
+        from ..core.context import estimate_tokens
+
+        if model is None and hasattr(self, 'agent'):
+            model = getattr(self.agent, 'model', 'gpt-4')
+        return estimate_tokens(content, model or 'gpt-4')
 
     @abstractmethod
     def execute(self, **kwargs: Any) -> Dict[str, Any]:

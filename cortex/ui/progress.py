@@ -1,5 +1,6 @@
 """Progress indicators for long-running operations."""
 
+import sys
 import time
 from contextlib import contextmanager
 from typing import Optional, Generator, Callable, Any
@@ -12,6 +13,9 @@ from rich.progress import (
     TaskProgressColumn,
     TimeElapsedColumn,
 )
+
+# Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
+SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
 
 console = Console()
 
@@ -70,7 +74,7 @@ class OperationTracker:
                 yield updater
         else:
             # Indeterminate progress (spinner)
-            with self.console.status(f"[cyan]{description}...[/cyan]", spinner="dots") as status:
+            with self.console.status(f"[cyan]{description}...[/cyan]", spinner=SPINNER_TYPE) as status:
                 updater = SpinnerUpdater(status, description, self._start_time)
                 yield updater
 

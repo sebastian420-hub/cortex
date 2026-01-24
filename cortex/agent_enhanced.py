@@ -10,6 +10,7 @@ This module extends the base Cortex agent with:
 import asyncio
 import json
 import logging
+import sys
 import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable, Union
@@ -18,6 +19,9 @@ from datetime import datetime
 from rich.console import Console
 from rich.panel import Panel
 from rich.markdown import Markdown
+
+# Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
+SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
 
 from .agent import Cortex
 from .models import PermissionMode
@@ -450,7 +454,7 @@ update_plan(plan_id="plan_xxx", action="add_step", step_data={...})
                     messages = self.conversation.get_history()
                     
                     # Show thinking indicator
-                    with console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                    with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
                         if (
                             use_streaming
                             and stream_model_response
