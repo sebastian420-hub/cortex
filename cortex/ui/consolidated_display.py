@@ -187,7 +187,14 @@ class ConsolidatedDisplay:
         
         # Threading
         self._lock = threading.Lock()
-    
+
+        # Context stats for footer
+        self._context_stats: Optional[Dict[str, Any]] = None
+
+    def update_context_stats(self, stats: Dict[str, Any]) -> None:
+        """Update context statistics for footer display."""
+        self._context_stats = stats
+
     @contextmanager
     def track_operations(self, tool_calls: List[Any], agent_description: str = "Processing"):
         """
@@ -370,15 +377,22 @@ class ConsolidatedDisplay:
         """Build minimal display content."""
         completed = sum(1 for op in self._operations.values() if op.status == OperationStatus.COMPLETED)
         total = len(self._operations)
-        
+
+        # Build main display
         if total == 0:
-            return f"[cyan]🔍 {agent_description}...[/cyan]"
-        
-        progress = f"{completed}/{total}"
-        if completed == total:
-            return f"[green]✓ {agent_description} complete[/green]"
+            main_display = f"[cyan]🔍 {agent_description}...[/cyan]"
+        elif completed == total:
+            main_display = f"[green]✓ {agent_description} complete[/green]"
         else:
-            return f"[cyan]🔍 {agent_description}... ({progress})[/cyan]"
+            progress = f"{completed}/{total}"
+            main_display = f"[cyan]🔍 {agent_description}... ({progress})[/cyan]"
+
+        # Add context footer if stats available
+        if self._context_stats:
+            footer = self._render_status_footer(self._context_stats)
+            return f"{main_display}\n{footer}"
+
+        return main_display
     
     def _build_detailed_display(self, agent_description: str) -> Panel:
         """Build detailed display content."""
@@ -387,19 +401,19 @@ class ConsolidatedDisplay:
         table.add_column("Status", style="bold", width=3)
         table.add_column("Operation", style="dim", width=50)
         table.add_column("Result", style="dim")
-        
+
         # Add operations
         for operation in self._operations.values():
             status_icon = self._get_status_icon(operation.status)
             status_color = self._get_status_color(operation.status)
-            
+
             status_text = f"[{status_color}]{status_icon}[/{status_color}]"
-            
+
             # Format description
             desc = operation.description
             if len(desc) > 45:
                 desc = desc[:42] + "..."
-            
+
             # Format result
             result_text = ""
             if operation.status == OperationStatus.COMPLETED and operation.result:
@@ -408,13 +422,19 @@ class ConsolidatedDisplay:
                 result_text = f"Error: {operation.error[:30]}..."
             elif operation.duration_ms:
                 result_text = f"{operation.duration_ms:.0f}ms"
-            
+
             table.add_row(status_text, desc, result_text)
-        
+
+        # Add context footer if stats available
+        if self._context_stats:
+            footer = self._render_status_footer(self._context_stats)
+            table.add_row("", "", "")  # Spacer
+            table.add_row("", footer, "")
+
         # Create panel
         duration = time.time() - self._start_time if self._start_time else 0
         duration_str = f" ({duration:.1f}s)" if duration > 0 else ""
-        
+
         return Panel(
             table,
             title=f"[cyan]🔍 {agent_description}{duration_str}[/cyan]",
@@ -453,10 +473,20 @@ class ConsolidatedDisplay:
         Returns:
             Formatted status footer string
         """
+        import sys
+
         mode = get_ui_mode()
         tokens = stats.get('current_token_count', 0)
         max_tokens = stats.get('max_tokens', 100000)
         utilization = stats.get('token_utilization', 0)
+
+        # Use ASCII-safe bar on Windows to avoid encoding issues
+        if sys.platform == "win32":
+            filled_char = "#"
+            empty_char = "-"
+        else:
+            filled_char = "█"
+            empty_char = "░"
 
         if mode == UIMode.MINIMAL:
             # Minimal: Just percentage
@@ -467,7 +497,7 @@ class ConsolidatedDisplay:
             # Normal: Bar + percentage
             bar_width = 20
             filled = int((utilization / 100) * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
+            bar = filled_char * filled + empty_char * (bar_width - filled)
             color = "red" if utilization >= 90 else "yellow" if utilization >= 70 else "green"
             return f"[{color}]Context: [{bar}] {utilization:.0f}%[/{color}]"
 
@@ -475,7 +505,7 @@ class ConsolidatedDisplay:
             # Debug: Full details
             bar_width = 20
             filled = int((utilization / 100) * bar_width)
-            bar = "█" * filled + "░" * (bar_width - filled)
+            bar = filled_char * filled + empty_char * (bar_width - filled)
             color = "red" if utilization >= 90 else "yellow" if utilization >= 70 else "green"
             msgs = stats.get('current_message_count', 0)
             avg = stats.get('avg_tokens_per_message', 0)

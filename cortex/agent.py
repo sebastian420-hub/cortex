@@ -1312,7 +1312,11 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                         # Execute tools in batch with consolidated display
                         consolidated_display = get_consolidated_display()
                         agent_description = self._get_agent_description(tool_calls_to_run)
-                        
+
+                        # Update context stats for footer display
+                        context_stats = self.conversation.get_truncation_stats()
+                        consolidated_display.update_context_stats(context_stats)
+
                         with consolidated_display.track_operations(tool_calls_to_run, agent_description):
                             batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
                             
