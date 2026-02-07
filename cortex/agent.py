@@ -1300,15 +1300,19 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                                 # Fallback to empty dict if parsing fails
                                 parsed_arguments = {}
 
+                            # Ensure ID is always a string (defensive, in case provider validation missed something)
+                            raw_id = tool_call_data.get("id", f"call_{iteration}_{i}")
+                            tool_call_id = str(raw_id) if raw_id is not None else f"call_{iteration}_{i}"
+
                             tool_calls_to_run.append(
                                 ToolCall(
-                                    id=tool_call_data.get("id", f"call_{iteration}_{i}"),
+                                    id=tool_call_id,
                                     name=tool_call_data["function"]["name"],
                                     arguments=parsed_arguments,
                                     index=i,
                                 )
                             )
-    
+
                         # Execute tools in batch with consolidated display
                         consolidated_display = get_consolidated_display()
                         agent_description = self._get_agent_description(tool_calls_to_run)
@@ -1692,9 +1696,13 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                                 # Fallback to empty dict if parsing fails
                                 parsed_arguments = {}
 
+                            # Ensure ID is always a string (defensive, in case provider validation missed something)
+                            raw_id = tool_call_data.get("id", f"call_{iteration}_{i}")
+                            tool_call_id = str(raw_id) if raw_id is not None else f"call_{iteration}_{i}"
+
                             tool_calls_to_run.append(
                                 ToolCall(
-                                    id=tool_call_data.get("id", f"call_{iteration}_{i}"),
+                                    id=tool_call_id,
                                     name=tool_call_data["function"]["name"],
                                     arguments=parsed_arguments,
                                     index=i,
