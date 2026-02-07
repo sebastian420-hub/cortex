@@ -47,7 +47,7 @@ class GrepTool(Tool):
         context_after: int = 0,
         context: int = 0,
         multiline: bool = False,
-        head_limit: int = 50,
+        head_limit: int = 100,
         offset: int = 0,
         show_line_numbers: bool = True,
     ) -> Dict[str, Any]:
@@ -65,7 +65,7 @@ class GrepTool(Tool):
             context_after: Lines to show after match (-A)
             context: Lines to show before and after match (-C)
             multiline: Enable multiline matching (default: False)
-            head_limit: Limit results (default: 50, 0 for unlimited)
+            head_limit: Limit results (default: 100 to prevent context overflow, 0 for unlimited)
             offset: Skip first N results (default: 0)
             show_line_numbers: Show line numbers in content mode (default: True)
 

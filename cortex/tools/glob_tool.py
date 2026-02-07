@@ -32,7 +32,7 @@ class GlobTool(Tool):
         path: str = ".",
         sort_by_mtime: bool = True,
         include_hidden: bool = False,
-        max_results: int = 500,
+        max_results: int = 200,
     ) -> Dict[str, Any]:
         """
         Find files matching glob pattern.
@@ -42,7 +42,7 @@ class GlobTool(Tool):
             path: Base directory to search from (default: current directory)
             sort_by_mtime: Sort by modification time, newest first (default: True)
             include_hidden: Include hidden files/directories (default: False)
-            max_results: Maximum number of results (default: 500)
+            max_results: Maximum number of results (default: 200, reduced to prevent context overflow)
 
         Returns:
             Standardized response with matching file paths
@@ -127,6 +127,7 @@ class GlobTool(Tool):
             "__pycache__",
             ".venv",
             "venv",
+            "env",
             ".tox",
             ".eggs",
             "dist",
@@ -137,15 +138,54 @@ class GlobTool(Tool):
             ".idea",
             ".vscode",
             ".vs",
+            "vendor",
+            "target",  # Rust/Java build output
+            ".gradle",
+            ".next",  # Next.js build
+            ".nuxt",  # Nuxt.js build
+            "__snapshots__",
+            "coverage",
+            ".turbo",
+        }
+
+        # Common binary/non-code extensions to skip
+        skip_extensions = {
+            '.pyc', '.pyo', '.pyd',
+            '.so', '.dll', '.dylib', '.exe', '.bin',
+            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp',
+            '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+            '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz',
+            '.mp3', '.mp4', '.avi', '.mkv', '.mov', '.wav', '.flac',
+            '.woff', '.woff2', '.ttf', '.otf', '.eot',
+            '.db', '.sqlite', '.sqlite3',
+            '.lock',  # Lock files
         }
 
         filtered = []
         for f in files:
             try:
                 rel_parts = f.relative_to(base_path).parts
+
                 # Skip if any part is hidden or in ignored list
                 if any(part.startswith(".") or part in ignored_dirs for part in rel_parts):
                     continue
+
+                # Skip common non-project directories (user data, downloads, etc.)
+                # These are often accidentally included in broad searches
+                suspicious_keywords = [
+                    "download", "temp", "tmp", "cache", "backup",
+                    "archive", "old", "deprecated", "legacy"
+                ]
+                if any(keyword in part.lower() for part in rel_parts for keyword in suspicious_keywords):
+                    # Only skip if it looks like a data directory (not source code)
+                    if not any(src_indicator in part.lower() for part in rel_parts
+                              for src_indicator in ["src", "lib", "core", "app", "api"]):
+                        continue
+
+                # Skip binary/media files
+                if f.suffix.lower() in skip_extensions:
+                    continue
+
                 filtered.append(f)
             except ValueError:
                 # File outside base path, include it

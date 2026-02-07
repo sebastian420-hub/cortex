@@ -88,6 +88,7 @@ from .hooks import (
     SessionEndEvent,
 )
 from .output import OutputFormat, create_formatter
+from .utils.result_truncation import truncate_tool_result, should_truncate_proactively
 
 try:
     from .core.streaming import stream_model_response, display_streaming_response
@@ -924,35 +925,88 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
         logger.debug(f"Estimated {tokens} tokens for API call ({char_count} chars)")
         return tokens
 
-    @retry_with_backoff(max_retries=3, exceptions=(Exception,))
     def _call_model(
         self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Call model via provider with retry logic"""
-        try:
-            # Pre-flight validation: Check message structure to prevent API errors
-            validation = self._validate_messages_for_api(messages)
-            if not validation["valid"]:
-                critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
-                if critical_issues:
-                    # Try to repair critical issues automatically
-                    messages = self._repair_messages_for_api(messages, critical_issues)
-                    logger.warning(f"Repaired {len(critical_issues)} critical message validation issues before API call")
+        """Call model via provider with context overflow recovery"""
+        max_retries = 3
 
-            # Apply rate limiting if enabled
-            if self.rate_limiter:
-                # Estimate tokens for rate limiting
-                token_count = self._estimate_api_call_tokens(messages, tools)
-                if not self.rate_limiter.acquire(token_count=token_count, blocking=True):
-                    logger.warning("Rate limiter blocked API call (should not happen with blocking=True)")
+        for attempt in range(max_retries):
+            try:
+                # Pre-flight validation: Check message structure to prevent API errors
+                validation = self._validate_messages_for_api(messages)
+                if not validation["valid"]:
+                    critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
+                    if critical_issues:
+                        # Try to repair critical issues automatically
+                        messages = self._repair_messages_for_api(messages, critical_issues)
+                        logger.warning(f"Repaired {len(critical_issues)} critical message validation issues before API call")
 
-            # Normalize model name for provider
-            normalized_model = self.provider.normalize_model_name(self.model)
-            return self.provider.chat(model=normalized_model, messages=messages, tools=tools)
-        except ProviderError as e:
-            raise ModelError(f"Provider error: {e}") from e
-        except Exception as e:
-            raise ModelError(f"Failed to call model: {e}") from e
+                # Apply rate limiting if enabled
+                if self.rate_limiter:
+                    # Estimate tokens for rate limiting
+                    token_count = self._estimate_api_call_tokens(messages, tools)
+                    if not self.rate_limiter.acquire(token_count=token_count, blocking=True):
+                        logger.warning("Rate limiter blocked API call (should not happen with blocking=True)")
+
+                # Normalize model name for provider
+                normalized_model = self.provider.normalize_model_name(self.model)
+                return self.provider.chat(model=normalized_model, messages=messages, tools=tools)
+
+            except ProviderError as e:
+                error_str = str(e).lower()
+                # Detect context overflow errors
+                if "context length" in error_str or "maximum context" in error_str or "too many tokens" in error_str or "tokens (" in error_str:
+                    logger.warning(f"Context overflow detected on attempt {attempt + 1}/{max_retries}: {e}")
+
+                    if attempt < max_retries - 1:
+                        # Trigger aggressive conversation truncation
+                        old_count = len(self.conversation.history)
+                        current_tokens = self.conversation.get_token_count()
+
+                        # Reduce conversation to ~30% of max to leave room for response
+                        target_tokens = int(self.conversation.max_tokens * 0.3)
+
+                        # Aggressively truncate by keeping only system + last 5 messages
+                        self.conversation.history = [
+                            self.conversation.history[0],  # System prompt
+                            *self.conversation.history[-5:]  # Last 5 messages
+                        ]
+
+                        new_count = len(self.conversation.history)
+                        new_tokens = self.conversation.get_token_count()
+
+                        logger.warning(
+                            f"Auto-recovery from context overflow: truncated conversation "
+                            f"{old_count} -> {new_count} messages (~{current_tokens} -> ~{new_tokens} tokens). "
+                            f"Retrying..."
+                        )
+
+                        if self._is_text_output():
+                            console.print(
+                                f"[yellow]⚠ Context overflow - automatically reduced conversation history. "
+                                f"Retrying...[/yellow]"
+                            )
+
+                        # Update messages for retry
+                        messages = self.conversation.get_history()
+                        continue
+                    else:
+                        # Last attempt failed
+                        raise ModelError(
+                            f"Context overflow persists after aggressive truncation. "
+                            f"Please start a new conversation or reduce the scope of your request. "
+                            f"Original error: {e}"
+                        ) from e
+                else:
+                    # Other provider error - raise immediately
+                    raise ModelError(f"Provider error: {e}") from e
+
+            except Exception as e:
+                raise ModelError(f"Failed to call model: {e}") from e
+
+        # Should not reach here
+        raise ModelError("Unexpected error in model call retry logic")
 
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a tool and return result with hook support."""
@@ -1363,6 +1417,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
                                 if self._handle_delegation_action(result):
                                     # Model was switched - add result and continue with new model
+                                    result = truncate_tool_result(tool_name, result)
                                     self.conversation.add_tool_result(tool_result.id, result)
                                     # Don't return - let the loop continue with the new model
                                     continue
@@ -1375,6 +1430,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                                     ErrorType.EXECUTION,
                                     {"tool_name": tool_name},
                                 )
+
+                            # Truncate large results to prevent context overflow
+                            result = truncate_tool_result(tool_name, result)
 
                             # Add result to conversation
                             self.conversation.add_tool_result(tool_result.id, result)
@@ -1741,6 +1799,7 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
                                 if await asyncio.to_thread(self._handle_delegation_action, result):
                                     # Model was switched - add result and continue with new model
+                                    result = truncate_tool_result(tool_name, result)
                                     self.conversation.add_tool_result(tool_result.id, result)
                                     # Don't return - let the loop continue with the new model
                                     continue
@@ -1754,6 +1813,9 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
                                     ErrorType.EXECUTION,
                                     {"tool_name": tool_name},
                                 )
+
+                            # Truncate large results to prevent context overflow
+                            result = truncate_tool_result(tool_name, result)
 
                             # Add result to conversation
                             self.conversation.add_tool_result(tool_result.id, result)
