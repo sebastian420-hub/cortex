@@ -20,20 +20,20 @@ _ENCODING_CACHE = {}
 def get_encoding_for_model(model: str) -> Optional[Any]:
     """
     Get appropriate tiktoken encoding for a model.
-    
+
     Args:
         model: Model name
-        
+
     Returns:
         tiktoken.Encoding or None if not available
     """
     if not TIKTOKEN_AVAILABLE:
         return None
-        
+
     # Check cache first
     if model in _ENCODING_CACHE:
         return _ENCODING_CACHE[model]
-    
+
     try:
         # Try to get encoding directly for the model
         # This works for OpenAI models
@@ -44,7 +44,7 @@ def get_encoding_for_model(model: str) -> Optional[Any]:
         # Model not found in tiktoken's registry
         # Map model families to appropriate encodings
         model_lower = model.lower()
-        
+
         # Determine encoding based on model family
         if any(prefix in model_lower for prefix in ["claude-", "anthropic"]):
             # Claude models - Anthropic uses different tokenizer
@@ -53,7 +53,9 @@ def get_encoding_for_model(model: str) -> Optional[Any]:
         elif any(prefix in model_lower for prefix in ["deepseek-"]):
             # DeepSeek models use OpenAI-compatible tokenizer
             encoding_name = "cl100k_base"
-        elif any(prefix in model_lower for prefix in ["llama", "mistral", "mixtral", "codestral", "qwen"]):
+        elif any(
+            prefix in model_lower for prefix in ["llama", "mistral", "mixtral", "codestral", "qwen"]
+        ):
             # Llama/Mistral family - these use SentencePiece tokenizers
             # o200k_base is a reasonable approximation for modern models
             try:
@@ -69,7 +71,7 @@ def get_encoding_for_model(model: str) -> Optional[Any]:
         else:
             # Default to cl100k_base for unknown models
             encoding_name = "cl100k_base"
-        
+
         try:
             encoding = tiktoken.get_encoding(encoding_name)
             _ENCODING_CACHE[model] = encoding
@@ -82,14 +84,14 @@ def get_encoding_for_model(model: str) -> Optional[Any]:
 def estimate_tokens(text: str, model: str = "gpt-4") -> int:
     """
     Estimate token count using tiktoken if available, fallback to approximation.
-    
+
     This function provides accurate token counting for supported models and
     reasonable approximations for others.
-    
+
     Args:
         text: Text to estimate (string or JSON-serializable object)
         model: Model name for tokenizer (default: gpt-4)
-        
+
     Returns:
         Estimated token count
     """
@@ -99,7 +101,7 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
             text = json.dumps(text, default=str)
         except (TypeError, ValueError):
             text = str(text)
-    
+
     if TIKTOKEN_AVAILABLE:
         encoding = get_encoding_for_model(model)
         if encoding is not None:
@@ -108,10 +110,10 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
             except Exception as e:
                 logger.debug(f"Token encoding failed for model {model}: {e}")
                 # Fall through to approximation
-    
+
     # Fallback: character-based approximation with model-specific factors
     model_lower = model.lower()
-    
+
     # Different models have different average characters per token
     if any(prefix in model_lower for prefix in ["claude-", "anthropic"]):
         # Claude tokens are roughly 3.5 characters each on average
@@ -131,7 +133,7 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
     else:
         # Default for GPT, DeepSeek, and unknown models
         chars_per_token = 4.0
-    
+
     # Ensure at least 1 token for non-empty text
     if len(text) == 0:
         return 0
@@ -141,21 +143,21 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
 def count_message_tokens(message: Dict[str, Any], model: str = "gpt-4") -> int:
     """
     Count tokens in a message dictionary, including role, content, and tool calls.
-    
+
     This provides a more accurate token count than just counting content,
     as it includes the message structure overhead.
-    
+
     Args:
         message: Message dictionary with role, content, etc.
         model: Model name for tokenizer
-        
+
     Returns:
         Estimated token count for the entire message
     """
     # Base tokens for message structure
     # Different models have different overhead per message
     model_lower = model.lower()
-    
+
     # Message overhead (role, etc.) - approximate values
     if any(prefix in model_lower for prefix in ["gpt-", "text-"]):
         # OpenAI models: ~3 tokens overhead for role
@@ -169,14 +171,14 @@ def count_message_tokens(message: Dict[str, Any], model: str = "gpt-4") -> int:
     else:
         # Default overhead
         overhead = 3
-    
+
     total_tokens = overhead
-    
+
     # Add tokens for role
     role = message.get("role", "")
     if role:
         total_tokens += estimate_tokens(role, model)
-    
+
     # Add tokens for content
     content = message.get("content", "")
     if content:
@@ -193,7 +195,7 @@ def count_message_tokens(message: Dict[str, Any], model: str = "gpt-4") -> int:
                         total_tokens += 100  # Approximate for non-text blocks
         else:
             total_tokens += estimate_tokens(content, model)
-    
+
     # Add tokens for tool calls if present
     tool_calls = message.get("tool_calls")
     if tool_calls:
@@ -209,17 +211,17 @@ def count_message_tokens(message: Dict[str, Any], model: str = "gpt-4") -> int:
             elif hasattr(tool_call, "function"):
                 total_tokens += estimate_tokens(tool_call.function.name, model)
                 total_tokens += estimate_tokens(tool_call.function.arguments, model)
-    
+
     # Add tokens for tool call ID if present (for assistant messages with tool calls)
     tool_call_id = message.get("tool_call_id")
     if tool_call_id:
         total_tokens += estimate_tokens(tool_call_id, model)
-    
+
     # Add tokens for name if present
     name = message.get("name")
     if name:
         total_tokens += estimate_tokens(name, model)
-    
+
     return total_tokens
 
 
@@ -228,13 +230,13 @@ def get_conversation_tokens(
 ) -> int:
     """
     Get estimated token count for conversation history.
-    
+
     Uses count_message_tokens for accurate counting of message structures.
-    
+
     Args:
         conversation_history: Conversation history
         model: Model name for tokenizer (default: gpt-4)
-        
+
     Returns:
         Estimated token count
     """
@@ -264,9 +266,7 @@ def truncate_history(
         return []
 
     # Calculate total tokens using accurate message token counting
-    total_tokens = sum(
-        count_message_tokens(msg, model) for msg in conversation_history
-    )
+    total_tokens = sum(count_message_tokens(msg, model) for msg in conversation_history)
 
     # If under limit, return as-is
     if total_tokens <= max_tokens:
@@ -299,6 +299,3 @@ def truncate_history(
     if system_msg:
         return [system_msg] + recent_messages
     return recent_messages
-
-
-

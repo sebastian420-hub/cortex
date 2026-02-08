@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 class AgentRoutingMixin:
     """Mixin providing model switching, routing, and delegation methods."""
 
-    def switch_model(self, new_model: str, provider_override: Optional[str] = None, silent: bool = False) -> None:
+    def switch_model(
+        self, new_model: str, provider_override: Optional[str] = None, silent: bool = False
+    ) -> None:
         """
         Switch to a different model while maintaining conversation history.
 
@@ -219,10 +221,16 @@ class AgentRoutingMixin:
 
             # Switch to target model
             try:
-                target_config = self._model_registry.get_model(target_model) if self._model_registry else None
+                target_config = (
+                    self._model_registry.get_model(target_model) if self._model_registry else None
+                )
                 provider_override = target_config.provider if target_config else None
                 # Use full API model name if available
-                api_model_name = target_config.api_model_name if target_config and target_config.api_model_name else target_model
+                api_model_name = (
+                    target_config.api_model_name
+                    if target_config and target_config.api_model_name
+                    else target_model
+                )
 
                 self.switch_model(api_model_name, provider_override=provider_override, silent=True)
 
@@ -253,10 +261,16 @@ class AgentRoutingMixin:
 
             # Switch back to coordinator
             try:
-                coordinator_config = self._model_registry.get_model(coordinator) if self._model_registry else None
+                coordinator_config = (
+                    self._model_registry.get_model(coordinator) if self._model_registry else None
+                )
                 provider_override = coordinator_config.provider if coordinator_config else None
                 # Use full API model name if available
-                api_model_name = coordinator_config.api_model_name if coordinator_config and coordinator_config.api_model_name else coordinator
+                api_model_name = (
+                    coordinator_config.api_model_name
+                    if coordinator_config and coordinator_config.api_model_name
+                    else coordinator
+                )
 
                 self.switch_model(api_model_name, provider_override=provider_override, silent=True)
 

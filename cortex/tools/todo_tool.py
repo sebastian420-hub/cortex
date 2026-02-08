@@ -71,8 +71,6 @@ class TodoManager:
         """Set callback for displaying todo updates."""
         self._display_callback = callback
 
-
-
     def update(self, todos_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Update the entire todo list.
@@ -100,7 +98,7 @@ class TodoManager:
                 return create_error_response(
                     f"Invalid status: {item.get('status')}. Must be pending, in_progress, or completed",
                     ErrorType.VALIDATION,
-                    context={"invalid_status": item.get('status')},
+                    context={"invalid_status": item.get("status")},
                 )
 
             # Find existing item to preserve timestamps
@@ -251,11 +249,13 @@ class TodoWriteTool(Tool):
         progress = self.todo_manager.get_progress()
         current = self.todo_manager.get_current_task()
 
-        return create_success_response({
-            "progress": progress,
-            "current_task": current.active_form if current else None,
-            "message": f"Todo list updated: {progress['completed']}/{progress['total']} completed",
-        })
+        return create_success_response(
+            {
+                "progress": progress,
+                "current_task": current.active_form if current else None,
+                "message": f"Todo list updated: {progress['completed']}/{progress['total']} completed",
+            }
+        )
 
 
 def display_todos(todos: List[TodoItem], console) -> None:

@@ -55,7 +55,7 @@ class SummaryChunk:
         if self.errors_encountered:
             sections.append(f"Errors encountered: {len(self.errors_encountered)}")
         if self.key_decisions:
-            sections.append(f"\nKey decisions: " + "; ".join(self.key_decisions[:5]))
+            sections.append("\nKey decisions: " + "; ".join(self.key_decisions[:5]))
 
         return {"role": "system", "content": "\n".join(sections)}
 
@@ -273,9 +273,7 @@ class LLMSummarizer(ConversationSummarizer):
         from .context import estimate_tokens
 
         # Calculate original tokens using accurate message counting
-        original_token_count = sum(
-            count_message_tokens(msg, model="gpt-4") for msg in messages
-        )
+        original_token_count = sum(count_message_tokens(msg, model="gpt-4") for msg in messages)
 
         # Prepare messages for summarization
         messages_text = self._format_messages_for_summary(messages)
@@ -359,7 +357,7 @@ Summary:"""
 
         full_text = "\n".join(parts)
         if len(full_text) > max_chars:
-            return full_text[:max_chars-3] + "..."
+            return full_text[: max_chars - 3] + "..."
         return full_text
 
 

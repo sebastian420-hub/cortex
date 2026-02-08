@@ -60,14 +60,14 @@ class StatsCommand(Command):
         table.add_row("", "")
 
         # Message statistics
-        table.add_row("Messages", str(stats['current_message_count']))
+        table.add_row("Messages", str(stats["current_message_count"]))
         table.add_row("Avg Tokens/Msg", f"{stats['avg_tokens_per_message']:.0f}")
         table.add_row("", "")
 
         # Optimization statistics
-        table.add_row("Truncations", str(stats['truncation_count']))
-        table.add_row("Summarizations", str(stats['summarization_count']))
-        table.add_row("Messages Removed", str(stats['total_messages_removed']))
+        table.add_row("Truncations", str(stats["truncation_count"]))
+        table.add_row("Summarizations", str(stats["summarization_count"]))
+        table.add_row("Messages Removed", str(stats["total_messages_removed"]))
 
         console.print(table)
 
@@ -85,7 +85,7 @@ class RoutingCommand(Command):
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the routing command"""
-        if hasattr(ctx.agent, 'get_routing_statistics'):
+        if hasattr(ctx.agent, "get_routing_statistics"):
             routing_stats = ctx.agent.get_routing_statistics()
             if routing_stats:
                 stats_text = f"""

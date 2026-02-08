@@ -27,7 +27,7 @@ class PromptGenerator:
     - Model-specific adaptations
     """
 
-    def __init__(self, agent: 'Cortex'):
+    def __init__(self, agent: "Cortex"):
         """
         Initialize with reference to parent agent.
 
@@ -53,13 +53,13 @@ class PromptGenerator:
             sections.append(self._format_project_context())
 
         # Memory bank summary
-        if hasattr(self.agent, 'memory_bank') and self.agent.memory_bank:
+        if hasattr(self.agent, "memory_bank") and self.agent.memory_bank:
             memory_summary = self.agent.memory_bank.get_summary()
             if memory_summary:
                 sections.append(self._format_memory_bank(memory_summary))
 
         # State manager context
-        if hasattr(self.agent, 'state_manager') and self.agent.state_manager:
+        if hasattr(self.agent, "state_manager") and self.agent.state_manager:
             state_context = self.agent.state_manager.get_llm_context()
             if state_context:
                 sections.append(self._format_state_context(state_context))
@@ -291,7 +291,10 @@ GOOD: Single grep with OR pattern: "class.*Service|def.*service"
             Orchestration prompt or empty string if not enabled
         """
         # Check if orchestration has been initialized yet
-        if not hasattr(self.agent, "_orchestration_enabled") or not self.agent._orchestration_enabled:
+        if (
+            not hasattr(self.agent, "_orchestration_enabled")
+            or not self.agent._orchestration_enabled
+        ):
             return ""
         if not hasattr(self.agent, "_model_registry") or not self.agent._model_registry:
             return ""
@@ -306,17 +309,18 @@ GOOD: Single grep with OR pattern: "class.*Service|def.*service"
 
         # Get remaining delegations
         remaining = 5  # Default
-        if hasattr(self.agent, '_delegation_tracker') and self.agent._delegation_tracker:
+        if hasattr(self.agent, "_delegation_tracker") and self.agent._delegation_tracker:
             remaining = self.agent._delegation_tracker.get_remaining()
 
         # Get delegation instructions
         from .prompts import get_delegation_instructions
+
         profile_name = model_config.prompt_profile
         prompt = get_delegation_instructions(
             current_model=self.agent.model,
             available_delegates=available_delegates,
             remaining_delegations=remaining,
-            profile_name=profile_name
+            profile_name=profile_name,
         )
 
         return prompt

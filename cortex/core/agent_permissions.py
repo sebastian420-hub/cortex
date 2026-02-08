@@ -29,27 +29,27 @@ class PermissionManager:
 
     # Dangerous operations that require extra caution
     DANGEROUS_COMMANDS = [
-        'rm -rf',
-        'sudo rm',
-        'format',
-        'del /f /q',
-        'DROP TABLE',
-        'DROP DATABASE',
-        'git reset --hard',
-        'git push --force',
-        'npm publish',
+        "rm -rf",
+        "sudo rm",
+        "format",
+        "del /f /q",
+        "DROP TABLE",
+        "DROP DATABASE",
+        "git reset --hard",
+        "git push --force",
+        "npm publish",
     ]
 
     # Destructive tools blocked in PLAN mode
     DESTRUCTIVE_TOOLS = {
-        'write_file',
-        'edit_file',
-        'execute_command',
-        'git_commit',
-        'git_push',
+        "write_file",
+        "edit_file",
+        "execute_command",
+        "git_commit",
+        "git_push",
     }
 
-    def __init__(self, agent: 'Cortex'):
+    def __init__(self, agent: "Cortex"):
         """
         Initialize with reference to parent agent.
 
@@ -83,7 +83,7 @@ class PermissionManager:
                         f"Tool: [cyan]{tool_name}[/cyan]\n"
                         f"PLAN mode is read-only. Use /mode normal to execute changes.",
                         title="Permission Denied",
-                        border_style="yellow"
+                        border_style="yellow",
                     )
                 )
                 return False
@@ -107,31 +107,31 @@ class PermissionManager:
             True if dangerous, False otherwise
         """
         # Tool-specific danger checks
-        if tool_name == 'execute_command':
+        if tool_name == "execute_command":
             return self._is_dangerous_command(args)
-        elif tool_name == 'write_file':
+        elif tool_name == "write_file":
             return self._is_dangerous_write(args)
-        elif tool_name in ['git_push', 'git_force_push']:
+        elif tool_name in ["git_push", "git_force_push"]:
             return True  # Git push always requires approval
 
         return False
 
     def _is_dangerous_command(self, args: Dict[str, Any]) -> bool:
         """Check if command is dangerous"""
-        command = args.get('command', '')
+        command = args.get("command", "")
         return any(pattern in command for pattern in self.DANGEROUS_COMMANDS)
 
     def _is_dangerous_write(self, args: Dict[str, Any]) -> bool:
         """Check if file write is dangerous"""
-        path = args.get('path', '')
+        path = args.get("path", "")
 
         # System files
         dangerous_paths = [
-            '/etc/',
-            '/bin/',
-            '/usr/bin/',
-            'C:\\Windows\\',
-            'C:\\System32\\',
+            "/etc/",
+            "/bin/",
+            "/usr/bin/",
+            "C:\\Windows\\",
+            "C:\\System32\\",
         ]
 
         return any(dangerous in path for dangerous in dangerous_paths)
@@ -159,7 +159,7 @@ class PermissionManager:
                 f"Tool: [cyan]{tool_name}[/cyan]\n"
                 f"Arguments:\n[dim]{json.dumps(args, indent=2)}[/dim]",
                 title="Permission Required",
-                border_style="yellow"
+                border_style="yellow",
             )
         )
 

@@ -4,9 +4,9 @@
 import sys
 sys.path.insert(0, '.')
 
-from cortex.ast.parser import ASTParser
-from cortex.ast.queries import ASTQueries
-from cortex.ast.service import ASTService
+from cortex.code_ast.parser import ASTParser
+from cortex.code_ast.queries import ASTQueries
+from cortex.code_ast.service import ASTService
 from pathlib import Path
 import tempfile
 import os

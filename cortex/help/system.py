@@ -185,7 +185,7 @@ class HelpSystem:
         content.append("")
 
         # Description
-        content.append(f"[bold]Description:[/bold]")
+        content.append("[bold]Description:[/bold]")
         content.append(entry.long_desc)
         content.append("")
 

@@ -252,19 +252,19 @@ class RecoveryManager:
             )
         elif "permission denied" in error_msg or "access denied" in error_msg:
             specific_guidance = (
-                f"**Permission Debug:**\n"
-                f"Access was denied.\n"
-                f"1. Check if the file/directory is read-only\n"
-                f"2. Check if another process has the file locked\n"
-                f"3. Try a different approach that doesn't require elevated access\n\n"
+                "**Permission Debug:**\n"
+                "Access was denied.\n"
+                "1. Check if the file/directory is read-only\n"
+                "2. Check if another process has the file locked\n"
+                "3. Try a different approach that doesn't require elevated access\n\n"
             )
         elif "syntax error" in error_msg or "invalid syntax" in error_msg:
             specific_guidance = (
-                f"**Syntax Error Debug:**\n"
-                f"There's a syntax issue in the code or command.\n"
-                f"1. Review the exact error message for line number/position\n"
-                f"2. Check for mismatched quotes, brackets, or parentheses\n"
-                f"3. Read the file and examine the problematic area\n\n"
+                "**Syntax Error Debug:**\n"
+                "There's a syntax issue in the code or command.\n"
+                "1. Review the exact error message for line number/position\n"
+                "2. Check for mismatched quotes, brackets, or parentheses\n"
+                "3. Read the file and examine the problematic area\n\n"
             )
         elif "import" in error_msg or "module" in error_msg:
             specific_guidance = (
@@ -276,12 +276,12 @@ class RecoveryManager:
             )
         elif "test" in context.tool_name.lower() or "test" in error_msg:
             specific_guidance = (
-                f"**Test Failure Debug:**\n"
-                f"Tests are failing.\n"
-                f"1. Read the failing test file to understand expectations\n"
-                f"2. Check the test output for assertion details\n"
-                f"3. Run a single test to isolate the issue\n"
-                f"4. Check if test fixtures or setup is correct\n\n"
+                "**Test Failure Debug:**\n"
+                "Tests are failing.\n"
+                "1. Read the failing test file to understand expectations\n"
+                "2. Check the test output for assertion details\n"
+                "3. Run a single test to isolate the issue\n"
+                "4. Check if test fixtures or setup is correct\n\n"
             )
 
         return RecoveryAction(

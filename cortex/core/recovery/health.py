@@ -71,8 +71,11 @@ class SessionHealthMonitor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def analyze_health(self, conversation_history: List[Dict[str, Any]],
-                      recent_errors: Optional[List[Dict[str, Any]]] = None) -> HealthReport:
+    def analyze_health(
+        self,
+        conversation_history: List[Dict[str, Any]],
+        recent_errors: Optional[List[Dict[str, Any]]] = None,
+    ) -> HealthReport:
         """
         Perform comprehensive health analysis of a conversation session.
 
@@ -93,10 +96,10 @@ class SessionHealthMonitor:
 
         # Calculate overall score (weighted average)
         overall_score = (
-            structural_health[0] * 0.4 +  # Structural issues are most critical
-            api_health[0] * 0.3 +         # API issues indicate immediate problems
-            performance_health[0] * 0.2 + # Performance affects usability
-            content_health[0] * 0.1       # Content issues are least critical
+            structural_health[0] * 0.4  # Structural issues are most critical
+            + api_health[0] * 0.3  # API issues indicate immediate problems
+            + performance_health[0] * 0.2  # Performance affects usability
+            + content_health[0] * 0.1  # Content issues are least critical
         )
 
         # Combine all issues
@@ -127,7 +130,9 @@ class SessionHealthMonitor:
             recommendations=recommendations,
         )
 
-    def _analyze_structural_health(self, conversation_history: List[Dict[str, Any]]) -> Tuple[float, List[Dict], Dict]:
+    def _analyze_structural_health(
+        self, conversation_history: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict], Dict]:
         """
         Analyze structural health of conversation.
 
@@ -153,36 +158,42 @@ class SessionHealthMonitor:
 
             # Check for required fields
             if role not in ["system", "user", "assistant", "tool"]:
-                issues.append({
-                    "type": "invalid_role",
-                    "index": i,
-                    "message": f"Invalid role '{role}' at message {i}",
-                    "severity": "high"
-                })
+                issues.append(
+                    {
+                        "type": "invalid_role",
+                        "index": i,
+                        "message": f"Invalid role '{role}' at message {i}",
+                        "severity": "high",
+                    }
+                )
                 score = max(0, score - penalty_per_issue)
                 metrics["format_errors"] += 1
 
             # Assistant message validation
             if role == "assistant":
                 if not content and not tool_calls:
-                    issues.append({
-                        "type": "invalid_assistant_message",
-                        "index": i,
-                        "message": f"Assistant message {i} has no content or tool_calls",
-                        "severity": "critical"
-                    })
+                    issues.append(
+                        {
+                            "type": "invalid_assistant_message",
+                            "index": i,
+                            "message": f"Assistant message {i} has no content or tool_calls",
+                            "severity": "critical",
+                        }
+                    )
                     score = max(0, score - penalty_per_issue * 2)  # Critical issues penalize more
                     metrics["format_errors"] += 1
 
             # Tool message validation
             elif role == "tool":
                 if not isinstance(content, str):
-                    issues.append({
-                        "type": "invalid_tool_result",
-                        "index": i,
-                        "message": f"Tool result {i} has non-string content",
-                        "severity": "high"
-                    })
+                    issues.append(
+                        {
+                            "type": "invalid_tool_result",
+                            "index": i,
+                            "message": f"Tool result {i} has non-string content",
+                            "severity": "high",
+                        }
+                    )
                     score = max(0, score - penalty_per_issue)
                     metrics["format_errors"] += 1
 
@@ -193,8 +204,9 @@ class SessionHealthMonitor:
 
         return score, issues, metrics
 
-    def _analyze_api_health(self, conversation_history: List[Dict[str, Any]],
-                           recent_errors: List[Dict[str, Any]]) -> Tuple[float, List[Dict], Dict]:
+    def _analyze_api_health(
+        self, conversation_history: List[Dict[str, Any]], recent_errors: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict], Dict]:
         """
         Analyze API interaction health.
 
@@ -218,18 +230,22 @@ class SessionHealthMonitor:
             metrics["error_types"][error_type] += 1
 
             if "invalid_assistant_message" in error.get("message", "").lower():
-                issues.append({
-                    "type": "api_corruption_error",
-                    "message": "Recent API error indicates message corruption",
-                    "severity": "critical"
-                })
+                issues.append(
+                    {
+                        "type": "api_corruption_error",
+                        "message": "Recent API error indicates message corruption",
+                        "severity": "critical",
+                    }
+                )
                 score = max(0, score - penalty_per_error * 4)  # Major penalty
             elif "rate_limit" in error.get("message", "").lower():
-                issues.append({
-                    "type": "rate_limit_issue",
-                    "message": "Rate limiting detected - may indicate overuse",
-                    "severity": "medium"
-                })
+                issues.append(
+                    {
+                        "type": "rate_limit_issue",
+                        "message": "Rate limiting detected - may indicate overuse",
+                        "severity": "medium",
+                    }
+                )
                 score = max(0, score - penalty_per_error * 2)
 
         # Analyze tool call patterns
@@ -247,34 +263,44 @@ class SessionHealthMonitor:
         if tool_calls:
             # Check for tool call/response mismatches
             tool_call_ids = {tc.get("id") for tc in tool_calls if tc.get("id")}
-            tool_result_ids = {msg.get("tool_call_id") for msg in tool_results if msg.get("tool_call_id")}
+            tool_result_ids = {
+                msg.get("tool_call_id") for msg in tool_results if msg.get("tool_call_id")
+            }
 
             unmatched_calls = tool_call_ids - tool_result_ids
-            unmatched_results = tool_result_ids - tool_call_ids
+            _unmatched_results = tool_result_ids - tool_call_ids
 
             if unmatched_calls:
-                issues.append({
-                    "type": "unmatched_tool_calls",
-                    "message": f"{len(unmatched_calls)} tool calls without matching results",
-                    "severity": "high"
-                })
+                issues.append(
+                    {
+                        "type": "unmatched_tool_calls",
+                        "message": f"{len(unmatched_calls)} tool calls without matching results",
+                        "severity": "high",
+                    }
+                )
                 score = max(0, score - penalty_per_error * len(unmatched_calls))
 
             # Calculate tool success rate
             successful_results = sum(1 for msg in tool_results if self._is_tool_result_success(msg))
-            metrics["tool_success_rate"] = successful_results / len(tool_results) if tool_results else 1.0
+            metrics["tool_success_rate"] = (
+                successful_results / len(tool_results) if tool_results else 1.0
+            )
 
             if metrics["tool_success_rate"] < 0.8:
-                issues.append({
-                    "type": "low_tool_success_rate",
-                    "message": f"Tool success rate is {metrics['tool_success_rate']:.1%}",
-                    "severity": "medium"
-                })
+                issues.append(
+                    {
+                        "type": "low_tool_success_rate",
+                        "message": f"Tool success rate is {metrics['tool_success_rate']:.1%}",
+                        "severity": "medium",
+                    }
+                )
                 score = max(0, score - penalty_per_error * 2)
 
         return score, issues, metrics
 
-    def _analyze_performance_health(self, conversation_history: List[Dict[str, Any]]) -> Tuple[float, List[Dict], Dict]:
+    def _analyze_performance_health(
+        self, conversation_history: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict], Dict]:
         """
         Analyze performance and efficiency metrics.
 
@@ -307,33 +333,44 @@ class SessionHealthMonitor:
 
         # Check for excessive conversation length
         if len(conversation_history) > 200:
-            issues.append({
-                "type": "excessive_length",
-                "message": f"Conversation has {len(conversation_history)} messages - may impact performance",
-                "severity": "medium"
-            })
+            issues.append(
+                {
+                    "type": "excessive_length",
+                    "message": f"Conversation has {len(conversation_history)} messages - may impact performance",
+                    "severity": "medium",
+                }
+            )
             score = max(0, score - penalty_per_issue * 2)
 
         # Check for very long messages (potential abuse)
-        long_messages = sum(1 for msg in conversation_history
-                          if isinstance(msg.get("content"), str) and len(msg["content"]) > 10000)
+        long_messages = sum(
+            1
+            for msg in conversation_history
+            if isinstance(msg.get("content"), str) and len(msg["content"]) > 10000
+        )
 
         if long_messages > 0:
-            issues.append({
-                "type": "long_messages",
-                "message": f"{long_messages} messages exceed 10k characters",
-                "severity": "low"
-            })
+            issues.append(
+                {
+                    "type": "long_messages",
+                    "message": f"{long_messages} messages exceed 10k characters",
+                    "severity": "low",
+                }
+            )
             score = max(0, score - penalty_per_issue * long_messages)
 
         # Calculate conversation depth (back-and-forth exchanges)
         user_messages = sum(1 for msg in conversation_history if msg.get("role") == "user")
-        assistant_messages = sum(1 for msg in conversation_history if msg.get("role") == "assistant")
+        assistant_messages = sum(
+            1 for msg in conversation_history if msg.get("role") == "assistant"
+        )
         metrics["conversation_depth"] = min(user_messages, assistant_messages)
 
         return score, issues, metrics
 
-    def _analyze_content_health(self, conversation_history: List[Dict[str, Any]]) -> Tuple[float, List[Dict], Dict]:
+    def _analyze_content_health(
+        self, conversation_history: List[Dict[str, Any]]
+    ) -> Tuple[float, List[Dict], Dict]:
         """
         Analyze content quality and coherence.
 
@@ -363,27 +400,34 @@ class SessionHealthMonitor:
         metrics["duplicate_messages"] = duplicates
 
         if duplicates > 3:
-            issues.append({
-                "type": "duplicate_content",
-                "message": f"{duplicates} duplicate messages detected",
-                "severity": "low"
-            })
+            issues.append(
+                {
+                    "type": "duplicate_content",
+                    "message": f"{duplicates} duplicate messages detected",
+                    "severity": "low",
+                }
+            )
             score = max(0, score - penalty_per_issue * duplicates)
 
         # Check for empty assistant responses
-        empty_assistant = sum(1 for msg in conversation_history
-                            if msg.get("role") == "assistant"
-                            and not msg.get("content", "").strip()
-                            and not msg.get("tool_calls"))
+        empty_assistant = sum(
+            1
+            for msg in conversation_history
+            if msg.get("role") == "assistant"
+            and not msg.get("content", "").strip()
+            and not msg.get("tool_calls")
+        )
 
         metrics["empty_responses"] = empty_assistant
 
         if empty_assistant > 2:
-            issues.append({
-                "type": "empty_responses",
-                "message": f"{empty_assistant} empty assistant responses",
-                "severity": "medium"
-            })
+            issues.append(
+                {
+                    "type": "empty_responses",
+                    "message": f"{empty_assistant} empty assistant responses",
+                    "severity": "medium",
+                }
+            )
             score = max(0, score - penalty_per_issue * empty_assistant)
 
         return score, issues, metrics
@@ -401,14 +445,17 @@ class SessionHealthMonitor:
 
         # Simple check: no three consecutive messages from same role (ignoring tools)
         for i in range(len(expected_roles) - 2):
-            if (expected_roles[i] == expected_roles[i+1] == expected_roles[i+2] and
-                expected_roles[i] in ["user", "assistant"]):
-                issues.append({
-                    "type": "conversation_flow_issue",
-                    "index": i,
-                    "message": f"Unusual conversation flow at messages {i}-{i+2}",
-                    "severity": "low"
-                })
+            if expected_roles[i] == expected_roles[i + 1] == expected_roles[
+                i + 2
+            ] and expected_roles[i] in ["user", "assistant"]:
+                issues.append(
+                    {
+                        "type": "conversation_flow_issue",
+                        "index": i,
+                        "message": f"Unusual conversation flow at messages {i}-{i+2}",
+                        "severity": "low",
+                    }
+                )
                 break  # Only report first occurrence
 
         return issues
@@ -424,7 +471,9 @@ class SessionHealthMonitor:
             pass
         return False
 
-    def _generate_recommendations(self, issues: List[Dict[str, Any]], overall_score: float) -> List[str]:
+    def _generate_recommendations(
+        self, issues: List[Dict[str, Any]], overall_score: float
+    ) -> List[str]:
         """Generate actionable recommendations based on issues and score."""
         recommendations = []
 
@@ -434,7 +483,9 @@ class SessionHealthMonitor:
         # Critical issues get priority recommendations
         critical_issues = [i for i in issues if i.get("severity") == "critical"]
         if critical_issues:
-            recommendations.append("CRITICAL: Session has corrupted messages. Use '/session repair' to fix.")
+            recommendations.append(
+                "CRITICAL: Session has corrupted messages. Use '/session repair' to fix."
+            )
 
         # High severity issues
         high_issues = [i for i in issues if i.get("severity") == "high"]
@@ -446,13 +497,17 @@ class SessionHealthMonitor:
             recommendations.append("Consider clearing repetitive conversation history.")
 
         if issue_types.get("excessive_length", 0) > 0:
-            recommendations.append("Session is very long. Consider creating a checkpoint and starting fresh.")
+            recommendations.append(
+                "Session is very long. Consider creating a checkpoint and starting fresh."
+            )
 
         if issue_types.get("low_tool_success_rate", 0) > 0:
             recommendations.append("Tool execution issues detected. Review recent tool calls.")
 
         if overall_score < 0.6:
-            recommendations.append("Session health is poor. Recommend checkpoint rollback or repair.")
+            recommendations.append(
+                "Session health is poor. Recommend checkpoint rollback or repair."
+            )
         elif overall_score < 0.8:
             recommendations.append("Session needs attention. Monitor for further issues.")
 

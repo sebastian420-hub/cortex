@@ -141,7 +141,11 @@ class GitCommitTool(Tool):
             self.console.print(f"[blue]🔧 Git Commit:[/blue] {message}")
 
         # Ask for approval
-        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
+        if (
+            self.permission_mode == PermissionMode.NORMAL
+            and self.console
+            and self.permission_mode != PermissionMode.AUTO_APPROVE
+        ):
             if not Confirm.ask(f"[bold]Commit with message: '{message}'?[/bold]"):
                 if self.console:
                     self.console.print("[red]✗[/red] Cancelled by user")
@@ -274,7 +278,11 @@ class GitAddTool(Tool):
             action_desc = ", ".join(files)
 
         # Ask for approval
-        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
+        if (
+            self.permission_mode == PermissionMode.NORMAL
+            and self.console
+            and self.permission_mode != PermissionMode.AUTO_APPROVE
+        ):
             if not Confirm.ask(f"[bold]Stage {action_desc} for commit?[/bold]"):
                 if self.console:
                     self.console.print("[red]✗[/red] Cancelled by user")
@@ -318,7 +326,9 @@ class GitAddTool(Tool):
                 retryable=True,
             )
         except Exception as e:
-            return create_error_response(str(e), ErrorType.EXECUTION, {"command": cmd}, retryable=True)
+            return create_error_response(
+                str(e), ErrorType.EXECUTION, {"command": cmd}, retryable=True
+            )
 
 
 class GitBranchTool(Tool):
@@ -335,11 +345,15 @@ class GitBranchTool(Tool):
             return self._list_branches()
         elif action == "create":
             if not branch_name:
-                return create_error_response("branch_name is required for 'create' action.", ErrorType.VALIDATION)
+                return create_error_response(
+                    "branch_name is required for 'create' action.", ErrorType.VALIDATION
+                )
             return self._create_branch(branch_name)
         elif action == "delete":
             if not branch_name:
-                return create_error_response("branch_name is required for 'delete' action.", ErrorType.VALIDATION)
+                return create_error_response(
+                    "branch_name is required for 'delete' action.", ErrorType.VALIDATION
+                )
             return self._delete_branch(branch_name, force)
         else:
             return create_error_response(
@@ -359,13 +373,15 @@ class GitBranchTool(Tool):
                 timeout=timeout,
             )
             if result.returncode != 0:
-                return create_error_response("Failed to list branches.", ErrorType.EXECUTION, {"stderr": result.stderr})
+                return create_error_response(
+                    "Failed to list branches.", ErrorType.EXECUTION, {"stderr": result.stderr}
+                )
 
             output = result.stdout
             if self.console:
                 self.console.print(Panel(output, title="🌳 Git Branches", border_style="cyan"))
-            
-            branches = [line.strip() for line in output.split('\n') if line.strip()]
+
+            branches = [line.strip() for line in output.split("\n") if line.strip()]
             return create_success_response({"branches": branches})
 
         except Exception as e:
@@ -375,12 +391,20 @@ class GitBranchTool(Tool):
         """Create a new branch."""
         if self.permission_mode == PermissionMode.PLAN:
             if self.console:
-                self.console.print(f"[yellow]PLAN MODE:[/yellow] Would create branch '{branch_name}'")
+                self.console.print(
+                    f"[yellow]PLAN MODE:[/yellow] Would create branch '{branch_name}'"
+                )
             return create_permission_denial("Plan mode - no branch creation", "git_branch_create")
 
-        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
+        if (
+            self.permission_mode == PermissionMode.NORMAL
+            and self.console
+            and self.permission_mode != PermissionMode.AUTO_APPROVE
+        ):
             if not Confirm.ask(f"[bold]Create new branch '{branch_name}'?[/bold]"):
-                return create_permission_denial("User cancelled branch creation.", "git_branch_create")
+                return create_permission_denial(
+                    "User cancelled branch creation.", "git_branch_create"
+                )
 
         try:
             timeout = self.get_timeout()
@@ -392,10 +416,20 @@ class GitBranchTool(Tool):
                 timeout=timeout,
             )
             if result.returncode != 0:
-                return create_error_response(f"Failed to create branch '{branch_name}'.", ErrorType.EXECUTION, {"stderr": result.stderr})
+                return create_error_response(
+                    f"Failed to create branch '{branch_name}'.",
+                    ErrorType.EXECUTION,
+                    {"stderr": result.stderr},
+                )
 
             if self.console:
-                self.console.print(Panel(f"Branch '{branch_name}' created.", title="✓ Branch Created", border_style="green"))
+                self.console.print(
+                    Panel(
+                        f"Branch '{branch_name}' created.",
+                        title="✓ Branch Created",
+                        border_style="green",
+                    )
+                )
             return create_success_response({"branch_name": branch_name, "action": "create"})
 
         except Exception as e:
@@ -405,15 +439,27 @@ class GitBranchTool(Tool):
         """Delete a branch."""
         if self.permission_mode == PermissionMode.PLAN:
             if self.console:
-                self.console.print(f"[yellow]PLAN MODE:[/yellow] Would delete branch '{branch_name}'")
+                self.console.print(
+                    f"[yellow]PLAN MODE:[/yellow] Would delete branch '{branch_name}'"
+                )
             return create_permission_denial("Plan mode - no branch deletion", "git_branch_delete")
 
         delete_flag = "-D" if force else "-d"
-        confirm_msg = f"[bold red]Permanently delete branch '{branch_name}'? This cannot be undone.[/bold red]" if force else f"[bold]Delete branch '{branch_name}'?[/bold]"
-        
-        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
+        confirm_msg = (
+            f"[bold red]Permanently delete branch '{branch_name}'? This cannot be undone.[/bold red]"
+            if force
+            else f"[bold]Delete branch '{branch_name}'?[/bold]"
+        )
+
+        if (
+            self.permission_mode == PermissionMode.NORMAL
+            and self.console
+            and self.permission_mode != PermissionMode.AUTO_APPROVE
+        ):
             if not Confirm.ask(confirm_msg):
-                return create_permission_denial("User cancelled branch deletion.", "git_branch_delete")
+                return create_permission_denial(
+                    "User cancelled branch deletion.", "git_branch_delete"
+                )
 
         try:
             timeout = self.get_timeout()
@@ -425,10 +471,16 @@ class GitBranchTool(Tool):
                 timeout=timeout,
             )
             if result.returncode != 0:
-                return create_error_response(f"Failed to delete branch '{branch_name}'.", ErrorType.EXECUTION, {"stderr": result.stderr})
+                return create_error_response(
+                    f"Failed to delete branch '{branch_name}'.",
+                    ErrorType.EXECUTION,
+                    {"stderr": result.stderr},
+                )
 
             if self.console:
-                self.console.print(Panel(result.stdout, title="✓ Branch Deleted", border_style="green"))
+                self.console.print(
+                    Panel(result.stdout, title="✓ Branch Deleted", border_style="green")
+                )
             return create_success_response({"branch_name": branch_name, "action": "delete"})
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION)
@@ -442,7 +494,7 @@ class GitPushTool(Tool):
 
     def execute(self, remote: str = "origin", branch: Optional[str] = None) -> Dict[str, Any]:
         """Push commits to a remote repository."""
-        
+
         action_desc = f"push to remote '{remote}'"
         if branch:
             action_desc += f" branch '{branch}'"
@@ -461,12 +513,13 @@ class GitPushTool(Tool):
                 expand=False,
             )
             self.console.print(warning_panel)
-            if self.permission_mode == PermissionMode.NORMAL and not Confirm.ask(f"[bold]Are you sure you want to {action_desc}?[/bold]"):
+            if self.permission_mode == PermissionMode.NORMAL and not Confirm.ask(
+                f"[bold]Are you sure you want to {action_desc}?[/bold]"
+            ):
                 return create_permission_denial("User cancelled push.", "git_push")
         elif self.permission_mode == PermissionMode.NORMAL and self.console:
             if not Confirm.ask(f"[bold]Are you sure you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled push.", "git_push")
-
 
         cmd = ["git", "push", remote]
         if branch:
@@ -485,7 +538,9 @@ class GitPushTool(Tool):
             if result.returncode != 0:
                 error_message = result.stderr or "Git push failed."
                 if "authentication" in error_message.lower():
-                    error_message += "\nHint: Authentication may have failed. Check your credentials."
+                    error_message += (
+                        "\nHint: Authentication may have failed. Check your credentials."
+                    )
                 return create_error_response(
                     error_message,
                     ErrorType.EXECUTION,
@@ -493,7 +548,13 @@ class GitPushTool(Tool):
                 )
 
             if self.console:
-                self.console.print(Panel(result.stderr or result.stdout, title="✓ Push Successful", border_style="green"))
+                self.console.print(
+                    Panel(
+                        result.stderr or result.stdout,
+                        title="✓ Push Successful",
+                        border_style="green",
+                    )
+                )
             return create_success_response({"output": result.stderr or result.stdout})
 
         except subprocess.TimeoutExpired:
@@ -535,9 +596,17 @@ class GitRemoteTool(Tool):
 
             output = result.stdout
             if self.console:
-                self.console.print(Panel(output or "[dim]No remotes configured.[/dim]", title="📡 Git Remotes", border_style="cyan"))
-            return create_success_response({"output": output, "remotes": output.strip().split("\n") if output.strip() else []})
-            
+                self.console.print(
+                    Panel(
+                        output or "[dim]No remotes configured.[/dim]",
+                        title="📡 Git Remotes",
+                        border_style="cyan",
+                    )
+                )
+            return create_success_response(
+                {"output": output, "remotes": output.strip().split("\n") if output.strip() else []}
+            )
+
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION)
 
@@ -564,14 +633,16 @@ class GitShowTool(Tool):
 
             if result.returncode != 0:
                 return create_error_response(
-                    f"Failed to show details for '{ref}'.", ErrorType.EXECUTION, {"stderr": result.stderr}
+                    f"Failed to show details for '{ref}'.",
+                    ErrorType.EXECUTION,
+                    {"stderr": result.stderr},
                 )
 
             output = result.stdout
             if self.console:
                 self.console.print(Panel(output, title=f"📄 Git Show: {ref}", border_style="cyan"))
             return create_success_response({"output": output})
-            
+
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION)
 
@@ -584,7 +655,7 @@ class GitCheckoutTool(Tool):
 
     def execute(self, branch: str, new_branch: bool = False) -> Dict[str, Any]:
         """Switch branches or create a new one."""
-        
+
         action_desc = f"checkout branch '{branch}'"
         cmd = ["git", "checkout", branch]
         if new_branch:
@@ -596,7 +667,11 @@ class GitCheckoutTool(Tool):
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would {action_desc}")
             return create_permission_denial("Plan mode - no checkout allowed", "git_checkout")
 
-        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
+        if (
+            self.permission_mode == PermissionMode.NORMAL
+            and self.console
+            and self.permission_mode != PermissionMode.AUTO_APPROVE
+        ):
             if not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled checkout.", "git_checkout")
 
@@ -619,9 +694,13 @@ class GitCheckoutTool(Tool):
 
             output = result.stderr or result.stdout
             if self.console:
-                self.console.print(Panel(output, title=f"✓ Git Checkout Successful", border_style="green"))
-            
-            return create_success_response({"output": output, "branch": branch, "new_branch": new_branch})
+                self.console.print(
+                    Panel(output, title=f"✓ Git Checkout Successful", border_style="green")
+                )
+
+            return create_success_response(
+                {"output": output, "branch": branch, "new_branch": new_branch}
+            )
 
         except Exception as e:
             return create_error_response(str(e), ErrorType.EXECUTION, {"command": cmd})
@@ -635,9 +714,11 @@ class GitResetTool(Tool):
 
     def execute(self, files: list[str]) -> Dict[str, Any]:
         """Unstage files from the index."""
-        
+
         if not files:
-            return create_error_response("At least one file must be provided.", ErrorType.VALIDATION)
+            return create_error_response(
+                "At least one file must be provided.", ErrorType.VALIDATION
+            )
 
         action_desc = f"unstage {', '.join(files)}"
 
@@ -647,7 +728,9 @@ class GitResetTool(Tool):
             return create_permission_denial("Plan mode - no reset allowed", "git_reset")
 
         if self.permission_mode == PermissionMode.NORMAL and self.console:
-            if self.permission_mode != PermissionMode.AUTO_APPROVE and not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
+            if self.permission_mode != PermissionMode.AUTO_APPROVE and not Confirm.ask(
+                f"[bold]Do you want to {action_desc}?[/bold]"
+            ):
                 return create_permission_denial("User cancelled reset.", "git_reset")
 
         cmd = ["git", "reset", "--"] + files
@@ -671,8 +754,14 @@ class GitResetTool(Tool):
 
             output = result.stderr or result.stdout
             if self.console:
-                self.console.print(Panel(f"Unstaged {', '.join(files)}", title=f"✓ Git Reset Successful", border_style="green"))
-            
+                self.console.print(
+                    Panel(
+                        f"Unstaged {', '.join(files)}",
+                        title=f"✓ Git Reset Successful",
+                        border_style="green",
+                    )
+                )
+
             return create_success_response({"output": output, "files": files})
 
         except Exception as e:
@@ -687,7 +776,7 @@ class GitFetchTool(Tool):
 
     def execute(self, remote: str = "origin") -> Dict[str, Any]:
         """Fetch changes from a remote repository."""
-        
+
         action_desc = f"fetch from remote '{remote}'"
 
         if self.permission_mode == PermissionMode.PLAN:
@@ -695,7 +784,11 @@ class GitFetchTool(Tool):
                 self.console.print(f"[yellow]PLAN MODE:[/yellow] Would {action_desc}")
             return create_permission_denial("Plan mode - no fetch allowed", "git_fetch")
 
-        if self.permission_mode == PermissionMode.NORMAL and self.console and self.permission_mode != PermissionMode.AUTO_APPROVE:
+        if (
+            self.permission_mode == PermissionMode.NORMAL
+            and self.console
+            and self.permission_mode != PermissionMode.AUTO_APPROVE
+        ):
             if not Confirm.ask(f"[bold]Do you want to {action_desc}?[/bold]"):
                 return create_permission_denial("User cancelled fetch.", "git_fetch")
 
@@ -721,8 +814,10 @@ class GitFetchTool(Tool):
 
             output = result.stderr or result.stdout
             if self.console:
-                self.console.print(Panel(output, title="✓ Git Fetch Successful", border_style="green"))
-            
+                self.console.print(
+                    Panel(output, title="✓ Git Fetch Successful", border_style="green")
+                )
+
             return create_success_response({"output": output})
 
         except subprocess.TimeoutExpired:
@@ -743,7 +838,7 @@ class GitPullTool(Tool):
 
     def execute(self, remote: str = "origin", branch: Optional[str] = None) -> Dict[str, Any]:
         """Fetch from and integrate with another repository or a local branch."""
-        
+
         action_desc = f"pull from remote '{remote}'"
         if branch:
             action_desc += f" branch '{branch}'"
@@ -774,7 +869,9 @@ class GitPullTool(Tool):
             if result.returncode != 0:
                 error_message = result.stderr or "Git pull failed."
                 if "authentication" in error_message.lower():
-                    error_message += "\nHint: Authentication may have failed. Check your credentials."
+                    error_message += (
+                        "\nHint: Authentication may have failed. Check your credentials."
+                    )
                 return create_error_response(
                     error_message,
                     ErrorType.EXECUTION,
@@ -783,8 +880,10 @@ class GitPullTool(Tool):
 
             output = result.stderr or result.stdout
             if self.console:
-                self.console.print(Panel(output, title="✓ Git Pull Successful", border_style="green"))
-            
+                self.console.print(
+                    Panel(output, title="✓ Git Pull Successful", border_style="green")
+                )
+
             return create_success_response({"output": output})
 
         except subprocess.TimeoutExpired:

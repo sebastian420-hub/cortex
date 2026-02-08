@@ -29,20 +29,20 @@ Usage:
         AgentState,
         AgentFocus,
     )
-    
+
     # Create state manager
     state_manager = StateManager(project_dir=Path("."))
-    
+
     # Set primary goal
     state_manager.set_primary_goal("Fix the bug in api.py")
-    
+
     # Record tool execution
     state_manager.record_tool_execution(
         tool_name="read_file",
         arguments={"path": "api.py"},
         result={"success": True, "content": "..."},
     )
-    
+
     # Get context for LLM
     context = state_manager.get_llm_context()
     ```
@@ -76,13 +76,11 @@ __all__ = [
     "WorkingMemoryItemType",
     "FileContext",
     "ToolContext",
-    
     # Session memory
     "EnhancedMemoryBank",
     "FailedApproach",
     "SuccessfulPattern",
     "SessionMemoryType",
-    
     # State management
     "StateManager",
     "AgentState",

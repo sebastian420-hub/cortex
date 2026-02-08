@@ -13,29 +13,31 @@ console = Console()
 
 class UIMode(Enum):
     """UI display modes"""
-    MINIMAL = "minimal"   # Like Claude Code - clean, minimal borders, focused
-    NORMAL = "normal"     # Current Cortex - rich panels, detailed displays
-    DEBUG = "debug"       # Development - all details, timing, internals
+
+    MINIMAL = "minimal"  # Like Claude Code - clean, minimal borders, focused
+    NORMAL = "normal"  # Current Cortex - rich panels, detailed displays
+    DEBUG = "debug"  # Development - all details, timing, internals
 
 
 class UIManager:
     """Global UI manager singleton"""
-    _instance: Optional['UIManager'] = None
+
+    _instance: Optional["UIManager"] = None
     _mode: UIMode = UIMode.NORMAL  # Start with normal for backward compatibility
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
+
     @classmethod
     def get_mode(cls) -> UIMode:
         return cls._mode
-    
+
     @classmethod
     def set_mode(cls, mode: UIMode):
         cls._mode = mode
-    
+
     @classmethod
     def toggle_mode(cls):
         """Cycle through UI modes: MINIMAL -> NORMAL -> DEBUG -> MINIMAL"""
@@ -44,15 +46,15 @@ class UIManager:
         next_idx = (current_idx + 1) % len(modes)
         cls._mode = modes[next_idx]
         return cls._mode
-    
+
     @classmethod
     def is_minimal(cls) -> bool:
         return cls._mode == UIMode.MINIMAL
-    
+
     @classmethod
     def is_normal(cls) -> bool:
         return cls._mode == UIMode.NORMAL
-    
+
     @classmethod
     def is_debug(cls) -> bool:
         return cls._mode == UIMode.DEBUG
@@ -95,13 +97,13 @@ def is_debug_mode() -> bool:
 
 
 __all__ = [
-    'UIMode',
-    'UIManager',
-    'ui_manager',
-    'get_ui_mode',
-    'set_ui_mode',
-    'toggle_ui_mode',
-    'should_show_panels',
-    'is_minimal_mode',
-    'is_debug_mode',
+    "UIMode",
+    "UIManager",
+    "ui_manager",
+    "get_ui_mode",
+    "set_ui_mode",
+    "toggle_ui_mode",
+    "should_show_panels",
+    "is_minimal_mode",
+    "is_debug_mode",
 ]

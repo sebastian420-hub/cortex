@@ -36,32 +36,73 @@ class ReadFileTool(Tool):
 
     # Binary file signatures (magic numbers)
     BINARY_SIGNATURES = [
-        b'\x89PNG',      # PNG
-        b'\xff\xd8\xff', # JPEG
-        b'GIF87a',       # GIF
-        b'GIF89a',       # GIF
-        b'PK\x03\x04',   # ZIP/DOCX/XLSX
-        b'%PDF',         # PDF
-        b'\x7fELF',      # ELF executable
-        b'MZ',           # Windows executable
-        b'\x00\x00\x01\x00',  # ICO
-        b'RIFF',         # RIFF (WAV, AVI)
-        b'\x1f\x8b',     # GZIP
-        b'BZh',          # BZIP2
-        b'\xfd7zXZ',     # XZ
-        b'SQLite',       # SQLite
+        b"\x89PNG",  # PNG
+        b"\xff\xd8\xff",  # JPEG
+        b"GIF87a",  # GIF
+        b"GIF89a",  # GIF
+        b"PK\x03\x04",  # ZIP/DOCX/XLSX
+        b"%PDF",  # PDF
+        b"\x7fELF",  # ELF executable
+        b"MZ",  # Windows executable
+        b"\x00\x00\x01\x00",  # ICO
+        b"RIFF",  # RIFF (WAV, AVI)
+        b"\x1f\x8b",  # GZIP
+        b"BZh",  # BZIP2
+        b"\xfd7zXZ",  # XZ
+        b"SQLite",  # SQLite
     ]
 
     # Binary file extensions
     BINARY_EXTENSIONS = {
-        '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.webp', '.tiff',
-        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-        '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz',
-        '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.a',
-        '.pyc', '.pyo', '.class', '.jar', '.war',
-        '.mp3', '.mp4', '.avi', '.mkv', '.mov', '.wav', '.flac',
-        '.woff', '.woff2', '.ttf', '.otf', '.eot',
-        '.db', '.sqlite', '.sqlite3',
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".gif",
+        ".bmp",
+        ".ico",
+        ".webp",
+        ".tiff",
+        ".pdf",
+        ".doc",
+        ".docx",
+        ".xls",
+        ".xlsx",
+        ".ppt",
+        ".pptx",
+        ".zip",
+        ".tar",
+        ".gz",
+        ".7z",
+        ".rar",
+        ".bz2",
+        ".xz",
+        ".exe",
+        ".dll",
+        ".so",
+        ".dylib",
+        ".bin",
+        ".o",
+        ".a",
+        ".pyc",
+        ".pyo",
+        ".class",
+        ".jar",
+        ".war",
+        ".mp3",
+        ".mp4",
+        ".avi",
+        ".mkv",
+        ".mov",
+        ".wav",
+        ".flac",
+        ".woff",
+        ".woff2",
+        ".ttf",
+        ".otf",
+        ".eot",
+        ".db",
+        ".sqlite",
+        ".sqlite3",
     }
 
     def _is_binary_file(self, path: Path) -> tuple[bool, str]:
@@ -77,14 +118,14 @@ class ReadFileTool(Tool):
 
         # Check magic numbers (more reliable)
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 header = f.read(16)
                 for sig in self.BINARY_SIGNATURES:
                     if header.startswith(sig):
                         return True, f"Binary signature detected"
 
                 # Check for null bytes (common in binaries)
-                if b'\x00' in header:
+                if b"\x00" in header:
                     return True, "Contains null bytes"
         except Exception:
             pass
@@ -112,7 +153,9 @@ class ReadFileTool(Tool):
             if is_minimal_mode():
                 # Minimal mode: simpler message
                 if offset > 0 or limit > 0:
-                    self.console.print(f"[dim][FILE] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})[/dim]")
+                    self.console.print(
+                        f"[dim][FILE] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})[/dim]"
+                    )
                 else:
                     self.console.print(f"[dim][FILE] {path}[/dim]")
             else:
@@ -242,14 +285,18 @@ class ReadFileTool(Tool):
                     line_count = len(truncated_lines)
                     total_display = f" of {total_lines}" if was_truncated else ""
                     cache_indicator = " [dim](cached)[/dim]" if from_cache else ""
-                    self.console.print(f"[cyan][FILE] {path}{cache_indicator} ({line_count} lines{total_display})[/cyan]")
+                    self.console.print(
+                        f"[cyan][FILE] {path}{cache_indicator} ({line_count} lines{total_display})[/cyan]"
+                    )
                     if truncated_lines:
                         # Show first few lines
-                        preview_lines = truncated_lines[:min(3, len(truncated_lines))]
+                        preview_lines = truncated_lines[: min(3, len(truncated_lines))]
                         for i, line in enumerate(preview_lines, start=start_line + 1):
                             self.console.print(f"  {i:3d}: {line}")
                         if len(truncated_lines) > 3:
-                            self.console.print(f"[dim]  ... ({len(truncated_lines) - 3} more lines)[/dim]")
+                            self.console.print(
+                                f"[dim]  ... ({len(truncated_lines) - 3} more lines)[/dim]"
+                            )
                 else:
                     # Normal/debug mode: panel display with syntax highlighting
                     ext = full_path.suffix.lstrip(".") or "txt"
@@ -299,30 +346,28 @@ class ReadFileTool(Tool):
     def read_file_chunked(self, path: str, chunk_strategy: str = "smart") -> Dict[str, Any]:
         """
         Read and chunk a file for memory-efficient editing.
-        
+
         Args:
             path: Relative path to the file
             chunk_strategy: Strategy for chunking ('smart', 'fixed_size', 'function_based')
-        
+
         Returns:
             Standardized response with chunk information
         """
         try:
             full_path = validate_path(self.project_dir, path)
-            
+
             if not full_path.exists():
                 return create_error_response(
-                    f"File not found: {path}",
-                    ErrorType.NOT_FOUND,
-                    {"path": path}
+                    f"File not found: {path}", ErrorType.NOT_FOUND, {"path": path}
                 )
-            
+
             if self.console:
                 self.console.print(f"[cyan]Chunking:[/cyan] {path}")
-            
+
             # Read file content
             raw_content = full_path.read_text(encoding="utf-8")
-            
+
             # Check if chunking is needed
             if not should_chunk_file(raw_content, path):
                 if self.console:
@@ -335,7 +380,7 @@ class ReadFileTool(Tool):
                         "size": len(raw_content),
                     }
                 )
-            
+
             # Determine chunking strategy
             strategy_map = {
                 "smart": ChunkingStrategy.SMART,
@@ -344,25 +389,24 @@ class ReadFileTool(Tool):
                 "section": ChunkingStrategy.SECTION_BASED,
             }
             strategy = strategy_map.get(chunk_strategy, ChunkingStrategy.SMART)
-            
+
             # Create chunker and chunk the file
-            chunker = FileChunker(
-                max_chunk_size=2000,
-                strategy=strategy
-            )
+            chunker = FileChunker(max_chunk_size=2000, strategy=strategy)
             chunks = chunker.chunk_file(raw_content, path)
-            
+
             # Prepare chunk information
             chunk_info = []
             for chunk in chunks:
-                chunk_info.append({
-                    "id": chunk.chunk_id,
-                    "type": chunk.chunk_type.value,
-                    "tokens": chunk.token_estimate,
-                    "bytes": chunk.current_length,
-                    "metadata": chunk.metadata,
-                })
-            
+                chunk_info.append(
+                    {
+                        "id": chunk.chunk_id,
+                        "type": chunk.chunk_type.value,
+                        "tokens": chunk.token_estimate,
+                        "bytes": chunk.current_length,
+                        "metadata": chunk.metadata,
+                    }
+                )
+
             # Show chunk info in console
             if self.console:
                 self.console.print(
@@ -376,7 +420,7 @@ class ReadFileTool(Tool):
                     )
                 if len(chunks) > 10:
                     self.console.print(f"[dim]  ... and {len(chunks) - 10} more[/dim]")
-            
+
             return create_success_response(
                 {
                     "path": path,
@@ -388,7 +432,7 @@ class ReadFileTool(Tool):
                     "size": len(raw_content),
                 }
             )
-            
+
         except SecurityError as e:
             return create_permission_denial(str(e), {"path": path})
         except Exception as e:
@@ -441,7 +485,9 @@ class WriteFileTool(Tool):
                 old_content = full_path.read_text(encoding="utf-8")
                 if self.console:
                     if is_minimal_mode():
-                        self.console.print(f"[yellow][DIFF] {path} ({len(old_content)} → {len(content)} bytes)[/yellow]")
+                        self.console.print(
+                            f"[yellow][DIFF] {path} ({len(old_content)} → {len(content)} bytes)[/yellow]"
+                        )
                     else:
                         self.console.print(
                             Panel(
@@ -460,7 +506,7 @@ class WriteFileTool(Tool):
                     self.console.print(f"[cyan][FILE] {path} ({line_count} lines)[/cyan]")
                     if content_lines:
                         # Show first few lines
-                        preview_lines = content_lines[:min(3, len(content_lines))]
+                        preview_lines = content_lines[: min(3, len(content_lines))]
                         for i, line in enumerate(preview_lines, 1):
                             self.console.print(f"  {i:3d}: {line}")
                         if line_count > 3:

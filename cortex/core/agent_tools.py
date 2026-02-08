@@ -25,7 +25,7 @@ class ToolExecutor:
     for backward compatibility. This class provides a cleaner interface.
     """
 
-    def __init__(self, agent: 'Cortex'):
+    def __init__(self, agent: "Cortex"):
         """
         Initialize with reference to parent agent.
 

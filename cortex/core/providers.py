@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 from ..utils.encoding import sanitize_string, sanitize_object
 
+
 class ProviderError(Exception):
     """Error related to model provider operations"""
 
@@ -83,22 +84,22 @@ class ModelProvider(ABC):
     def extract_thinking_content(self, response: Any) -> Optional[str]:
         """
         Extract thinking/reasoning content from provider response.
-        
+
         Args:
             response: Raw provider response
-            
+
         Returns:
             Thinking content string if available, None otherwise
         """
         return None
-    
+
     def supports_thinking(self, model: str) -> bool:
         """
         Check if this model supports thinking process output.
-        
+
         Args:
             model: Model name
-            
+
         Returns:
             True if model can expose thinking content
         """
@@ -168,51 +169,55 @@ class OllamaProvider(ModelProvider):
     def extract_thinking_content(self, response: Any) -> Optional[str]:
         """
         Extract thinking/reasoning content from Ollama response.
-        
+
         Ollama models might return thinking in custom message fields.
         This is model-dependent and may require specific model configurations.
         """
         # Check for thinking in message object
         if isinstance(response, dict):
-            message = response.get('message', {})
-            
+            message = response.get("message", {})
+
             # Try common thinking field names
-            thinking = message.get('thinking') or message.get('reasoning')
+            thinking = message.get("thinking") or message.get("reasoning")
             if thinking:
                 return thinking
-            
+
             # Some models might have thinking in content field
-            content = message.get('content', '')
+            content = message.get("content", "")
             if content and isinstance(content, str):
                 # Check if content starts with thinking tags or patterns
                 stripped = content.strip()
                 if stripped.startswith("<thinking>") or stripped.startswith("<tool_call>"):
                     # This might be thinking content
                     return None  # Don't extract from content to avoid duplication
-            
+
         # For non-dict responses (like ollama chat response object)
-        elif hasattr(response, 'get'):
+        elif hasattr(response, "get"):
             try:
-                message = response.get('message', {})
-                thinking = message.get('thinking') or message.get('reasoning')
+                message = response.get("message", {})
+                thinking = message.get("thinking") or message.get("reasoning")
                 if thinking:
                     return thinking
             except Exception:
                 pass
-        
+
         return None
-    
+
     def supports_thinking(self, model: str) -> bool:
         """
         Check if Ollama model supports thinking process output.
-        
+
         Some Ollama models like deepseek-r1 and specialized reasoning models
         may expose thinking content. This method identifies these models.
         """
         model_lower = model.lower()
         thinking_indicators = [
-            "deepseek-r1", "deepseek-reasoner", "reasoner",
-            "thinking", "r1", "qwen2.5-32b-thought"
+            "deepseek-r1",
+            "deepseek-reasoner",
+            "reasoner",
+            "thinking",
+            "r1",
+            "qwen2.5-32b-thought",
         ]
         return any(indicator in model_lower for indicator in thinking_indicators)
 
@@ -368,25 +373,29 @@ class DeepSeekProvider(ModelProvider):
     def extract_thinking_content(self, response: Any) -> Optional[str]:
         """
         Extract thinking/reasoning content from DeepSeek response.
-        
+
         DeepSeek returns reasoning_content field in message object.
         """
         # For non-streaming responses
-        if hasattr(response, 'choices') and response.choices:
+        if hasattr(response, "choices") and response.choices:
             message = response.choices[0].message
-            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+            if hasattr(message, "reasoning_content") and message.reasoning_content:
                 return message.reasoning_content
         # For streaming chunks (delta)
-        elif hasattr(response, 'choices') and response.choices and hasattr(response.choices[0], 'delta'):
+        elif (
+            hasattr(response, "choices")
+            and response.choices
+            and hasattr(response.choices[0], "delta")
+        ):
             delta = response.choices[0].delta
-            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 return delta.reasoning_content
         return None
-    
+
     def supports_thinking(self, model: str) -> bool:
         """
         Check if DeepSeek model supports thinking process output.
-        
+
         DeepSeek reasoner models expose reasoning_content.
         Some other DeepSeek models may also support it.
         """
@@ -614,43 +623,43 @@ class AnthropicProvider(ModelProvider):
     def extract_thinking_content(self, response: Any) -> Optional[str]:
         """
         Extract thinking/reasoning content from Anthropic response.
-        
+
         Anthropic returns thinking as special content blocks when using
         thinking mode (available in Claude 3.5+).
         """
         try:
             # Anthropic returns content as a list of blocks
-            if hasattr(response, 'content') and response.content:
+            if hasattr(response, "content") and response.content:
                 thinking_parts = []
-                
+
                 for content_block in response.content:
                     # Check if this is a thinking block (Anthropic API)
-                    if hasattr(content_block, 'type') and content_block.type == "thinking":
-                        if hasattr(content_block, 'thinking') and content_block.thinking:
+                    if hasattr(content_block, "type") and content_block.type == "thinking":
+                        if hasattr(content_block, "thinking") and content_block.thinking:
                             thinking_parts.append(content_block.thinking)
                     # Check for text blocks that might contain thinking
-                    elif hasattr(content_block, 'type') and content_block.type == "text":
+                    elif hasattr(content_block, "type") and content_block.type == "text":
                         # Check if it has thinking attribute (some Anthropic models)
-                        if hasattr(content_block, 'thinking') and content_block.thinking:
+                        if hasattr(content_block, "thinking") and content_block.thinking:
                             thinking_parts.append(content_block.thinking)
-                
+
                 return "\n".join(thinking_parts) if thinking_parts else None
         except Exception:
             # Be defensive - if structure is unexpected, just return None
             pass
         return None
-    
+
     def supports_thinking(self, model: str) -> bool:
         """
         Check if Anthropic model supports thinking process output.
-        
+
         Thinking mode is available in Claude 3.5+ (Claude 3.5 Sonnet, Claude 3.7 Sonnet).
         """
         model_lower = model.lower()
         return (
-            "claude-3.5" in model_lower or 
-            "claude-3.7" in model_lower or
-            "claude-3.6" in model_lower  # Future-proofing
+            "claude-3.5" in model_lower
+            or "claude-3.7" in model_lower
+            or "claude-3.6" in model_lower  # Future-proofing
         )
 
 
@@ -679,7 +688,7 @@ class OpenRouterProvider(ModelProvider):
                 # Optional: For rankings on openrouter.ai, if applicable
                 "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:8000"),
                 "X-Title": os.getenv("OPENROUTER_X_TITLE", "Cortex CLI"),
-            }
+            },
         )
 
     def chat(
@@ -700,7 +709,7 @@ class OpenRouterProvider(ModelProvider):
             # Add reasoning support for MiMo and other reasoning models
             if self._should_enable_reasoning(model):
                 kwargs["extra_body"] = self._get_reasoning_config(model, tools)
-            
+
             response = self.client.chat.completions.create(**kwargs)
 
             # Convert OpenAI format to Cortex internal format
@@ -716,11 +725,11 @@ class OpenRouterProvider(ModelProvider):
                     }
                     for tc in message.tool_calls
                 ]
-            
+
             # Extract reasoning_details if available
             if hasattr(message, "reasoning_details") and message.reasoning_details:
                 result["message"]["reasoning_details"] = message.reasoning_details
-            
+
             return result
         except Exception as e:
             raise ProviderError(f"OpenRouter API error: {e}") from e
@@ -790,32 +799,36 @@ class OpenRouterProvider(ModelProvider):
     def extract_thinking_content(self, response: Any) -> Optional[str]:
         """
         Extract thinking/reasoning content from OpenRouter response.
-        
+
         OpenRouter supports OpenAI-compatible reasoning models (o1, o3, etc.).
         It may also route requests to DeepSeek reasoning models.
         """
         # For non-streaming responses
-        if hasattr(response, 'choices') and response.choices:
+        if hasattr(response, "choices") and response.choices:
             message = response.choices[0].message
             # Try OpenAI reasoning field (for o1, o3, o1-mini)
-            if hasattr(message, 'reasoning') and message.reasoning:
+            if hasattr(message, "reasoning") and message.reasoning:
                 return message.reasoning
             # Try reasoning_content (for DeepSeek via OpenRouter)
-            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+            if hasattr(message, "reasoning_content") and message.reasoning_content:
                 return message.reasoning_content
         # For streaming chunks (delta)
-        elif hasattr(response, 'choices') and response.choices and hasattr(response.choices[0], 'delta'):
+        elif (
+            hasattr(response, "choices")
+            and response.choices
+            and hasattr(response.choices[0], "delta")
+        ):
             delta = response.choices[0].delta
-            if hasattr(delta, 'reasoning') and delta.reasoning:
+            if hasattr(delta, "reasoning") and delta.reasoning:
                 return delta.reasoning
-            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 return delta.reasoning_content
         return None
-    
+
     def supports_thinking(self, model: str) -> bool:
         """
         Check if OpenRouter model supports thinking process output.
-        
+
         OpenRouter provides access to various reasoning models including:
         - OpenAI o1, o3, o1-mini (reasoning field)
         - DeepSeek reasoning models (reasoning_content field)
@@ -824,57 +837,70 @@ class OpenRouterProvider(ModelProvider):
         """
         model_lower = model.lower()
         thinking_indicators = [
-            "o1", "o3", "o1-mini", "reasoner", "thinking",
-            "deepseek", "claude-3.5", "claude-3.7", "mimo"
+            "o1",
+            "o3",
+            "o1-mini",
+            "reasoner",
+            "thinking",
+            "deepseek",
+            "claude-3.5",
+            "claude-3.7",
+            "mimo",
         ]
         return any(indicator in model_lower for indicator in thinking_indicators)
-    
+
     def _should_enable_reasoning(self, model: str) -> bool:
         """
         Determine if reasoning should be enabled for this model.
-        
+
         MiMo and other reasoning models benefit from thinking tokens for complex tasks.
         """
         # Enable for MiMo models
         if "mimo" in model.lower():
             return True
-        
+
         # Enable for other reasoning models
         return self.supports_thinking(model)
-    
-    def _get_reasoning_config(self, model: str, tools: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+
+    def _get_reasoning_config(
+        self, model: str, tools: Optional[List[Dict[str, Any]]]
+    ) -> Dict[str, Any]:
         """
         Get reasoning configuration based on task complexity.
-        
+
         Args:
             model: Model name
             tools: List of tools being used (indicates task complexity)
-        
+
         Returns:
             Reasoning configuration dict for extra_body
         """
         from .model_capabilities import get_model_profile
-        
+
         config = {}
-        
+
         # Get model profile to access reasoning budget
         profile = get_model_profile(model)
-        
+
         # Determine thinking budget based on task complexity
         # Note: Some models may ignore max_tokens but it's good to provide
         if tools and len(tools) > 0:
             # Complex tasks with tools (coding, editing, etc.)
             # Use complex budget from profile or default 8000
-            budget = profile.reasoning_budget.get("complex", 8000) if profile.reasoning_budget else 8000
+            budget = (
+                profile.reasoning_budget.get("complex", 8000) if profile.reasoning_budget else 8000
+            )
         else:
             # Simple tasks without tools
             # Use simple budget from profile or default 2000
-            budget = profile.reasoning_budget.get("simple", 2000) if profile.reasoning_budget else 2000
-        
+            budget = (
+                profile.reasoning_budget.get("simple", 2000) if profile.reasoning_budget else 2000
+            )
+
         # OpenRouter reasoning format for MiMo and similar models
         # Uses "reasoning": {"max_tokens": budget} format
         config["reasoning"] = {"max_tokens": budget}
-        
+
         return config
 
 
@@ -904,23 +930,38 @@ class ProviderFactory:
             return OllamaProvider()
 
         # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
-        if '/' in model_name:
+        if "/" in model_name:
             return OpenRouterProvider()
 
         # Check for OpenRouter models first (including models with colons)
         openrouter_indicators = [
-            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
-            "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/",
-            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
-            "nousresearch/", "z-ai/"
+            "devstral",
+            "openrouter/",
+            "nvidia/",
+            ":free",
+            ":paid",
+            "mistralai/",
+            "google/",
+            "anthropic/",
+            "meta-llama/",
+            "perplexity/",
+            "cohere/",
+            "jamba/",
+            "qwen/",
+            "x-ai/",
+            "xiaomi/",
+            "cognitivecomputations/",
+            "openai/",
+            "nousresearch/",
+            "z-ai/",
         ]
-        
+
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
         if "llama3" in model_lower and ":" in model_name:
             # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
             import re
-            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+
+            if re.match(r"^llama3(\.\d+)?:\d+[bB]?$", model_name):
                 # This is an Ollama model, skip to Ollama detection below
                 # Don't return here, let it fall through
                 pass
@@ -972,23 +1013,38 @@ class ProviderFactory:
             return False
 
         # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
-        if '/' in model_name:
+        if "/" in model_name:
             return True
 
         # Check for OpenRouter indicators first (including models with colons)
         openrouter_indicators = [
-            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
-            "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/",
-            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
-            "nousresearch/", "z-ai/"
+            "devstral",
+            "openrouter/",
+            "nvidia/",
+            ":free",
+            ":paid",
+            "mistralai/",
+            "google/",
+            "anthropic/",
+            "meta-llama/",
+            "perplexity/",
+            "cohere/",
+            "jamba/",
+            "qwen/",
+            "x-ai/",
+            "xiaomi/",
+            "cognitivecomputations/",
+            "openai/",
+            "nousresearch/",
+            "z-ai/",
         ]
-        
+
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
         if "llama3" in model_lower and ":" in model_name:
             import re
+
             # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
-            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+            if re.match(r"^llama3(\.\d+)?:\d+[bB]?$", model_name):
                 # This is an Ollama model (local)
                 return False
             else:
@@ -1001,13 +1057,13 @@ class ProviderFactory:
         # Check for Ollama model patterns (contains colon but not OpenRouter patterns)
         if ":" in model_name:
             return False
-        
+
         # Check for other cloud providers
         if model_lower.startswith("deepseek-"):
             return True
         if model_lower.startswith("claude-") or model_lower == "claude":
             return True
-        
+
         # Default to local (Ollama)
         return False
 
@@ -1021,23 +1077,38 @@ class ProviderFactory:
             return "ollama"
 
         # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
-        if '/' in model_name:
+        if "/" in model_name:
             return "openrouter"
 
         # Check for OpenRouter models first (including models with colons)
         openrouter_indicators = [
-            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
-            "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/",
-            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
-            "nousresearch/", "z-ai/"
+            "devstral",
+            "openrouter/",
+            "nvidia/",
+            ":free",
+            ":paid",
+            "mistralai/",
+            "google/",
+            "anthropic/",
+            "meta-llama/",
+            "perplexity/",
+            "cohere/",
+            "jamba/",
+            "qwen/",
+            "x-ai/",
+            "xiaomi/",
+            "cognitivecomputations/",
+            "openai/",
+            "nousresearch/",
+            "z-ai/",
         ]
-        
+
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
         if "llama3" in model_lower and ":" in model_name:
             # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
             import re
-            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+
+            if re.match(r"^llama3(\.\d+)?:\d+[bB]?$", model_name):
                 # This is an Ollama model, skip to Ollama detection below
                 pass
             else:

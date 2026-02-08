@@ -74,7 +74,9 @@ class OperationTracker:
                 yield updater
         else:
             # Indeterminate progress (spinner)
-            with self.console.status(f"[cyan]{description}...[/cyan]", spinner=SPINNER_TYPE) as status:
+            with self.console.status(
+                f"[cyan]{description}...[/cyan]", spinner=SPINNER_TYPE
+            ) as status:
                 updater = SpinnerUpdater(status, description, self._start_time)
                 yield updater
 

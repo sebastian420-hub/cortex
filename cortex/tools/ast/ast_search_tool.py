@@ -14,7 +14,7 @@ from enum import Enum
 from ...tools.base import Tool
 from ...core.security import validate_path, SecurityError
 from ...utils.errors import create_error_response, create_success_response, ErrorType
-from ...ast import ASTService, detect_language, SUPPORTED_LANGUAGES
+from ...code_ast import ASTService, detect_language, SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 
@@ -39,90 +39,91 @@ Use grep instead for: text patterns, strings, comments, or quick text searches."
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "Pattern to search for (function/class/import name or regex)"
+                    "description": "Pattern to search for (function/class/import name or regex)",
                 },
                 "path": {
                     "type": "string",
-                    "description": "Directory or file to search in. Default: current directory"
+                    "description": "Directory or file to search in. Default: current directory",
                 },
                 "search_type": {
                     "type": "string",
                     "enum": ["smart", "function", "class", "import", "text", "structure"],
-                    "description": "Type of search: 'function' finds function definitions, 'class' finds classes, 'import' finds imports, 'smart' auto-detects"
+                    "description": "Type of search: 'function' finds function definitions, 'class' finds classes, 'import' finds imports, 'smart' auto-detects",
                 },
                 "file_type": {
                     "type": "string",
-                    "description": "Filter by file extension (e.g., 'py' for Python, 'js' for JavaScript)"
+                    "description": "Filter by file extension (e.g., 'py' for Python, 'js' for JavaScript)",
                 },
                 "output_mode": {
                     "type": "string",
                     "enum": ["files_with_matches", "content", "count"],
-                    "description": "Output format: 'content' shows matching code, 'files_with_matches' shows file paths, 'count' shows match counts"
+                    "description": "Output format: 'content' shows matching code, 'files_with_matches' shows file paths, 'count' shows match counts",
                 },
                 "context": {
                     "type": "integer",
-                    "description": "Lines of context to show around matches (for content mode)"
+                    "description": "Lines of context to show around matches (for content mode)",
                 },
                 "head_limit": {
                     "type": "integer",
-                    "description": "Maximum number of results to return. Default: 50"
-                }
+                    "description": "Maximum number of results to return. Default: 50",
+                },
             },
-            "required": ["pattern"]
-        }
-    }
+            "required": ["pattern"],
+        },
+    },
 }
 
 
 class SearchType(Enum):
     """Types of search operations."""
-    TEXT = "text"           # Traditional text search
-    STRUCTURE = "structure" # AST pattern matching
-    SMART = "smart"         # Auto-detect based on pattern
-    FUNCTION = "function"   # Search function definitions
-    CLASS = "class"         # Search class definitions
-    IMPORT = "import"       # Search import statements
+
+    TEXT = "text"  # Traditional text search
+    STRUCTURE = "structure"  # AST pattern matching
+    SMART = "smart"  # Auto-detect based on pattern
+    FUNCTION = "function"  # Search function definitions
+    CLASS = "class"  # Search class definitions
+    IMPORT = "import"  # Search import statements
 
 
 class ASTSearchTool(Tool):
     """
     Enhanced search tool with AST understanding.
-    
+
     Combines traditional text search with AST-based structural search
     for smarter code understanding and more accurate results.
     """
-    
+
     timeout_category = "search"
     default_timeout = 45  # Slightly longer for AST parsing
-    
+
     def __init__(self, *args, **kwargs):
         """Initialize AST search tool."""
         super().__init__(*args, **kwargs)
         self.ast_service = ASTService(cache_size=50, enable_cache=True)
-        
+
         # Patterns that indicate structural search
         self.structural_patterns = [
-            r'^def\s+',           # Function definitions
-            r'^class\s+',         # Class definitions
-            r'^\s*@',             # Decorators
-            r'^\s*import\s+',     # Imports
-            r'^\s*from\s+',       # From imports
-            r'^\s*export\s+',     # Exports
-            r'^\s*function\s+',   # JS function
-            r'^\s*const\s+',      # JS const
-            r'^\s*let\s+',        # JS let
-            r'^\s*var\s+',        # JS var
-            r'^\s*public\s+',     # Java/C# public
-            r'^\s*private\s+',    # Java/C# private
-            r'^\s*protected\s+',  # Java/C# protected
-            r'^\s*func\s+',       # Go func
-            r'^\s*package\s+',    # Go package
-            r'^\s*struct\s+',     # Go/Rust struct
-            r'^\s*impl\s+',       # Rust impl
-            r'^\s*trait\s+',      # Rust trait
-            r'^\s*interface\s+',  # Java/Go interface
+            r"^def\s+",  # Function definitions
+            r"^class\s+",  # Class definitions
+            r"^\s*@",  # Decorators
+            r"^\s*import\s+",  # Imports
+            r"^\s*from\s+",  # From imports
+            r"^\s*export\s+",  # Exports
+            r"^\s*function\s+",  # JS function
+            r"^\s*const\s+",  # JS const
+            r"^\s*let\s+",  # JS let
+            r"^\s*var\s+",  # JS var
+            r"^\s*public\s+",  # Java/C# public
+            r"^\s*private\s+",  # Java/C# private
+            r"^\s*protected\s+",  # Java/C# protected
+            r"^\s*func\s+",  # Go func
+            r"^\s*package\s+",  # Go package
+            r"^\s*struct\s+",  # Go/Rust struct
+            r"^\s*impl\s+",  # Rust impl
+            r"^\s*trait\s+",  # Rust trait
+            r"^\s*interface\s+",  # Java/Go interface
         ]
-    
+
     def execute(
         self,
         pattern: str,
@@ -139,7 +140,7 @@ class ASTSearchTool(Tool):
     ) -> Dict[str, Any]:
         """
         Search for pattern in files with optional AST understanding.
-        
+
         Args:
             pattern: Pattern to search for
             path: Directory or file to search in
@@ -152,7 +153,7 @@ class ASTSearchTool(Tool):
             head_limit: Limit results (0 for unlimited)
             offset: Skip first N results
             show_line_numbers: Show line numbers in content mode
-            
+
         Returns:
             Standardized response with search results
         """
@@ -160,18 +161,18 @@ class ASTSearchTool(Tool):
             self.console.print(f"[cyan]Searching for:[/cyan] '{pattern}'")
             if search_type != "text":
                 self.console.print(f"[dim]Search type: {search_type}[/dim]")
-        
+
         # Validate path
         try:
             full_path = validate_path(self.project_dir, path)
         except SecurityError as e:
             return create_error_response(str(e), ErrorType.SECURITY, {"path": path})
-        
+
         if not full_path.exists():
             return create_error_response(
                 f"Path not found: {path}", ErrorType.NOT_FOUND, {"path": path}
             )
-        
+
         # Validate search type
         try:
             search_type_enum = SearchType(search_type)
@@ -181,70 +182,123 @@ class ASTSearchTool(Tool):
                 ErrorType.VALIDATION,
                 {"search_type": search_type},
             )
-        
+
         # Determine search strategy
         if search_type_enum == SearchType.SMART:
             if self._looks_like_structural_pattern(pattern):
                 return self._ast_search(
-                    pattern, full_path, file_type, output_mode,
-                    context, head_limit, offset, show_line_numbers
+                    pattern,
+                    full_path,
+                    file_type,
+                    output_mode,
+                    context,
+                    head_limit,
+                    offset,
+                    show_line_numbers,
                 )
             else:
                 return self._text_search(
-                    pattern, full_path, file_type, output_mode,
-                    case_insensitive, context, multiline,
-                    head_limit, offset, show_line_numbers
+                    pattern,
+                    full_path,
+                    file_type,
+                    output_mode,
+                    case_insensitive,
+                    context,
+                    multiline,
+                    head_limit,
+                    offset,
+                    show_line_numbers,
                 )
         elif search_type_enum == SearchType.STRUCTURE:
             return self._ast_search(
-                pattern, full_path, file_type, output_mode,
-                context, head_limit, offset, show_line_numbers
+                pattern,
+                full_path,
+                file_type,
+                output_mode,
+                context,
+                head_limit,
+                offset,
+                show_line_numbers,
             )
         elif search_type_enum in [SearchType.FUNCTION, SearchType.CLASS, SearchType.IMPORT]:
             return self._structural_search(
-                search_type_enum, pattern, full_path, file_type, output_mode,
-                context, head_limit, offset, show_line_numbers
+                search_type_enum,
+                pattern,
+                full_path,
+                file_type,
+                output_mode,
+                context,
+                head_limit,
+                offset,
+                show_line_numbers,
             )
         else:  # TEXT
             return self._text_search(
-                pattern, full_path, file_type, output_mode,
-                case_insensitive, context, multiline,
-                head_limit, offset, show_line_numbers
+                pattern,
+                full_path,
+                file_type,
+                output_mode,
+                case_insensitive,
+                context,
+                multiline,
+                head_limit,
+                offset,
+                show_line_numbers,
             )
-    
+
     def _looks_like_structural_pattern(self, pattern: str) -> bool:
         """
         Check if pattern looks like a structural code pattern.
-        
+
         Args:
             pattern: Search pattern
-            
+
         Returns:
             True if pattern looks structural
         """
         pattern_lower = pattern.lower()
-        
+
         # Check against structural patterns
         for struct_pattern in self.structural_patterns:
             if re.match(struct_pattern, pattern_lower):
                 return True
-        
+
         # Check for common code constructs
         code_keywords = [
-            'def ', 'class ', 'import ', 'from ', 'export ',
-            'function ', 'const ', 'let ', 'var ', 'public ',
-            'private ', 'protected ', 'func ', 'package ',
-            'struct ', 'impl ', 'trait ', 'interface ',
-            'async ', 'await ', 'throws ', 'extends ',
-            'implements ', 'namespace ', 'module ', 'type ',
+            "def ",
+            "class ",
+            "import ",
+            "from ",
+            "export ",
+            "function ",
+            "const ",
+            "let ",
+            "var ",
+            "public ",
+            "private ",
+            "protected ",
+            "func ",
+            "package ",
+            "struct ",
+            "impl ",
+            "trait ",
+            "interface ",
+            "async ",
+            "await ",
+            "throws ",
+            "extends ",
+            "implements ",
+            "namespace ",
+            "module ",
+            "type ",
         ]
-        
+
         for keyword in code_keywords:
             if keyword in pattern_lower:
                 return True
-        
+
         return False
-    
+
     def _text_search(
         self,
         pattern: str,
@@ -260,18 +314,16 @@ class ASTSearchTool(Tool):
     ) -> Dict[str, Any]:
         """
         Perform traditional text search (fallback).
-        
+
         Uses the existing grep tool for text search.
         """
         # Import existing grep tool
         from ..grep_tool import GrepTool
-        
+
         grep_tool = GrepTool(
-            project_dir=self.project_dir,
-            permission_mode=self.permission_mode,
-            console=self.console
+            project_dir=self.project_dir, permission_mode=self.permission_mode, console=self.console
         )
-        
+
         return grep_tool.execute(
             pattern=pattern,
             path=str(path),
@@ -284,7 +336,7 @@ class ASTSearchTool(Tool):
             offset=offset,
             show_line_numbers=show_line_numbers,
         )
-    
+
     def _ast_search(
         self,
         pattern: str,
@@ -298,7 +350,7 @@ class ASTSearchTool(Tool):
     ) -> Dict[str, Any]:
         """
         Perform AST-based structural search.
-        
+
         Args:
             pattern: Search pattern (can be tree-sitter query or text)
             path: Path to search in
@@ -308,48 +360,50 @@ class ASTSearchTool(Tool):
             head_limit: Result limit
             offset: Result offset
             show_line_numbers: Show line numbers
-            
+
         Returns:
             Search results
         """
         # Find files to search
         files = self._find_files(path, file_type)
-        
+
         if not files:
-            return create_success_response({
-                "results": [],
-                "match_count": 0,
-                "message": "No files to search",
-                "engine": "ast",
-            })
-        
+            return create_success_response(
+                {
+                    "results": [],
+                    "match_count": 0,
+                    "message": "No files to search",
+                    "engine": "ast",
+                }
+            )
+
         results = []
         match_count = 0
-        
+
         for file_path in files:
             # Detect language
             language = detect_language(file_path)
             if not language or language not in SUPPORTED_LANGUAGES:
                 continue
-            
+
             # Parse file with AST
             ast = self.ast_service.parse_file(file_path, language)
             if ast is None:
                 continue
-            
+
             # Try to execute as tree-sitter query
             query_results = self._execute_ast_query(ast, language, pattern, file_path)
-            
+
             if query_results:
                 match_count += len(query_results)
-                
+
                 if output_mode == "files_with_matches":
                     rel_path = str(file_path.relative_to(self.project_dir))
                     if rel_path not in results:
                         results.append(rel_path)
                 elif output_mode == "content":
                     results.extend(query_results)
-        
+
         # Apply offset and limit
         total_results = len(results)
         if offset > 0:
@@ -359,23 +413,27 @@ class ASTSearchTool(Tool):
             truncated = total_results > offset + head_limit
         else:
             truncated = False
-        
+
         if not results:
-            return create_success_response({
-                "results": [],
-                "match_count": 0,
-                "message": "No matches found",
+            return create_success_response(
+                {
+                    "results": [],
+                    "match_count": 0,
+                    "message": "No matches found",
+                    "engine": "ast",
+                }
+            )
+
+        return create_success_response(
+            {
+                "results": results,
+                "match_count": len(results),
+                "total_matches": total_results,
+                "truncated": truncated,
                 "engine": "ast",
-            })
-        
-        return create_success_response({
-            "results": results,
-            "match_count": len(results),
-            "total_matches": total_results,
-            "truncated": truncated,
-            "engine": "ast",
-        })
-    
+            }
+        )
+
     def _structural_search(
         self,
         search_type: SearchType,
@@ -390,7 +448,7 @@ class ASTSearchTool(Tool):
     ) -> Dict[str, Any]:
         """
         Search for specific structural elements (functions, classes, imports).
-        
+
         Args:
             search_type: Type of structural element to search
             pattern: Pattern to match (optional)
@@ -401,30 +459,32 @@ class ASTSearchTool(Tool):
             head_limit: Result limit
             offset: Result offset
             show_line_numbers: Show line numbers
-            
+
         Returns:
             Search results
         """
         # Find files to search
         files = self._find_files(path, file_type)
-        
+
         if not files:
-            return create_success_response({
-                "results": [],
-                "match_count": 0,
-                "message": "No files to search",
-                "engine": "ast",
-            })
-        
+            return create_success_response(
+                {
+                    "results": [],
+                    "match_count": 0,
+                    "message": "No files to search",
+                    "engine": "ast",
+                }
+            )
+
         results = []
         match_count = 0
-        
+
         for file_path in files:
             # Detect language
             language = detect_language(file_path)
             if not language or language not in SUPPORTED_LANGUAGES:
                 continue
-            
+
             # Extract structural elements based on search type
             if search_type == SearchType.FUNCTION:
                 elements = self.ast_service.extract_functions(file_path, language)
@@ -437,15 +497,15 @@ class ASTSearchTool(Tool):
                 element_type = "import"
             else:
                 continue
-            
+
             # Filter elements by pattern if provided
             if pattern:
                 elements = [e for e in elements if self._matches_pattern(e, pattern, element_type)]
-            
+
             if elements:
                 match_count += len(elements)
                 rel_path = str(file_path.relative_to(self.project_dir))
-                
+
                 if output_mode == "files_with_matches":
                     if rel_path not in results:
                         results.append(rel_path)
@@ -457,13 +517,13 @@ class ASTSearchTool(Tool):
                             result_text = f"{rel_path}:{element.start_line}: class {element.name}"
                         elif element_type == "import":
                             result_text = f"{rel_path}:{element.line}: import {element.module}"
-                        
+
                         if show_line_numbers:
                             results.append(result_text)
                         else:
                             # Remove line number
-                            results.append(result_text.split(':', 2)[-1])
-        
+                            results.append(result_text.split(":", 2)[-1])
+
         # Apply offset and limit
         total_results = len(results)
         if offset > 0:
@@ -473,70 +533,76 @@ class ASTSearchTool(Tool):
             truncated = total_results > offset + head_limit
         else:
             truncated = False
-        
+
         if not results:
-            return create_success_response({
-                "results": [],
-                "match_count": 0,
-                "message": f"No {search_type.value} matches found",
+            return create_success_response(
+                {
+                    "results": [],
+                    "match_count": 0,
+                    "message": f"No {search_type.value} matches found",
+                    "engine": "ast",
+                }
+            )
+
+        return create_success_response(
+            {
+                "results": results,
+                "match_count": len(results),
+                "total_matches": total_results,
+                "truncated": truncated,
                 "engine": "ast",
-            })
-        
-        return create_success_response({
-            "results": results,
-            "match_count": len(results),
-            "total_matches": total_results,
-            "truncated": truncated,
-            "engine": "ast",
-            "search_type": search_type.value,
-        })
-    
-    def _execute_ast_query(self, ast: Any, language: str, pattern: str, file_path: Path) -> List[str]:
+                "search_type": search_type.value,
+            }
+        )
+
+    def _execute_ast_query(
+        self, ast: Any, language: str, pattern: str, file_path: Path
+    ) -> List[str]:
         """
         Execute a tree-sitter query on AST.
-        
+
         Args:
             ast: Parsed AST
             language: Programming language
             pattern: Query pattern
             file_path: Path to the file
-            
+
         Returns:
             List of result strings
         """
         try:
             # Try to execute as tree-sitter query
             query_results = self.ast_service.query(file_path, pattern, language)
-            
+
             results = []
             rel_path = str(file_path.relative_to(self.project_dir))
-            
+
             for result in query_results:
                 line_info = f"{rel_path}:{result['start_line']}"
-                if result['start_column']:
+                if result["start_column"]:
                     line_info += f":{result['start_column']}"
-                
+
                 result_text = f"{line_info}: {result['text'][:200]}"
-                if len(result['text']) > 200:
+                if len(result["text"]) > 200:
                     result_text += "..."
-                
+
                 results.append(result_text)
-            
+
             return results
-            
+
         except Exception as e:
             logger.warning(f"Failed to execute AST query: {e}")
             return []
-    
+
     def _matches_pattern(self, element: Any, pattern: str, element_type: str) -> bool:
         """
         Check if element matches pattern.
-        
+
         Args:
             element: Structural element
             pattern: Pattern to match
             element_type: Type of element
-            
+
         Returns:
             True if element matches pattern
         """
@@ -547,21 +613,21 @@ class ASTSearchTool(Tool):
         elif element_type == "import":
             return pattern.lower() in element.module.lower()
         return False
-    
+
     def _find_files(self, path: Path, file_type: Optional[str]) -> List[Path]:
         """
         Find files to search based on filters.
-        
+
         Args:
             path: Base path
             file_type: File type filter
-            
+
         Returns:
             List of file paths
         """
         if path.is_file():
             return [path]
-        
+
         # File type to extension mapping (simplified)
         type_extensions = {
             "py": ["*.py"],
@@ -578,9 +644,9 @@ class ASTSearchTool(Tool):
             "ruby": ["*.rb"],
             "php": ["*.php"],
         }
-        
+
         files = []
-        
+
         # Determine patterns to use
         patterns = []
         if file_type and file_type.lower() in type_extensions:
@@ -588,35 +654,47 @@ class ASTSearchTool(Tool):
         else:
             # Search all supported code files
             for lang_config in SUPPORTED_LANGUAGES.values():
-                patterns.extend([f"*{ext}" for ext in lang_config['extensions']])
-        
+                patterns.extend([f"*{ext}" for ext in lang_config["extensions"]])
+
         # Collect files
         for pat in patterns:
             if "**" in pat:
                 files.extend(path.glob(pat))
             else:
                 files.extend(path.rglob(pat))
-        
+
         # Filter to actual files and skip hidden/binary
         filtered = []
         for f in files:
             if not f.is_file():
                 continue
-            
+
             # Skip hidden files and common binary/generated directories
             parts = f.relative_to(path).parts
             skip_dirs = {
-                ".git", ".svn", ".hg", "node_modules", "__pycache__",
-                ".pytest_cache", ".mypy_cache", ".coverage", "dist",
-                "build", "target", "out", "bin", "obj", ".next",
+                ".git",
+                ".svn",
+                ".hg",
+                "node_modules",
+                "__pycache__",
+                ".pytest_cache",
+                ".mypy_cache",
+                ".coverage",
+                "dist",
+                "build",
+                "target",
+                "out",
+                "bin",
+                "obj",
+                ".next",
             }
-            
-            if any(part.startswith('.') for part in parts):
+
+            if any(part.startswith(".") for part in parts):
                 continue
-            
+
             if any(part in skip_dirs for part in parts):
                 continue
-            
+
             filtered.append(f)
-        
+
         return filtered

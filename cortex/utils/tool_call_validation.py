@@ -124,8 +124,8 @@ def validate_tool_call_data(tool_call_data: Dict[str, Any], index: int = 0) -> D
         "type": tool_call_data.get("type", "function"),
         "function": {
             "name": function_data.get("name") or "",
-            "arguments": normalize_tool_call_arguments(function_data.get("arguments"))
-        }
+            "arguments": normalize_tool_call_arguments(function_data.get("arguments")),
+        },
     }
 
     # Preserve index if present (for streaming tool calls)

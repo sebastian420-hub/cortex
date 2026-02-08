@@ -30,6 +30,7 @@ from .edit_tool import EditTool
 
 # Phase 3 web tools
 from .web_tools import WebFetchTool, WebSearchTool, clear_fetch_cache
+
 # Skill tools
 from .skill_tools import SkillLoaderTool
 from .todo_tool import (
@@ -50,6 +51,7 @@ from .ask_user_tool import (
 )
 from .registry import ToolRegistry, get_registry, reset_registry
 from ..subagent import TaskTool, TASK_TOOL_SCHEMA
+
 # Planning tools
 from .planning_tools import (
     CREATE_PLAN_SCHEMA,
@@ -57,6 +59,7 @@ from .planning_tools import (
     MONITOR_PLAN_SCHEMA,
     UPDATE_PLAN_SCHEMA,
 )
+
 # Delegation tools for model orchestration
 from .delegation_tools import (
     DelegateToModelTool,
@@ -76,6 +79,7 @@ try:
         AST_EXTRACT_SCHEMA,
         AST_ANALYZE_SCHEMA,
     )
+
     AST_TOOLS_AVAILABLE = True
 except ImportError:
     AST_TOOLS_AVAILABLE = False
@@ -617,20 +621,20 @@ TOOLS: List[Dict[str, Any]] = [
                     "action": {
                         "type": "string",
                         "enum": ["list", "load", "suggest", "get"],
-                        "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)"
+                        "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)",
                     },
                     "skill_name": {
                         "type": "string",
-                        "description": "Name of skill (for load/get actions)"
+                        "description": "Name of skill (for load/get actions)",
                     },
                     "task_description": {
                         "type": "string",
-                        "description": "Task description (for suggest action)"
+                        "description": "Task description (for suggest action)",
                     },
                     "limit": {
                         "type": "integer",
-                        "description": "Maximum number of skills to return (for list/suggest)"
-                    }
+                        "description": "Maximum number of skills to return (for list/suggest)",
+                    },
                 },
                 "required": ["action"],
             },
@@ -654,11 +658,13 @@ TOOLS: List[Dict[str, Any]] = [
 
 # Conditionally add AST tools if tree-sitter is available
 if AST_TOOLS_AVAILABLE:
-    TOOLS.extend([
-        AST_SEARCH_SCHEMA,
-        AST_EXTRACT_SCHEMA,
-        AST_ANALYZE_SCHEMA,
-    ])
+    TOOLS.extend(
+        [
+            AST_SEARCH_SCHEMA,
+            AST_EXTRACT_SCHEMA,
+            AST_ANALYZE_SCHEMA,
+        ]
+    )
 
 
 def create_tool_instance(
@@ -722,6 +728,7 @@ def create_tool_instance(
     # Special handling for delegation tools (model orchestration)
     if tool_name == "delegate_to_model":
         from .delegation_tools import DelegateToModelTool
+
         delegation_tracker = None
         model_registry = None
         current_model = None
@@ -741,6 +748,7 @@ def create_tool_instance(
 
     if tool_name == "return_to_coordinator":
         from .delegation_tools import ReturnToCoordinatorTool
+
         delegation_tracker = None
         current_model = None
         coordinator_model = "mimo-v2-flash"

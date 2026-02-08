@@ -304,7 +304,11 @@ class EditTool(Tool):
             else:
                 text = Text()
                 text.append("- ", style="red")
-                text.append(old_string[:100] + ("..." if len(old_string) > 100 else ""), style="red")
+                text.append(
+                    old_string[:100] + ("..." if len(old_string) > 100 else ""), style="red"
+                )
                 text.append("\n+ ", style="green")
-                text.append(new_string[:100] + ("..." if len(new_string) > 100 else ""), style="green")
+                text.append(
+                    new_string[:100] + ("..." if len(new_string) > 100 else ""), style="green"
+                )
                 self.console.print(Panel(text, title="Changes", border_style="yellow"))

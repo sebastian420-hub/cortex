@@ -64,7 +64,9 @@ class ProfileCommand(Command):
         adapter_info = get_adapter_info(model_to_check)
 
         # Create a table for the profile
-        table = Table(title=f"Model Profile: {profile.name}", show_header=True, header_style="bold cyan")
+        table = Table(
+            title=f"Model Profile: {profile.name}", show_header=True, header_style="bold cyan"
+        )
         table.add_column("Property", style="dim")
         table.add_column("Value")
 
@@ -83,4 +85,4 @@ class ProfileCommand(Command):
             table.add_row("Notes", profile.notes)
 
         console.print(table)
-        console.print(f"\n[dim]Usage: /profile [model_name] - Check any model's profile[/dim]")
+        console.print("\n[dim]Usage: /profile [model_name] - Check any model's profile[/dim]")

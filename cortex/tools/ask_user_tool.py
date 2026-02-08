@@ -78,9 +78,9 @@ class AskUserQuestionTool(Tool):
 
         if len(questions) > 4:
             return create_error_response(
-                "Maximum 4 questions allowed at once", 
+                "Maximum 4 questions allowed at once",
                 ErrorType.VALIDATION,
-                context={"max_allowed": 4, "provided": len(questions)}
+                context={"max_allowed": 4, "provided": len(questions)},
             )
 
         answers = []
@@ -121,21 +121,21 @@ class AskUserQuestionTool(Tool):
             return create_error_response(
                 "Question must have 'question' field",
                 ErrorType.VALIDATION,
-                context={"missing_field": "question"}
+                context={"missing_field": "question"},
             )
 
         if "header" not in q_data:
             return create_error_response(
                 "Question must have 'header' field",
                 ErrorType.VALIDATION,
-                context={"missing_field": "header"}
+                context={"missing_field": "header"},
             )
 
         if len(q_data.get("header", "")) > 12:
             return create_error_response(
                 f"Header too long: '{q_data['header']}' (max 12 chars)",
                 ErrorType.VALIDATION,
-                context={"header_length": len(q_data.get("header", "")), "max_length": 12}
+                context={"header_length": len(q_data.get("header", "")), "max_length": 12},
             )
 
         options = q_data.get("options", [])
@@ -143,14 +143,14 @@ class AskUserQuestionTool(Tool):
             return create_error_response(
                 "Question must have at least 2 options",
                 ErrorType.VALIDATION,
-                context={"options_count": len(options), "min_required": 2}
+                context={"options_count": len(options), "min_required": 2},
             )
 
         if len(options) > 4:
             return create_error_response(
                 "Question can have maximum 4 options",
                 ErrorType.VALIDATION,
-                context={"options_count": len(options), "max_allowed": 4}
+                context={"options_count": len(options), "max_allowed": 4},
             )
 
         for i, opt in enumerate(options):
@@ -158,7 +158,7 @@ class AskUserQuestionTool(Tool):
                 return create_error_response(
                     f"Option {i+1} missing 'label' field",
                     ErrorType.VALIDATION,
-                    context={"option_index": i, "missing_field": "label"}
+                    context={"option_index": i, "missing_field": "label"},
                 )
 
         return None

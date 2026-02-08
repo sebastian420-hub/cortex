@@ -150,15 +150,52 @@ class GlobTool(Tool):
 
         # Common binary/non-code extensions to skip
         skip_extensions = {
-            '.pyc', '.pyo', '.pyd',
-            '.so', '.dll', '.dylib', '.exe', '.bin',
-            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp',
-            '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-            '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz',
-            '.mp3', '.mp4', '.avi', '.mkv', '.mov', '.wav', '.flac',
-            '.woff', '.woff2', '.ttf', '.otf', '.eot',
-            '.db', '.sqlite', '.sqlite3',
-            '.lock',  # Lock files
+            ".pyc",
+            ".pyo",
+            ".pyd",
+            ".so",
+            ".dll",
+            ".dylib",
+            ".exe",
+            ".bin",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".bmp",
+            ".ico",
+            ".svg",
+            ".webp",
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".7z",
+            ".rar",
+            ".bz2",
+            ".xz",
+            ".mp3",
+            ".mp4",
+            ".avi",
+            ".mkv",
+            ".mov",
+            ".wav",
+            ".flac",
+            ".woff",
+            ".woff2",
+            ".ttf",
+            ".otf",
+            ".eot",
+            ".db",
+            ".sqlite",
+            ".sqlite3",
+            ".lock",  # Lock files
         }
 
         filtered = []
@@ -173,13 +210,25 @@ class GlobTool(Tool):
                 # Skip common non-project directories (user data, downloads, etc.)
                 # These are often accidentally included in broad searches
                 suspicious_keywords = [
-                    "download", "temp", "tmp", "cache", "backup",
-                    "archive", "old", "deprecated", "legacy"
+                    "download",
+                    "temp",
+                    "tmp",
+                    "cache",
+                    "backup",
+                    "archive",
+                    "old",
+                    "deprecated",
+                    "legacy",
                 ]
-                if any(keyword in part.lower() for part in rel_parts for keyword in suspicious_keywords):
+                if any(
+                    keyword in part.lower() for part in rel_parts for keyword in suspicious_keywords
+                ):
                     # Only skip if it looks like a data directory (not source code)
-                    if not any(src_indicator in part.lower() for part in rel_parts
-                              for src_indicator in ["src", "lib", "core", "app", "api"]):
+                    if not any(
+                        src_indicator in part.lower()
+                        for part in rel_parts
+                        for src_indicator in ["src", "lib", "core", "app", "api"]
+                    ):
                         continue
 
                 # Skip binary/media files

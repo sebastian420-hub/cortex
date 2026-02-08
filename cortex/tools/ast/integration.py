@@ -19,12 +19,12 @@ logger = logging.getLogger(__name__)
 def register_ast_tools(registry: ToolRegistry) -> None:
     """
     Register AST-aware tools with the tool registry.
-    
+
     Args:
         registry: ToolRegistry instance
     """
     logger.info("Registering AST tools...")
-    
+
     # Helper function to convert parameter list to schema
     def build_schema(tool_name: str, description: str, parameters: list) -> dict:
         properties = {}
@@ -36,19 +36,19 @@ def register_ast_tools(registry: ToolRegistry) -> None:
             param_required = param.get("required", False)
             param_default = param.get("default")
             param_enum = param.get("enum")
-            
+
             # Build property schema
             prop_schema = {"type": param_type, "description": param_desc}
             if param_enum is not None:
                 prop_schema["enum"] = param_enum
             if param_default is not None:
                 prop_schema["default"] = param_default
-            
+
             properties[param_name] = prop_schema
-            
+
             if param_required:
                 required.append(param_name)
-        
+
         return {
             "type": "function",
             "function": {
@@ -61,7 +61,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
                 },
             },
         }
-    
+
     # Register AST Search Tool
     registry.register(
         name="ast_search",
@@ -141,7 +141,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         ),
         namespace="builtin",
     )
-    
+
     # Register AST Extract Tool
     registry.register(
         name="ast_extract",
@@ -214,7 +214,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         ),
         namespace="builtin",
     )
-    
+
     # Register AST Analyze Tool
     registry.register(
         name="ast_analyze",
@@ -264,14 +264,14 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         ),
         namespace="builtin",
     )
-    
+
     logger.info("AST tools registered successfully")
 
 
 def get_ast_tool_descriptions() -> List[Dict[str, Any]]:
     """
     Get descriptions of all AST tools.
-    
+
     Returns:
         List of tool descriptions
     """
@@ -309,16 +309,18 @@ def get_ast_tool_descriptions() -> List[Dict[str, Any]]:
 def is_ast_available() -> bool:
     """
     Check if AST parsing is available.
-    
+
     Returns:
         True if tree-sitter is installed and AST tools can be used
     """
     try:
-        from ...ast.service import ASTService
+        from ...code_ast.service import ASTService
+
         service = ASTService(cache_size=1, enable_cache=False)
         # Try to parse a simple Python file
         import tempfile
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
             f.write("def test():\n    pass\n")
             f.flush()
             ast = service.parse_file(f.name, "python")
@@ -331,18 +333,21 @@ def is_ast_available() -> bool:
 def get_ast_status() -> Dict[str, Any]:
     """
     Get status of AST parsing capabilities.
-    
+
     Returns:
         Dictionary with AST status information
     """
     try:
-        from ...ast.parser import ASTParser
+        from ...code_ast.parser import ASTParser
+
         parser = ASTParser()
-        
+
         return {
             "available": parser.is_available(),
-            "supported_languages": parser.get_supported_languages() if parser.is_available() else [],
-            "tree_sitter_installed": hasattr(parser, 'available') and parser.available,
+            "supported_languages": (
+                parser.get_supported_languages() if parser.is_available() else []
+            ),
+            "tree_sitter_installed": hasattr(parser, "available") and parser.available,
         }
     except Exception as e:
         logger.error(f"Failed to get AST status: {e}")

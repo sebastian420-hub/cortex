@@ -243,10 +243,10 @@ class ToolRegistry:
 
         # Phase 3 web tools
         from .web_tools import WebFetchTool, WebSearchTool
-        
+
         # Skill tools
         from .skill_tools import SkillLoaderTool
-        
+
         # Planning tools
         from .planning_tools import (
             CreatePlanTool,
@@ -849,20 +849,20 @@ class ToolRegistry:
                             "action": {
                                 "type": "string",
                                 "enum": ["list", "load", "suggest", "get"],
-                                "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)"
+                                "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)",
                             },
                             "skill_name": {
                                 "type": "string",
-                                "description": "Name of skill (for load/get actions)"
+                                "description": "Name of skill (for load/get actions)",
                             },
                             "task_description": {
                                 "type": "string",
-                                "description": "Task description (for suggest action)"
+                                "description": "Task description (for suggest action)",
                             },
                             "limit": {
                                 "type": "integer",
-                                "description": "Maximum number of skills to return (for list/suggest)"
-                            }
+                                "description": "Maximum number of skills to return (for list/suggest)",
+                            },
                         },
                         "required": ["action"],
                     },
@@ -890,6 +890,7 @@ class ToolRegistry:
         # Register AST tools if available
         try:
             from .ast.integration import register_ast_tools, is_ast_available
+
             if is_ast_available():
                 register_ast_tools(self)
                 logger.info("AST tools registered successfully")

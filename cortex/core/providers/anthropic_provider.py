@@ -229,18 +229,18 @@ class AnthropicProvider(ModelProvider):
         """
         try:
             # Anthropic returns content as a list of blocks
-            if hasattr(response, 'content') and response.content:
+            if hasattr(response, "content") and response.content:
                 thinking_parts = []
 
                 for content_block in response.content:
                     # Check if this is a thinking block (Anthropic API)
-                    if hasattr(content_block, 'type') and content_block.type == "thinking":
-                        if hasattr(content_block, 'thinking') and content_block.thinking:
+                    if hasattr(content_block, "type") and content_block.type == "thinking":
+                        if hasattr(content_block, "thinking") and content_block.thinking:
                             thinking_parts.append(content_block.thinking)
                     # Check for text blocks that might contain thinking
-                    elif hasattr(content_block, 'type') and content_block.type == "text":
+                    elif hasattr(content_block, "type") and content_block.type == "text":
                         # Check if it has thinking attribute (some Anthropic models)
-                        if hasattr(content_block, 'thinking') and content_block.thinking:
+                        if hasattr(content_block, "thinking") and content_block.thinking:
                             thinking_parts.append(content_block.thinking)
 
                 return "\n".join(thinking_parts) if thinking_parts else None
@@ -257,7 +257,7 @@ class AnthropicProvider(ModelProvider):
         """
         model_lower = model.lower()
         return (
-            "claude-3.5" in model_lower or
-            "claude-3.7" in model_lower or
-            "claude-3.6" in model_lower  # Future-proofing
+            "claude-3.5" in model_lower
+            or "claude-3.7" in model_lower
+            or "claude-3.6" in model_lower  # Future-proofing
         )

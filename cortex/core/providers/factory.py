@@ -35,23 +35,38 @@ class ProviderFactory:
             return OllamaProvider()
 
         # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
-        if '/' in model_name:
+        if "/" in model_name:
             return OpenRouterProvider()
 
         # Check for OpenRouter models first (including models with colons)
         openrouter_indicators = [
-            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
-            "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/",
-            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
-            "nousresearch/", "z-ai/"
+            "devstral",
+            "openrouter/",
+            "nvidia/",
+            ":free",
+            ":paid",
+            "mistralai/",
+            "google/",
+            "anthropic/",
+            "meta-llama/",
+            "perplexity/",
+            "cohere/",
+            "jamba/",
+            "qwen/",
+            "x-ai/",
+            "xiaomi/",
+            "cognitivecomputations/",
+            "openai/",
+            "nousresearch/",
+            "z-ai/",
         ]
 
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
         if "llama3" in model_lower and ":" in model_name:
             # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
             import re
-            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+
+            if re.match(r"^llama3(\.\d+)?:\d+[bB]?$", model_name):
                 # This is an Ollama model, skip to Ollama detection below
                 # Don't return here, let it fall through
                 pass
@@ -103,23 +118,38 @@ class ProviderFactory:
             return False
 
         # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
-        if '/' in model_name:
+        if "/" in model_name:
             return True
 
         # Check for OpenRouter indicators first (including models with colons)
         openrouter_indicators = [
-            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
-            "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/",
-            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
-            "nousresearch/", "z-ai/"
+            "devstral",
+            "openrouter/",
+            "nvidia/",
+            ":free",
+            ":paid",
+            "mistralai/",
+            "google/",
+            "anthropic/",
+            "meta-llama/",
+            "perplexity/",
+            "cohere/",
+            "jamba/",
+            "qwen/",
+            "x-ai/",
+            "xiaomi/",
+            "cognitivecomputations/",
+            "openai/",
+            "nousresearch/",
+            "z-ai/",
         ]
 
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
         if "llama3" in model_lower and ":" in model_name:
             import re
+
             # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
-            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+            if re.match(r"^llama3(\.\d+)?:\d+[bB]?$", model_name):
                 # This is an Ollama model (local)
                 return False
             else:
@@ -152,23 +182,38 @@ class ProviderFactory:
             return "ollama"
 
         # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
-        if '/' in model_name:
+        if "/" in model_name:
             return "openrouter"
 
         # Check for OpenRouter models first (including models with colons)
         openrouter_indicators = [
-            "devstral", "openrouter/", "nvidia/", ":free", ":paid",
-            "mistralai/", "google/", "anthropic/", "meta-llama/",
-            "perplexity/", "cohere/", "jamba/", "qwen/",
-            "x-ai/", "xiaomi/", "cognitivecomputations/", "openai/",
-            "nousresearch/", "z-ai/"
+            "devstral",
+            "openrouter/",
+            "nvidia/",
+            ":free",
+            ":paid",
+            "mistralai/",
+            "google/",
+            "anthropic/",
+            "meta-llama/",
+            "perplexity/",
+            "cohere/",
+            "jamba/",
+            "qwen/",
+            "x-ai/",
+            "xiaomi/",
+            "cognitivecomputations/",
+            "openai/",
+            "nousresearch/",
+            "z-ai/",
         ]
 
         # Special case: if model contains "llama3" but looks like Ollama format, it's Ollama
         if "llama3" in model_lower and ":" in model_name:
             # Check if it matches Ollama pattern like "llama3.2:70b" or "llama3:70b"
             import re
-            if re.match(r'^llama3(\.\d+)?:\d+[bB]?$', model_name):
+
+            if re.match(r"^llama3(\.\d+)?:\d+[bB]?$", model_name):
                 # This is an Ollama model, skip to Ollama detection below
                 pass
             else:

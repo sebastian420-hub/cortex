@@ -23,7 +23,7 @@ class MessageProcessor:
     for backward compatibility. This class provides organization.
     """
 
-    def __init__(self, agent: 'Cortex'):
+    def __init__(self, agent: "Cortex"):
         """Initialize with reference to parent agent"""
         self.agent = agent
         self.iteration_count = 0

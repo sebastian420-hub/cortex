@@ -12,11 +12,11 @@ from .queries import ASTQueries
 from .languages import LanguageManager, detect_language, SUPPORTED_LANGUAGES
 
 __all__ = [
-    'ASTService',
-    'ASTParser', 
-    'ASTCache',
-    'ASTQueries',
-    'LanguageManager',
-    'detect_language',
-    'SUPPORTED_LANGUAGES',
+    "ASTService",
+    "ASTParser",
+    "ASTCache",
+    "ASTQueries",
+    "LanguageManager",
+    "detect_language",
+    "SUPPORTED_LANGUAGES",
 ]

@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # Tool Formatter
 # =============================================================================
 
+
 class ToolFormatter:
     """Formats tool documentation based on model capabilities."""
 
@@ -61,17 +62,27 @@ class ToolFormatter:
         # Priority order for common tool categories
         priority_order = [
             # File operations - most commonly needed
-            "read_file", "write_file", "edit_file",
+            "read_file",
+            "write_file",
+            "edit_file",
             # Search operations
-            "grep_search", "glob_files", "find_files",
+            "grep_search",
+            "glob_files",
+            "find_files",
             # Execution
-            "bash", "run_command",
+            "bash",
+            "run_command",
             # Planning
-            "create_plan", "execute_plan", "monitor_plan", "update_plan",
+            "create_plan",
+            "execute_plan",
+            "monitor_plan",
+            "update_plan",
             # Web
-            "web_search", "web_fetch",
+            "web_search",
+            "web_fetch",
             # Memory
-            "memory_store", "memory_recall",
+            "memory_store",
+            "memory_recall",
         ]
 
         def get_priority(tool: Dict[str, Any]) -> int:
@@ -82,7 +93,7 @@ class ToolFormatter:
                 return len(priority_order)  # Unknown tools go last
 
         sorted_tools = sorted(tools, key=get_priority)
-        return sorted_tools[:self.profile.max_tools_per_prompt]
+        return sorted_tools[: self.profile.max_tools_per_prompt]
 
     def _format_detailed(self, tools: List[Dict[str, Any]]) -> str:
         """Full documentation with examples for capable models."""
@@ -134,14 +145,16 @@ class ToolFormatter:
     def _format_explicit(self, tools: List[Dict[str, Any]]) -> str:
         """Very explicit format with step-by-step for smaller models."""
         sections = ["# TOOLS - READ CAREFULLY\n"]
-        sections.append("""To use a tool, you MUST format your response with a function call.
+        sections.append(
+            """To use a tool, you MUST format your response with a function call.
 
 When you want to use a tool:
 1. Choose the appropriate tool from the list below
 2. Provide all REQUIRED parameters
 3. The system will execute the tool and return results
 
-""")
+"""
+        )
 
         for tool in tools:
             name = tool.get("name", "unknown")
@@ -161,7 +174,9 @@ When you want to use a tool:
                     param_type = param_info.get("type", "any")
                     param_desc = param_info.get("description", "")[:50]
                     required_marker = "*" if param_name in required else ""
-                    sections.append(f"  - {param_name}{required_marker} ({param_type}): {param_desc}")
+                    sections.append(
+                        f"  - {param_name}{required_marker} ({param_type}): {param_desc}"
+                    )
 
             # Show example
             example = self._generate_example(tool)
@@ -222,6 +237,7 @@ When you want to use a tool:
 # Prompt Builder
 # =============================================================================
 
+
 class PromptBuilder:
     """
     Builds prompts adapted to model capabilities.
@@ -245,12 +261,14 @@ class PromptBuilder:
         self.project_dir = project_dir or Path(".")
         self.profile = get_model_profile(model_name)
         self.tool_formatter = ToolFormatter(self.profile)
-        
+
         # Date and knowledge cutoff (MiMo and similar models need this)
         self.knowledge_cutoff = "December 2024"
         self.current_date = datetime.now().strftime("%B %d, %Y")
 
-        logger.debug(f"PromptBuilder initialized for {model_name} with style {self.profile.prompt_style}")
+        logger.debug(
+            f"PromptBuilder initialized for {model_name} with style {self.profile.prompt_style}"
+        )
 
     def build_system_prompt(
         self,
@@ -649,7 +667,7 @@ ALL responses MUST be valid JSON matching this schema:
 
         if self.profile.reasoning == CapabilityLevel.MODERATE:
             notes.append("Break complex problems into smaller steps.")
-        
+
         if self.profile.reasoning == CapabilityLevel.EXCELLENT:
             notes.append("Think through problems explicitly and step by step before acting.")
 
@@ -657,7 +675,11 @@ ALL responses MUST be valid JSON matching this schema:
             notes.append("Format tool arguments carefully as JSON objects.")
 
         if notes:
-            header = "## Model-Specific Notes\n\n" if self.profile.prompt_style == PromptStyle.DETAILED else "## Notes\n\n"
+            header = (
+                "## Model-Specific Notes\n\n"
+                if self.profile.prompt_style == PromptStyle.DETAILED
+                else "## Notes\n\n"
+            )
             if self.model_name.startswith("mimo"):
                 # Remove the header since we added MiMo-specific header
                 notes_to_join = notes

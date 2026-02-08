@@ -68,8 +68,10 @@ class PlanProgressDisplay:
         # Add metadata branch
         meta = tree.add("[dim]Metadata[/dim]")
         meta.add(f"[dim]ID:[/dim] {plan.id}")
-        meta.add(f"[dim]Created:[/dim] {plan.created_at[:19] if hasattr(plan, 'created_at') else 'N/A'}")
-        if hasattr(plan, 'constraints') and plan.constraints:
+        meta.add(
+            f"[dim]Created:[/dim] {plan.created_at[:19] if hasattr(plan, 'created_at') else 'N/A'}"
+        )
+        if hasattr(plan, "constraints") and plan.constraints:
             meta.add(f"[dim]Constraints:[/dim] {len(plan.constraints)}")
 
         # Add steps branch
@@ -80,9 +82,9 @@ class PlanProgressDisplay:
             step_node = steps_branch.add(step_text)
 
             # Add step details if present
-            if hasattr(step, 'tool_name') and step.tool_name:
+            if hasattr(step, "tool_name") and step.tool_name:
                 step_node.add(f"[dim]Tool: {step.tool_name}[/dim]")
-            if hasattr(step, 'dependencies') and step.dependencies:
+            if hasattr(step, "dependencies") and step.dependencies:
                 step_node.add(f"[dim]Depends on: {', '.join(step.dependencies)}[/dim]")
 
         # Display the tree in a panel
@@ -97,13 +99,11 @@ class PlanProgressDisplay:
             total_steps: Total number of steps
         """
         self.console.print()
-        self.console.print(
-            f"[cyan]▶ Step {step_number}/{total_steps}:[/cyan] {step.description}"
-        )
+        self.console.print(f"[cyan]▶ Step {step_number}/{total_steps}:[/cyan] {step.description}")
 
-        if hasattr(step, 'tool_name') and step.tool_name:
+        if hasattr(step, "tool_name") and step.tool_name:
             self.console.print(f"   [dim]Tool: {step.tool_name}[/dim]")
-        if hasattr(step, 'expected_outcome') and step.expected_outcome:
+        if hasattr(step, "expected_outcome") and step.expected_outcome:
             self.console.print(f"   [dim]Expected: {step.expected_outcome}[/dim]")
 
     def show_step_complete(self, step: Any, result: Optional[str] = None) -> None:
@@ -182,7 +182,7 @@ class PlanProgressDisplay:
             step_results: List of step execution results
         """
         duration = time.time() - self._start_time if self._start_time else 0
-        progress = plan.get_progress() if hasattr(plan, 'get_progress') else {}
+        progress = plan.get_progress() if hasattr(plan, "get_progress") else {}
 
         # Create summary table
         table = Table(title="Execution Summary", show_header=False, border_style="green")
@@ -191,7 +191,7 @@ class PlanProgressDisplay:
 
         table.add_row("Plan ID", plan.id)
         table.add_row("Goal", plan.goal[:50] + "..." if len(plan.goal) > 50 else plan.goal)
-        table.add_row("Total Steps", str(progress.get('total', len(plan.steps))))
+        table.add_row("Total Steps", str(progress.get("total", len(plan.steps))))
         table.add_row("Completed", f"[green]{progress.get('completed', 0)}[/green]")
         table.add_row("Failed", f"[red]{progress.get('failed', 0)}[/red]")
         table.add_row("Skipped", f"[dim]{progress.get('skipped', 0)}[/dim]")
@@ -206,8 +206,8 @@ class PlanProgressDisplay:
             table.add_row("Duration", duration_str)
 
         # Calculate success rate
-        total = progress.get('total', 1)
-        completed = progress.get('completed', 0)
+        total = progress.get("total", 1)
+        completed = progress.get("completed", 0)
         success_rate = (completed / total * 100) if total > 0 else 0
         table.add_row("Success Rate", f"{success_rate:.1f}%")
 

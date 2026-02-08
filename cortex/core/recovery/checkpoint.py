@@ -158,11 +158,13 @@ class CheckpointManager:
 
         # Create checkpoint metadata
         checkpoint_metadata = metadata or {}
-        checkpoint_metadata.update({
-            "created_by": "auto" if not force else "manual",
-            "compression": self.compression_enabled,
-            "version": "1.0",
-        })
+        checkpoint_metadata.update(
+            {
+                "created_by": "auto" if not force else "manual",
+                "compression": self.compression_enabled,
+                "version": "1.0",
+            }
+        )
 
         # Create checkpoint object
         checkpoint = Checkpoint(
@@ -186,8 +188,10 @@ class CheckpointManager:
         # Clean up old checkpoints
         self._cleanup_old_checkpoints(session_id)
 
-        logger.info(f"Created checkpoint {checkpoint_id} for session {session_id} "
-                   f"({message_count} messages, health: {health_score:.2f})")
+        logger.info(
+            f"Created checkpoint {checkpoint_id} for session {session_id} "
+            f"({message_count} messages, health: {health_score:.2f})"
+        )
 
         return checkpoint
 
@@ -248,8 +252,9 @@ class CheckpointManager:
             # Load checkpoint data
             conversation_history = self._load_checkpoint_data(checkpoint.file_path)
 
-            logger.info(f"Restored checkpoint {checkpoint.id} "
-                       f"({len(conversation_history)} messages)")
+            logger.info(
+                f"Restored checkpoint {checkpoint.id} " f"({len(conversation_history)} messages)"
+            )
 
             return conversation_history
 
@@ -271,7 +276,8 @@ class CheckpointManager:
             # Remove from cache
             if checkpoint.session_id in self._checkpoint_cache:
                 self._checkpoint_cache[checkpoint.session_id] = [
-                    cp for cp in self._checkpoint_cache[checkpoint.session_id]
+                    cp
+                    for cp in self._checkpoint_cache[checkpoint.session_id]
                     if cp.id != checkpoint.id
                 ]
 
@@ -332,7 +338,9 @@ class CheckpointManager:
 
         return deleted_count
 
-    def _save_checkpoint(self, checkpoint: Checkpoint, conversation_history: List[Dict[str, Any]]) -> None:
+    def _save_checkpoint(
+        self, checkpoint: Checkpoint, conversation_history: List[Dict[str, Any]]
+    ) -> None:
         """Save checkpoint data to disk."""
         session_dir = self.checkpoint_dir / checkpoint.session_id
         session_dir.mkdir(exist_ok=True)
@@ -354,10 +362,10 @@ class CheckpointManager:
         # Save with or without compression
         try:
             if self.compression_enabled:
-                with gzip.open(file_path, 'wt', encoding='utf-8') as f:
+                with gzip.open(file_path, "wt", encoding="utf-8") as f:
                     json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
             else:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     json.dump(checkpoint_data, f, indent=2, ensure_ascii=False)
 
             # Save metadata separately for quick loading
@@ -370,11 +378,11 @@ class CheckpointManager:
     def _load_checkpoint_data(self, file_path: Path) -> List[Dict[str, Any]]:
         """Load checkpoint data from disk."""
         try:
-            if file_path.suffix == '.gz':
-                with gzip.open(file_path, 'rt', encoding='utf-8') as f:
+            if file_path.suffix == ".gz":
+                with gzip.open(file_path, "rt", encoding="utf-8") as f:
                     data = json.load(f)
             else:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
             return data["conversation"]
@@ -394,7 +402,7 @@ class CheckpointManager:
         # Load from metadata files (faster than parsing full checkpoint files)
         for metadata_file in session_dir.glob("*.meta.json"):
             try:
-                with open(metadata_file, 'r', encoding='utf-8') as f:
+                with open(metadata_file, "r", encoding="utf-8") as f:
                     checkpoint_data = json.load(f)
                     checkpoint = Checkpoint.from_dict(checkpoint_data)
 
@@ -417,7 +425,7 @@ class CheckpointManager:
         metadata_file = self._get_metadata_file_path(checkpoint.session_id, checkpoint.id)
 
         try:
-            with open(metadata_file, 'w', encoding='utf-8') as f:
+            with open(metadata_file, "w", encoding="utf-8") as f:
                 json.dump(checkpoint.to_dict(), f, indent=2, ensure_ascii=False)
         except Exception as e:
             logger.warning(f"Failed to save checkpoint metadata for {checkpoint.id}: {e}")
@@ -438,7 +446,7 @@ class CheckpointManager:
         checkpoints.sort(key=lambda x: x.timestamp)
 
         # Delete oldest checkpoints
-        to_delete = checkpoints[:len(checkpoints) - self.max_checkpoints]
+        to_delete = checkpoints[: len(checkpoints) - self.max_checkpoints]
 
         for checkpoint in to_delete:
             self.delete_checkpoint(checkpoint)
@@ -446,7 +454,9 @@ class CheckpointManager:
         if to_delete:
             logger.info(f"Cleaned up {len(to_delete)} old checkpoints for session {session_id}")
 
-    def _find_checkpoint_by_hash(self, session_id: str, conversation_hash: str) -> Optional[Checkpoint]:
+    def _find_checkpoint_by_hash(
+        self, session_id: str, conversation_hash: str
+    ) -> Optional[Checkpoint]:
         """Find existing checkpoint with matching conversation hash."""
         checkpoints = self.list_checkpoints(session_id)
         for checkpoint in checkpoints:
@@ -470,4 +480,4 @@ class CheckpointManager:
 
         # Hash the normalized conversation
         conversation_str = json.dumps(normalized, sort_keys=True, ensure_ascii=False)
-        return hashlib.sha256(conversation_str.encode('utf-8')).hexdigest()[:16]  # Short hash
+        return hashlib.sha256(conversation_str.encode("utf-8")).hexdigest()[:16]  # Short hash

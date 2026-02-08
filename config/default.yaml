@@ -1,9 +1,15 @@
 # Default configuration for Cortex
 
-model: deepseek-reasoner
+model: moonshotai/kimi-k2.5
 permission_mode: normal
 max_iterations: 15
-max_tokens: 100000
+
+# Context window size (in tokens)
+# Set to 'auto' to automatically detect based on model capabilities
+# Or specify a number to use a fixed limit
+# Examples: auto, 100000, 200000
+max_tokens: auto
+
 keep_recent_messages: 20
 auto_save: false
 

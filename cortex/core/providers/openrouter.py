@@ -31,7 +31,7 @@ class OpenRouterProvider(ModelProvider):
                 # Optional: For rankings on openrouter.ai, if applicable
                 "HTTP-Referer": os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:8000"),
                 "X-Title": os.getenv("OPENROUTER_X_TITLE", "Cortex CLI"),
-            }
+            },
         )
 
     def chat(
@@ -61,12 +61,19 @@ class OpenRouterProvider(ModelProvider):
 
             if hasattr(message, "tool_calls") and message.tool_calls:
                 from cortex.utils.tool_call_validation import validate_tool_call_data
+
                 result["message"]["tool_calls"] = [
-                    validate_tool_call_data({
-                        "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                        "id": tc.id,
-                        "type": tc.type,
-                    }, index=i)
+                    validate_tool_call_data(
+                        {
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                            "id": tc.id,
+                            "type": tc.type,
+                        },
+                        index=i,
+                    )
                     for i, tc in enumerate(message.tool_calls)
                 ]
 
@@ -111,16 +118,22 @@ class OpenRouterProvider(ModelProvider):
                         }
                         if hasattr(delta, "tool_calls") and delta.tool_calls:
                             from cortex.utils.tool_call_validation import validate_tool_call_data
+
                             result["message"]["tool_calls"] = [
-                                validate_tool_call_data({
-                                    "function": {
-                                        "name": tc.function.name if tc.function else None,
-                                        "arguments": tc.function.arguments if tc.function else "",
+                                validate_tool_call_data(
+                                    {
+                                        "function": {
+                                            "name": tc.function.name if tc.function else None,
+                                            "arguments": (
+                                                tc.function.arguments if tc.function else ""
+                                            ),
+                                        },
+                                        "id": tc.id,
+                                        "index": tc.index,
+                                        "type": tc.type,
                                     },
-                                    "id": tc.id,
-                                    "index": tc.index,
-                                    "type": tc.type,
-                                }, index=tc.index if tc.index is not None else i)
+                                    index=tc.index if tc.index is not None else i,
+                                )
                                 for i, tc in enumerate(delta.tool_calls)
                             ]
                         # Extract reasoning_details if available
@@ -149,20 +162,24 @@ class OpenRouterProvider(ModelProvider):
         It may also route requests to DeepSeek reasoning models.
         """
         # For non-streaming responses
-        if hasattr(response, 'choices') and response.choices:
+        if hasattr(response, "choices") and response.choices:
             message = response.choices[0].message
             # Try OpenAI reasoning field (for o1, o3, o1-mini)
-            if hasattr(message, 'reasoning') and message.reasoning:
+            if hasattr(message, "reasoning") and message.reasoning:
                 return message.reasoning
             # Try reasoning_content (for DeepSeek via OpenRouter)
-            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+            if hasattr(message, "reasoning_content") and message.reasoning_content:
                 return message.reasoning_content
         # For streaming chunks (delta)
-        elif hasattr(response, 'choices') and response.choices and hasattr(response.choices[0], 'delta'):
+        elif (
+            hasattr(response, "choices")
+            and response.choices
+            and hasattr(response.choices[0], "delta")
+        ):
             delta = response.choices[0].delta
-            if hasattr(delta, 'reasoning') and delta.reasoning:
+            if hasattr(delta, "reasoning") and delta.reasoning:
                 return delta.reasoning
-            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 return delta.reasoning_content
         return None
 
@@ -178,8 +195,15 @@ class OpenRouterProvider(ModelProvider):
         """
         model_lower = model.lower()
         thinking_indicators = [
-            "o1", "o3", "o1-mini", "reasoner", "thinking",
-            "deepseek", "claude-3.5", "claude-3.7", "mimo"
+            "o1",
+            "o3",
+            "o1-mini",
+            "reasoner",
+            "thinking",
+            "deepseek",
+            "claude-3.5",
+            "claude-3.7",
+            "mimo",
         ]
         return any(indicator in model_lower for indicator in thinking_indicators)
 
@@ -196,7 +220,9 @@ class OpenRouterProvider(ModelProvider):
         # Enable for other reasoning models
         return self.supports_thinking(model)
 
-    def _get_reasoning_config(self, model: str, tools: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:
+    def _get_reasoning_config(
+        self, model: str, tools: Optional[List[Dict[str, Any]]]
+    ) -> Dict[str, Any]:
         """
         Get reasoning configuration based on task complexity.
 
@@ -219,11 +245,15 @@ class OpenRouterProvider(ModelProvider):
         if tools and len(tools) > 0:
             # Complex tasks with tools (coding, editing, etc.)
             # Use complex budget from profile or default 8000
-            budget = profile.reasoning_budget.get("complex", 8000) if profile.reasoning_budget else 8000
+            budget = (
+                profile.reasoning_budget.get("complex", 8000) if profile.reasoning_budget else 8000
+            )
         else:
             # Simple tasks without tools
             # Use simple budget from profile or default 2000
-            budget = profile.reasoning_budget.get("simple", 2000) if profile.reasoning_budget else 2000
+            budget = (
+                profile.reasoning_budget.get("simple", 2000) if profile.reasoning_budget else 2000
+            )
 
         # OpenRouter reasoning format for MiMo and similar models
         # Uses "reasoning": {"max_tokens": budget} format

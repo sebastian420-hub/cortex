@@ -1,67 +1,68 @@
 """Prompt adapters for model-specific prompt adaptations."""
+
 from typing import Optional, Dict, Any
 from cortex.core.model_capabilities import get_model_profile, PromptStyle, CapabilityLevel
 
 
 class BaseAdapter:
     """Base class for model-specific prompt adaptations."""
-    
+
     name: str = "base"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         """Check if this adapter applies to the given model."""
         raise NotImplementedError
-    
+
     @classmethod
     def get_tool_format_hint(cls) -> str:
         """Get tool formatting hints for this model."""
         return ""
-    
+
     @classmethod
     def get_response_format_hint(cls) -> str:
         """Get response format hints for this model."""
         return ""
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         """Get special instructions for this model."""
         return ""
-    
+
     @classmethod
     def adapt_prompt(cls, prompt: str, profile) -> str:
         """Adapt the prompt for this model."""
         adaptations = []
-        
+
         # Add tool format hint for MiMo
         if cls.name == "mimo":
             tool_hint = cls.get_tool_format_hint()
             if tool_hint:
                 adaptations.append(tool_hint)
-        
+
         response_hint = cls.get_response_format_hint()
         if response_hint:
             adaptations.append(response_hint)
-        
+
         special = cls.get_special_instructions()
         if special:
             adaptations.append(special)
-        
+
         if adaptations:
             return prompt + "\n\n" + "\n\n".join(adaptations)
-        
+
         return prompt
 
 
 class ClaudeAdapter(BaseAdapter):
     """Adapter for Claude models."""
-    
+
     name = "claude"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         return "claude" in model_name.lower()
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## Claude-Specific Guidelines
@@ -75,13 +76,13 @@ class ClaudeAdapter(BaseAdapter):
 
 class GPTAdapter(BaseAdapter):
     """Adapter for GPT models."""
-    
+
     name = "gpt"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         return model_name.lower().startswith("gpt")
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## GPT-Specific Guidelines
@@ -95,13 +96,13 @@ class GPTAdapter(BaseAdapter):
 
 class DeepSeekAdapter(BaseAdapter):
     """Adapter for DeepSeek models."""
-    
+
     name = "deepseek"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         return "deepseek" in model_name.lower()
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## DeepSeek-Specific Guidelines
@@ -115,14 +116,14 @@ class DeepSeekAdapter(BaseAdapter):
 
 class MiMoAdapter(BaseAdapter):
     """Adapter for Xiaomi MiMo-V2-Flash model."""
-    
+
     name = "mimo"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         model_lower = model_name.lower()
         return "mimo" in model_lower
-    
+
     @classmethod
     def get_tool_format_hint(cls) -> str:
         return """## Tool Format (MiMo)
@@ -161,7 +162,7 @@ ALL tool calls MUST be valid JSON with this structure:
 - ALWAYS explain your reasoning in < 150 words
 - Always output valid JSON; never output raw shell or code without the schema wrapper
 """
-    
+
     @classmethod
     def get_response_format_hint(cls) -> str:
         return """## Response Guidelines (MiMo)
@@ -172,7 +173,7 @@ ALL tool calls MUST be valid JSON with this structure:
 - Validate file paths and command syntax before proposing
 - Reference line numbers and prior errors explicitly
 """
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## MiMo-Specific Capabilities
@@ -187,13 +188,13 @@ ALL tool calls MUST be valid JSON with this structure:
 
 class MistralAdapter(BaseAdapter):
     """Adapter for Mistral models."""
-    
+
     name = "mistral"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         return "mistral" in model_name.lower()
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## Mistral-Specific Guidelines
@@ -207,14 +208,14 @@ class MistralAdapter(BaseAdapter):
 
 class CodeSpecializedAdapter(BaseAdapter):
     """Adapter for code-specialized models."""
-    
+
     name = "code"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         model_lower = model_name.lower()
         return any(keyword in model_lower for keyword in ["coder", "codestral", "code"])
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## Code-Specialized Model Guidelines
@@ -228,13 +229,13 @@ class CodeSpecializedAdapter(BaseAdapter):
 
 class OllamaAdapter(BaseAdapter):
     """Adapter for Ollama/local models."""
-    
+
     name = "ollama"
-    
+
     @classmethod
     def applies_to(cls, model_name: str) -> bool:
         return "ollama" in model_name.lower() or "/" in model_name
-    
+
     @classmethod
     def get_special_instructions(cls) -> str:
         return """## Ollama/Local Model Guidelines

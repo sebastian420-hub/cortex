@@ -36,10 +36,11 @@ class REPL:
             """Ctrl+L to clear screen"""
             console.clear()
 
-        @bindings.add('c-t')
+        @bindings.add("c-t")
         def toggle_ui_mode_handler(event):
             """Ctrl+T to toggle UI mode"""
             from .modes import toggle_ui_mode
+
             toggle_ui_mode()
 
         self.key_bindings = bindings
@@ -51,7 +52,7 @@ class REPL:
     def show_banner(self, project_name: str, model: str, permission_mode: str) -> None:
         """Show welcome banner"""
         from .modes import get_ui_mode
-        
+
         ui_mode = get_ui_mode()
         banner = Panel(
             f"[bright_cyan]Cortex[/bright_cyan] - Unified Agent for Coding, Cybersecurity, and Personal Assistance\n\n"

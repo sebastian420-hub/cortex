@@ -64,8 +64,8 @@ def test_ast_parsing():
     print("\nTesting AST parsing...")
     
     try:
-        from cortex.ast.service import ASTService
-        from cortex.ast.parser import ASTParser
+        from cortex.code_ast.service import ASTService
+        from cortex.code_ast.parser import ASTParser
         
         # Create a simple test file
         test_file = project_root / "test_ast_sample.py"
@@ -98,7 +98,7 @@ class Calculator:
         test_file.write_text(test_content)
         
         # Test language detection
-        from cortex.ast.languages import detect_language
+        from cortex.code_ast.languages import detect_language
         language = detect_language(test_file)
         print(f"Detected language: {language}")
         

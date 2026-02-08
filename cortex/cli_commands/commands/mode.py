@@ -53,14 +53,14 @@ class UIModeCommand(Command):
                 set_ui_mode(mode)
                 console.print(f"[green]✓[/green] UI mode changed to: {mode.value}")
             except ValueError:
-                console.print(f"[red]Invalid UI mode. Use: minimal, normal, or debug[/red]")
+                console.print("[red]Invalid UI mode. Use: minimal, normal, or debug[/red]")
         else:
             current_mode = get_ui_mode()
             console.print(f"Current UI mode: {current_mode.value}")
-            console.print(f"[dim]Usage: /ui <minimal|normal|debug>[/dim]")
-            console.print(f"[dim]  minimal: Claude Code style (clean, no panels)[/dim]")
-            console.print(f"[dim]  normal: Rich panels and detailed displays[/dim]")
-            console.print(f"[dim]  debug: Development details and timing[/dim]")
+            console.print("[dim]Usage: /ui <minimal|normal|debug>[/dim]")
+            console.print("[dim]  minimal: Claude Code style (clean, no panels)[/dim]")
+            console.print("[dim]  normal: Rich panels and detailed displays[/dim]")
+            console.print("[dim]  debug: Development details and timing[/dim]")
 
 
 class PlanCommand(Command):

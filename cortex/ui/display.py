@@ -51,13 +51,13 @@ def show_file_preview(content: str, path: str, max_lines: int = 20) -> None:
     ext = path.split(".")[-1] if "." in path else "txt"
     content_lines = content.split("\n")
     line_count = len(content_lines)
-    
+
     if is_minimal_mode():
         # Minimal mode: clean display without panel
         console.print(f"[cyan][FILE] {path} ({line_count} lines)[/cyan]")
         if content_lines:
             # Show first few lines
-            preview_lines = content_lines[:min(3, len(content_lines))]
+            preview_lines = content_lines[: min(3, len(content_lines))]
             for i, line in enumerate(preview_lines, 1):
                 console.print(f"  {i:3d}: {line}")
             if line_count > 3:
@@ -108,7 +108,7 @@ def display_thinking(
         # In minimal mode, never show panels
         if expanded:
             # Show full thinking content without panel
-            console.print(f"[dim][THINK] Thinking:[/dim]")
+            console.print("[dim][THINK] Thinking:[/dim]")
             lines = content.split("\n")
             for line in lines:
                 console.print(f"[dim]  {line}[/dim]")
@@ -151,7 +151,7 @@ def display_reasoning_details(
 ) -> None:
     """
     Display reasoning_details from OpenRouter reasoning models (MiMo, Claude, etc.).
-    
+
     Args:
         reasoning_details: List of reasoning detail objects from API response
         expanded: If True, show full content. If False, show minimal preview.
@@ -159,7 +159,7 @@ def display_reasoning_details(
     """
     if not reasoning_details or not isinstance(reasoning_details, list):
         return
-    
+
     if is_minimal_mode():
         # In minimal mode, never show panels
         if expanded:
@@ -169,7 +169,7 @@ def display_reasoning_details(
                 if detail_type == "reasoning.text":
                     content = detail.get("text", "")
                     if content:
-                        console.print(f"[dim][THINK] Thinking:[/dim]")
+                        console.print("[dim][THINK] Thinking:[/dim]")
                         lines = content.split("\n")
                         for line in lines:
                             console.print(f"[dim]  {line}[/dim]")
@@ -178,7 +178,7 @@ def display_reasoning_details(
                     if summary:
                         console.print(f"[dim][SUM] Summary: {summary}[/dim]")
                 elif detail_type == "reasoning.encrypted":
-                    console.print(f"[dim][LOCK] Encrypted reasoning data[/dim]")
+                    console.print("[dim][LOCK] Encrypted reasoning data[/dim]")
         else:
             # Minimal preview - show first text or summary
             for detail in reasoning_details:
@@ -228,7 +228,7 @@ def display_reasoning_details(
                         console.print(
                             Panel(
                                 summary,
-                                title=f"[bold yellow][SUM] Summary[/bold yellow]",
+                                title="[bold yellow][SUM] Summary[/bold yellow]",
                                 border_style="yellow",
                                 padding=(0, 1),
                             )
@@ -237,7 +237,7 @@ def display_reasoning_details(
                     console.print(
                         Panel(
                             "[dim]Encrypted reasoning data[/dim]",
-                            title=f"[bold yellow][LOCK] Encrypted[/bold yellow]",
+                            title="[bold yellow][LOCK] Encrypted[/bold yellow]",
                             border_style="yellow",
                             padding=(0, 1),
                         )
@@ -332,7 +332,7 @@ def display_tool_execution(
 ) -> None:
     """
     Display tool execution with mode awareness.
-    
+
     Args:
         tool_name: Name of the tool executed
         arguments: Tool arguments
@@ -341,7 +341,7 @@ def display_tool_execution(
         show_arguments: Force showing arguments (for debug mode)
     """
     success = result.get("success", False)
-    
+
     if is_minimal_mode():
         # Minimal mode: simple icon and duration
         icon = "⚙️"
@@ -353,35 +353,36 @@ def display_tool_execution(
                 console.print(f"[{color}]{icon} {tool_name} ({duration_ms/1000:.1f}s)[/{color}]")
         else:
             console.print(f"[{color}]{icon} {tool_name}[/{color}]")
-    
+
     elif is_debug_mode():
         # Debug mode: detailed information
         icon = "✓" if success else "✗"
         color = "green" if success else "red"
-        
+
         console.print(f"[{color}][TOOL] {tool_name} {icon}[/{color}]")
         console.print(f"  [dim]Duration: {duration_ms:.2f}ms[/dim]")
-        
+
         if show_arguments or is_debug_mode():
             # Show arguments in debug mode
             try:
                 import json
+
                 args_preview = json.dumps(arguments, indent=2)
                 # Limit preview length
                 if len(args_preview) > 500:
                     args_preview = args_preview[:500] + "..."
                 console.print(f"  [dim]Arguments: {args_preview}[/dim]")
-            except:
+            except Exception:
                 console.print(f"  [dim]Arguments: {str(arguments)[:200]}[/dim]")
-        
+
         # Show error if any
         if "error" in result:
             console.print(f"  [red]Error: {result.get('error')}[/red]")
-        
+
         # Show metadata if available
         if "metadata" in result:
             console.print(f"  [dim]Metadata: {result.get('metadata')}[/dim]")
-    
+
     else:
         # Normal mode: current behavior (tools display their own output)
         # We could optionally show a simple execution message here

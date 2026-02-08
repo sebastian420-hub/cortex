@@ -84,7 +84,7 @@ def display_streaming_response(
                             if "function" not in existing:
                                 existing["function"] = {}
                             existing["function"].update(tc["function"])
-                        
+
                         # Update other top-level keys
                         for key, value in tc.items():
                             if key != "function":

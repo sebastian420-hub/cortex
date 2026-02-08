@@ -22,7 +22,7 @@ from ..memory import MemoryBank, MemoryItem, MemoryType, MemorySource
 
 class SessionMemoryType(str, Enum):
     """Extended memory types for session memory."""
-    
+
     FAILED_APPROACH = "failed_approach"  # What didn't work and why
     SUCCESSFUL_PATTERN = "successful_pattern"  # What worked well
     SESSION_INSIGHT = "session_insight"  # High-level insight from session
@@ -33,14 +33,14 @@ class SessionMemoryType(str, Enum):
 @dataclass
 class FailedApproach:
     """Record of a failed approach with analysis."""
-    
+
     approach: str  # What was tried
     error: str  # What went wrong
     root_cause: Optional[str] = None  # Why it failed (if known)
     alternative_suggested: Optional[str] = None  # What to try instead
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -51,7 +51,7 @@ class FailedApproach:
             "timestamp": self.timestamp,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "FailedApproach":
         """Create from dictionary."""
@@ -68,14 +68,14 @@ class FailedApproach:
 @dataclass
 class SuccessfulPattern:
     """Record of a successful pattern or strategy."""
-    
+
     pattern: str  # Description of the pattern
     context: str  # Context where it worked
     effectiveness: float = 1.0  # 0.0 to 1.0
     applications: int = 1  # Number of times successfully applied
     last_applied: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -86,7 +86,7 @@ class SuccessfulPattern:
             "last_applied": self.last_applied,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SuccessfulPattern":
         """Create from dictionary."""
@@ -103,7 +103,7 @@ class SuccessfulPattern:
 class EnhancedMemoryBank(MemoryBank):
     """
     Extended memory bank with session-level capabilities.
-    
+
     This extends the base MemoryBank with:
     1. Tracking of failed approaches (what didn't work)
     2. Recording successful patterns (what worked well)
@@ -111,11 +111,11 @@ class EnhancedMemoryBank(MemoryBank):
     4. Progress tracking for complex tasks
     5. Context assembly summaries
     """
-    
+
     def __init__(self, max_items: int = 100):
         """
         Initialize enhanced memory bank.
-        
+
         Args:
             max_items: Maximum items to retain (oldest pruned first)
         """
@@ -125,7 +125,7 @@ class EnhancedMemoryBank(MemoryBank):
         self.session_insights: List[MemoryItem] = []
         self.progress_markers: Dict[str, str] = {}  # task_id -> progress_description
         self.context_summaries: Dict[str, str] = {}  # context_key -> summary
-        
+
     def record_failed_approach(
         self,
         approach: str,
@@ -136,7 +136,7 @@ class EnhancedMemoryBank(MemoryBank):
     ) -> None:
         """
         Record a failed approach with analysis.
-        
+
         Args:
             approach: What was tried
             error: What went wrong
@@ -151,21 +151,25 @@ class EnhancedMemoryBank(MemoryBank):
             alternative_suggested=alternative_suggested,
             metadata=metadata or {},
         )
-        
+
         # Keep only most recent failed approaches (limit to 10)
         self.failed_approaches.append(failed_approach)
         if len(self.failed_approaches) > 10:
             self.failed_approaches = self.failed_approaches[-10:]
-        
+
         # Also add as a regular memory item
-        self.add(MemoryItem(
-            type=MemoryType.ERROR,
-            content=f"Failed approach: {approach}. Error: {error}",
-            source=MemorySource.TOOL_RESULT,
-            confidence=1.0,
-            metadata={"failed_approach": True, **metadata} if metadata else {"failed_approach": True},
-        ))
-    
+        self.add(
+            MemoryItem(
+                type=MemoryType.ERROR,
+                content=f"Failed approach: {approach}. Error: {error}",
+                source=MemorySource.TOOL_RESULT,
+                confidence=1.0,
+                metadata=(
+                    {"failed_approach": True, **metadata} if metadata else {"failed_approach": True}
+                ),
+            )
+        )
+
     def record_successful_pattern(
         self,
         pattern: str,
@@ -175,7 +179,7 @@ class EnhancedMemoryBank(MemoryBank):
     ) -> None:
         """
         Record a successful pattern or strategy.
-        
+
         Args:
             pattern: Description of the pattern
             context: Context where it worked
@@ -191,7 +195,7 @@ class EnhancedMemoryBank(MemoryBank):
                 # Slightly adjust effectiveness toward new value
                 existing.effectiveness = (existing.effectiveness + effectiveness) / 2
                 return
-        
+
         # Add new pattern
         successful_pattern = SuccessfulPattern(
             pattern=pattern,
@@ -200,19 +204,16 @@ class EnhancedMemoryBank(MemoryBank):
             applications=1,
             metadata=metadata or {},
         )
-        
+
         self.successful_patterns.append(successful_pattern)
-        
+
         # Keep patterns sorted by effectiveness and recency
-        self.successful_patterns.sort(
-            key=lambda x: (x.effectiveness, x.last_applied),
-            reverse=True
-        )
-        
+        self.successful_patterns.sort(key=lambda x: (x.effectiveness, x.last_applied), reverse=True)
+
         # Limit to top 20 patterns
         if len(self.successful_patterns) > 20:
             self.successful_patterns = self.successful_patterns[:20]
-    
+
     def add_session_insight(
         self,
         insight: str,
@@ -222,7 +223,7 @@ class EnhancedMemoryBank(MemoryBank):
     ) -> None:
         """
         Add a session-level insight.
-        
+
         Args:
             insight: The insight text
             confidence: Confidence score 0.0 to 1.0
@@ -234,68 +235,74 @@ class EnhancedMemoryBank(MemoryBank):
             content=insight,
             source=source,
             confidence=confidence,
-            metadata={"session_insight": True, **metadata} if metadata else {"session_insight": True},
+            metadata=(
+                {"session_insight": True, **metadata} if metadata else {"session_insight": True}
+            ),
         )
-        
+
         self.session_insights.append(memory_item)
         self.add(memory_item)
-    
+
     def mark_progress(self, task_id: str, progress: str) -> None:
         """
         Mark progress on a complex task.
-        
+
         Args:
             task_id: Identifier for the task
             progress: Description of progress made
         """
         self.progress_markers[task_id] = progress
-        
+
         # Also add as a memory item
-        self.add(MemoryItem(
-            type=MemoryType.CONTEXT,
-            content=f"Progress on {task_id}: {progress}",
-            source=MemorySource.INFERRED,
-            confidence=1.0,
-            metadata={"progress_marker": True, "task_id": task_id},
-        ))
-    
+        self.add(
+            MemoryItem(
+                type=MemoryType.CONTEXT,
+                content=f"Progress on {task_id}: {progress}",
+                source=MemorySource.INFERRED,
+                confidence=1.0,
+                metadata={"progress_marker": True, "task_id": task_id},
+            )
+        )
+
     def add_context_summary(self, context_key: str, summary: str) -> None:
         """
         Add a summary of assembled context.
-        
+
         Args:
             context_key: Key identifying the context
             summary: Summary text
         """
         self.context_summaries[context_key] = summary
-        
+
         # Also add as a memory item
-        self.add(MemoryItem(
-            type=MemoryType.CONTEXT,
-            content=f"Context summary for {context_key}: {summary[:100]}...",
-            source=MemorySource.INFERRED,
-            confidence=1.0,
-            metadata={"context_summary": True, "context_key": context_key},
-        ))
-    
+        self.add(
+            MemoryItem(
+                type=MemoryType.CONTEXT,
+                content=f"Context summary for {context_key}: {summary[:100]}...",
+                source=MemorySource.INFERRED,
+                confidence=1.0,
+                metadata={"context_summary": True, "context_key": context_key},
+            )
+        )
+
     def extract_learnings_from_tool_results(self, tool_results: List[Dict[str, Any]]) -> None:
         """
         Extract learnings from tool execution results.
-        
+
         Args:
             tool_results: List of tool result dictionaries
         """
         for result in tool_results:
             if not isinstance(result, dict):
                 continue
-            
+
             success = result.get("success", False)
             tool_name = result.get("tool_name", "unknown")
-            
+
             if not success:
                 error = result.get("error", "Unknown error")
                 error_type = result.get("error_type", "execution")
-                
+
                 # Record failed approach
                 self.record_failed_approach(
                     approach=f"Tool: {tool_name}",
@@ -309,34 +316,34 @@ class EnhancedMemoryBank(MemoryBank):
             else:
                 # Check for patterns in successful execution
                 result_data = result.get("data", {})
-                
+
                 # Look for file operations
                 if "path" in result_data and tool_name in ["read_file", "write_file", "edit"]:
                     pattern = f"File operation {tool_name} on {result_data.get('path')}"
                     context = f"Successfully used {tool_name} tool"
                     self.record_successful_pattern(pattern, context)
-                
+
                 # Look for search operations
                 elif "matches" in result_data and tool_name in ["grep", "search_files"]:
                     pattern_count = result_data.get("match_count", 0)
                     pattern = f"Search with {tool_name} found {pattern_count} matches"
                     context = f"Successfully used {tool_name} for discovery"
                     self.record_successful_pattern(pattern, context)
-    
+
     def get_session_summary(self) -> str:
         """
         Get comprehensive session summary for planning.
-        
+
         Returns:
             Formatted summary of session memory
         """
         sections = []
-        
+
         # Base memory summary
         base_summary = super().get_summary()
         if base_summary:
             sections.append(base_summary)
-        
+
         # Failed approaches
         if self.failed_approaches:
             failed_list = []
@@ -344,76 +351,77 @@ class EnhancedMemoryBank(MemoryBank):
                 failed_list.append(f"{i}. {fa.approach}: {fa.error}")
                 if fa.alternative_suggested:
                     failed_list.append(f"   → Try: {fa.alternative_suggested}")
-            
+
             sections.append("Recent Failed Approaches:\\n" + "\\n".join(failed_list))
-        
+
         # Successful patterns
         if self.successful_patterns:
             pattern_list = []
             for i, sp in enumerate(self.successful_patterns[:3], 1):
                 pattern_list.append(f"{i}. {sp.pattern} (used {sp.applications} times)")
-            
+
             sections.append("Successful Patterns:\\n" + "\\n".join(pattern_list))
-        
+
         # Session insights
         if self.session_insights:
             insight_list = []
             for i, insight in enumerate(self.session_insights[-3:], 1):
                 insight_list.append(f"{i}. {insight.content}")
-            
+
             sections.append("Session Insights:\\n" + "\\n".join(insight_list))
-        
+
         # Progress markers
         if self.progress_markers:
             progress_list = []
             for task_id, progress in list(self.progress_markers.items())[-3:]:
                 progress_list.append(f"- {task_id}: {progress}")
-            
+
             sections.append("Recent Progress:\\n" + "\\n".join(progress_list))
-        
+
         return "\\n\\n".join(sections)
-    
+
     def get_failed_approaches_for_context(self, context: str) -> List[FailedApproach]:
         """
         Get failed approaches relevant to a specific context.
-        
+
         Args:
             context: Context to match against
-            
+
         Returns:
             List of relevant failed approaches
         """
         relevant = []
         context_lower = context.lower()
-        
+
         for fa in self.failed_approaches:
-            if (context_lower in fa.approach.lower() or 
-                context_lower in fa.error.lower() or
-                (fa.alternative_suggested and context_lower in fa.alternative_suggested.lower())):
+            if (
+                context_lower in fa.approach.lower()
+                or context_lower in fa.error.lower()
+                or (fa.alternative_suggested and context_lower in fa.alternative_suggested.lower())
+            ):
                 relevant.append(fa)
-        
+
         return relevant
-    
+
     def get_successful_patterns_for_context(self, context: str) -> List[SuccessfulPattern]:
         """
         Get successful patterns relevant to a specific context.
-        
+
         Args:
             context: Context to match against
-            
+
         Returns:
             List of relevant successful patterns
         """
         relevant = []
         context_lower = context.lower()
-        
+
         for sp in self.successful_patterns:
-            if (context_lower in sp.pattern.lower() or 
-                context_lower in sp.context.lower()):
+            if context_lower in sp.pattern.lower() or context_lower in sp.context.lower():
                 relevant.append(sp)
-        
+
         return relevant
-    
+
     def clear_session_data(self) -> None:
         """Clear session-specific data (but keep base memories)."""
         self.failed_approaches.clear()
@@ -421,11 +429,11 @@ class EnhancedMemoryBank(MemoryBank):
         self.session_insights.clear()
         self.progress_markers.clear()
         self.context_summaries.clear()
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
         base_dict = super().to_dict()
-        
+
         enhanced_dict = {
             **base_dict,
             "failed_approaches": [fa.to_dict() for fa in self.failed_approaches],
@@ -434,9 +442,9 @@ class EnhancedMemoryBank(MemoryBank):
             "progress_markers": self.progress_markers,
             "context_summaries": self.context_summaries,
         }
-        
+
         return enhanced_dict
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "EnhancedMemoryBank":
         """Create from dictionary."""
@@ -446,42 +454,44 @@ class EnhancedMemoryBank(MemoryBank):
         session_insights_data = data.pop("session_insights", [])
         progress_markers = data.pop("progress_markers", {})
         context_summaries = data.pop("context_summaries", {})
-        
+
         # Create base memory bank
         emb = cls(max_items=data.get("max_items", 100))
-        
+
         # Restore base items
         if "items" in data:
             emb.items = [MemoryItem.from_dict(item) for item in data["items"]]
-        
+
         # Restore enhanced data
         emb.failed_approaches = [FailedApproach.from_dict(fa) for fa in failed_approaches_data]
-        emb.successful_patterns = [SuccessfulPattern.from_dict(sp) for sp in successful_patterns_data]
+        emb.successful_patterns = [
+            SuccessfulPattern.from_dict(sp) for sp in successful_patterns_data
+        ]
         emb.session_insights = [MemoryItem.from_dict(si) for si in session_insights_data]
         emb.progress_markers = progress_markers
         emb.context_summaries = context_summaries
-        
+
         return emb
-    
+
     def _is_similar_pattern(self, pattern1: str, pattern2: str, threshold: float = 0.6) -> bool:
         """
         Check if two patterns are similar.
-        
+
         Args:
             pattern1: First pattern description
             pattern2: Second pattern description
             threshold: Similarity threshold (0.0 to 1.0)
-            
+
         Returns:
             True if patterns are similar
         """
         words1 = set(pattern1.lower().split())
         words2 = set(pattern2.lower().split())
-        
+
         if not words1 or not words2:
             return pattern1.lower() == pattern2.lower()
-        
+
         intersection = len(words1 & words2)
         union = len(words1 | words2)
-        
+
         return (intersection / union) >= threshold if union > 0 else False

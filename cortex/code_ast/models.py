@@ -11,6 +11,7 @@ from typing import List, Optional, Dict, Any
 @dataclass
 class FunctionInfo:
     """Information about a function extracted from AST."""
+
     name: str
     start_line: int
     end_line: int
@@ -23,6 +24,7 @@ class FunctionInfo:
 @dataclass
 class ClassInfo:
     """Information about a class extracted from AST."""
+
     name: str
     start_line: int
     end_line: int
@@ -35,6 +37,7 @@ class ClassInfo:
 @dataclass
 class ImportInfo:
     """Information about an import statement extracted from AST."""
+
     module: str
     line: int
     imports: List[str] = field(default_factory=list)
@@ -44,6 +47,7 @@ class ImportInfo:
 @dataclass
 class QueryResult:
     """Result of a tree-sitter query."""
+
     captures: List[Dict[str, Any]]
     text: str
     start_line: int
@@ -55,6 +59,7 @@ class QueryResult:
 @dataclass
 class CodeBlock:
     """A block of code with context."""
+
     content: str
     start_line: int
     end_line: int

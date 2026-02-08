@@ -10,16 +10,15 @@ from typing import Optional
 import logging
 
 # Configure logging - only show WARNING and above by default
-logging.basicConfig(level=logging.WARNING, format='%(levelname)s:%(name)s:%(message)s')
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s:%(name)s:%(message)s")
 
 # Suppress noisy third-party loggers
-logging.getLogger('httpx').setLevel(logging.WARNING)
-logging.getLogger('httpcore').setLevel(logging.WARNING)
-logging.getLogger('cortex.tools.registry').setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("cortex.tools.registry").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
@@ -28,8 +27,6 @@ from .agent_enhanced import EnhancedCortex
 from .models import PermissionMode
 from .config import AgentConfig
 from .core.providers import ProviderFactory, ProviderError
-from .core.model_capabilities import get_model_profile, list_all_profiles
-from .core.prompts import get_adapter_info
 from .ui.console import console
 from .ui.repl import REPL
 from .ui.modes import UIMode, set_ui_mode
@@ -184,7 +181,7 @@ Examples:
         "--model",
         "-m",
         default=None,
-        help="Model to use (default: llama3.2). Auto-detects provider from model name.",
+        help="Model to use (default: moonshotai/kimi-k2.5). Auto-detects provider from model name.",
     )
 
     parser.add_argument(
@@ -204,12 +201,16 @@ Examples:
 
     parser.add_argument("--plan-mode", action="store_true", help="Start in plan mode (read-only)")
 
-    parser.add_argument("--enhanced", action="store_true", help="Use enhanced agent with planning and layered memory")
+    parser.add_argument(
+        "--enhanced",
+        action="store_true",
+        help="Use enhanced agent with planning and layered memory",
+    )
 
     parser.add_argument(
         "--routing",
         action="store_true",
-        help="Enable intelligent model routing (auto-selects best model for task)"
+        help="Enable intelligent model routing (auto-selects best model for task)",
     )
 
     parser.add_argument("--prompt", "-p", help="One-shot prompt (exit after completion)")
@@ -230,7 +231,7 @@ Examples:
         "--async",
         dest="use_async",
         action="store_true",
-        help="Use async execution for non-blocking operation (experimental)"
+        help="Use async execution for non-blocking operation (experimental)",
     )
 
     parser.add_argument(
@@ -258,7 +259,7 @@ Examples:
         "--ui-mode",
         choices=["minimal", "normal", "debug"],
         default=None,
-        help="UI display mode: minimal (Claude Code style), normal (rich panels), debug (development details)"
+        help="UI display mode: minimal (Claude Code style), normal (rich panels), debug (development details)",
     )
 
     args = parser.parse_args()
@@ -307,7 +308,9 @@ Examples:
             # Use full OpenRouter model name for API calls
             config.model = "xiaomi/mimo-v2-flash:free"
             config.provider = "openrouter"
-            console.print("[cyan]Model orchestration enabled - using xiaomi/mimo-v2-flash:free as coordinator[/cyan]")
+            console.print(
+                "[cyan]Model orchestration enabled - using xiaomi/mimo-v2-flash:free as coordinator[/cyan]"
+            )
         else:
             console.print("[cyan]Model orchestration enabled (self-switching models)[/cyan]")
 
@@ -459,19 +462,23 @@ Examples:
     if args.prompt:
         # One-shot mode
         console.print(Panel(f"[cyan]Task:[/cyan] {args.prompt}", title="One-shot Mode"))
-        
+
         # Run in async mode if requested
         if args.use_async:
-            if hasattr(agent, 'process_with_planning_async'):
-                asyncio.run(agent.process_with_planning_async(args.prompt, use_streaming=args.streaming))
-            elif hasattr(agent, '_process_message_async'):
+            if hasattr(agent, "process_with_planning_async"):
+                asyncio.run(
+                    agent.process_with_planning_async(args.prompt, use_streaming=args.streaming)
+                )
+            elif hasattr(agent, "_process_message_async"):
                 asyncio.run(agent._process_message_async(args.prompt, use_streaming=args.streaming))
             else:
-                console.print("[yellow]Warning: Async mode not available. Using sync mode.[/yellow]")
+                console.print(
+                    "[yellow]Warning: Async mode not available. Using sync mode.[/yellow]"
+                )
                 agent._process_message(args.prompt, use_streaming=args.streaming)
         else:
             # Use enhanced processing if available
-            if hasattr(agent, 'process_with_planning'):
+            if hasattr(agent, "process_with_planning"):
                 agent.process_with_planning(args.prompt, use_streaming=args.streaming)
             else:
                 agent._process_message(args.prompt, use_streaming=args.streaming)
@@ -487,11 +494,16 @@ Examples:
             )
     else:
         # Interactive mode
-        run_interactive(agent, session_manager, use_streaming=args.streaming, use_async=args.use_async)
+        run_interactive(
+            agent, session_manager, use_streaming=args.streaming, use_async=args.use_async
+        )
 
 
 def run_interactive(
-    agent: Cortex, session_manager: SessionManager, use_streaming: bool = False, use_async: bool = False
+    agent: Cortex,
+    session_manager: SessionManager,
+    use_streaming: bool = False,
+    use_async: bool = False,
 ):
     """Run interactive REPL session"""
 
@@ -518,7 +530,7 @@ def run_interactive(
         if Confirm.ask("[cyan]Continue processing?[/cyan]", default=False):
             # Ask how many additional iterations
             additional = IntPrompt.ask(
-                f"[cyan]How many additional iterations?[/cyan]",
+                "[cyan]How many additional iterations?[/cyan]",
                 default=agent.config.max_iterations_continue_amount,
             )
             return max(1, additional)  # Ensure at least 1
@@ -582,19 +594,25 @@ def run_interactive(
             # Process with agent
             if use_async:
                 # Async mode
-                if hasattr(agent, 'process_with_planning_async'):
-                    asyncio.run(agent.process_with_planning_async(user_input, use_streaming=use_streaming))
-                elif hasattr(agent, '_process_message_async'):
-                    asyncio.run(agent._process_message_async(user_input, use_streaming=use_streaming))
+                if hasattr(agent, "process_with_planning_async"):
+                    asyncio.run(
+                        agent.process_with_planning_async(user_input, use_streaming=use_streaming)
+                    )
+                elif hasattr(agent, "_process_message_async"):
+                    asyncio.run(
+                        agent._process_message_async(user_input, use_streaming=use_streaming)
+                    )
                 else:
-                    console.print("[yellow]Warning: Async mode not available. Using sync mode.[/yellow]")
-                    if hasattr(agent, 'process_with_planning'):
+                    console.print(
+                        "[yellow]Warning: Async mode not available. Using sync mode.[/yellow]"
+                    )
+                    if hasattr(agent, "process_with_planning"):
                         agent.process_with_planning(user_input, use_streaming=use_streaming)
                     else:
                         agent._process_message(user_input, use_streaming=use_streaming)
             else:
                 # Sync mode - Use enhanced processing if available
-                if hasattr(agent, 'process_with_planning'):
+                if hasattr(agent, "process_with_planning"):
                     agent.process_with_planning(user_input, use_streaming=use_streaming)
                 else:
                     agent._process_message(user_input, use_streaming=use_streaming)
@@ -633,7 +651,7 @@ def run_interactive(
             break
 
 
-def init_command_registry(session_manager: SessionManager) -> 'CommandRegistry':
+def init_command_registry(session_manager: SessionManager) -> "CommandRegistry":
     """
     Initialize and populate the command registry.
 
@@ -728,13 +746,11 @@ def handle_command(
     agent: Cortex,
     session_manager: SessionManager,
     repl: REPL,
-    command_registry: Optional[CommandRegistry] = None
+    command_registry: Optional[CommandRegistry] = None,
 ):
     """Handle special commands"""
-    from datetime import datetime
-    from .ui.modes import UIMode, set_ui_mode, get_ui_mode
 
-    logger = logging.getLogger(__name__) # Initialize logger here
+    logger = logging.getLogger(__name__)  # Initialize logger here
     logger.debug(f"Handling command: '{command}'")
 
     # Initialize registry if not provided
@@ -759,7 +775,7 @@ def handle_command(
                     config=agent.config,
                     hook_manager=agent.hook_manager,
                     output_format=agent.output_format.value,
-                    verbose=False
+                    verbose=False,
                 )
                 # Execute command
                 cmd_obj.execute(ctx, cmd_args)

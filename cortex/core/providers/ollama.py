@@ -74,15 +74,15 @@ class OllamaProvider(ModelProvider):
         """
         # Check for thinking in message object
         if isinstance(response, dict):
-            message = response.get('message', {})
+            message = response.get("message", {})
 
             # Try common thinking field names
-            thinking = message.get('thinking') or message.get('reasoning')
+            thinking = message.get("thinking") or message.get("reasoning")
             if thinking:
                 return thinking
 
             # Some models might have thinking in content field
-            content = message.get('content', '')
+            content = message.get("content", "")
             if content and isinstance(content, str):
                 # Check if content starts with thinking tags or patterns
                 stripped = content.strip()
@@ -91,10 +91,10 @@ class OllamaProvider(ModelProvider):
                     return None  # Don't extract from content to avoid duplication
 
         # For non-dict responses (like ollama chat response object)
-        elif hasattr(response, 'get'):
+        elif hasattr(response, "get"):
             try:
-                message = response.get('message', {})
-                thinking = message.get('thinking') or message.get('reasoning')
+                message = response.get("message", {})
+                thinking = message.get("thinking") or message.get("reasoning")
                 if thinking:
                     return thinking
             except Exception:
@@ -111,7 +111,11 @@ class OllamaProvider(ModelProvider):
         """
         model_lower = model.lower()
         thinking_indicators = [
-            "deepseek-r1", "deepseek-reasoner", "reasoner",
-            "thinking", "r1", "qwen2.5-32b-thought"
+            "deepseek-r1",
+            "deepseek-reasoner",
+            "reasoner",
+            "thinking",
+            "r1",
+            "qwen2.5-32b-thought",
         ]
         return any(indicator in model_lower for indicator in thinking_indicators)

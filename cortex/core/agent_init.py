@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 # Import routing system (optional)
 try:
     from .routing import RoutingOrchestrator, RoutingConfig
+
     ROUTING_AVAILABLE = True
 except ImportError:
     ROUTING_AVAILABLE = False
@@ -73,7 +74,7 @@ class AgentInitializer:
         config: AgentConfig,
         hook_manager: HookManager,
         output_format: OutputFormat,
-        project_context: str = None
+        project_context: str = None,
     ):
         """
         Initialize all agent components.
@@ -186,16 +187,14 @@ class AgentInitializer:
 
     def _init_recovery_orchestrator(self) -> RecoveryOrchestrator:
         """Initialize recovery orchestrator"""
-        return RecoveryOrchestrator(
-            self.checkpoint_manager,
-            self.health_monitor
-        )
+        return RecoveryOrchestrator(self.checkpoint_manager, self.health_monitor)
 
     def _init_loop_guard(self) -> LoopGuard:
         """Initialize loop guard with recovery manager if enabled"""
         recovery_manager = None
         if self.config.error_recovery.get("enable_smart_recovery", False):
             from .recovery_strategies import create_recovery_manager_from_config
+
             recovery_manager = create_recovery_manager_from_config(self.config.error_recovery)
 
         return LoopGuard(
@@ -251,7 +250,11 @@ class AgentInitializer:
                     patterns=cache_warming_config.get("patterns"),
                     source=cache_warming_config.get("source", "git_history"),
                     max_files=cache_warming_config.get("max_files", 50),
-                    directory=Path(cache_warming_config.get("directory")) if cache_warming_config.get("directory") else None,
+                    directory=(
+                        Path(cache_warming_config.get("directory"))
+                        if cache_warming_config.get("directory")
+                        else None
+                    ),
                 )
                 if cache_stats["cached"] > 0:
                     logger.info(f"Cache warming complete: {cache_stats['cached']} files cached")
@@ -283,19 +286,23 @@ class AgentInitializer:
 
         if ROUTING_AVAILABLE and routing_config.get("enabled", False):
             try:
-                router = RoutingOrchestrator(RoutingConfig(
-                    enabled=True,
-                    mode=routing_config.get("mode", "rule_based"),
-                    prefer_local_models=routing_config.get("prefer_local_models", True),
-                    allow_cloud_fallback=routing_config.get("allow_cloud_fallback", True),
-                    task_analysis_enabled=routing_config.get("task_analysis_enabled", True),
-                    cost_optimization_enabled=routing_config.get("cost_optimization_enabled", True),
-                    transparency_enabled=routing_config.get("transparency_enabled", True),
-                    cache_decisions=routing_config.get("cache_decisions", True),
-                    log_decisions=routing_config.get("log_decisions", False),
-                    log_file=routing_config.get("log_file"),
-                ))
-                routing_enabled = True
+                router = RoutingOrchestrator(
+                    RoutingConfig(
+                        enabled=True,
+                        mode=routing_config.get("mode", "rule_based"),
+                        prefer_local_models=routing_config.get("prefer_local_models", True),
+                        allow_cloud_fallback=routing_config.get("allow_cloud_fallback", True),
+                        task_analysis_enabled=routing_config.get("task_analysis_enabled", True),
+                        cost_optimization_enabled=routing_config.get(
+                            "cost_optimization_enabled", True
+                        ),
+                        transparency_enabled=routing_config.get("transparency_enabled", True),
+                        cache_decisions=routing_config.get("cache_decisions", True),
+                        log_decisions=routing_config.get("log_decisions", False),
+                        log_file=routing_config.get("log_file"),
+                    )
+                )
+                _routing_enabled = True
                 logger.info("Intelligent model routing enabled")
             except Exception as e:
                 logger.warning(f"Failed to initialize routing system: {e}")

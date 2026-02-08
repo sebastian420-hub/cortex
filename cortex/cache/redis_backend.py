@@ -23,23 +23,25 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from datetime import datetime
 
 try:
     import redis
+
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
     redis = None
 
-from .file_cache import CacheEntry, FileCache
+from .file_cache import FileCache
 
 logger = logging.getLogger(__name__)
 
 
 class RedisCacheError(Exception):
     """Exception raised for Redis cache errors."""
+
     pass
 
 
@@ -98,7 +100,9 @@ class RedisFileCache(FileCache):
         self._redis_client: Optional[redis.Redis] = None
         self._redis_connected = False
         self._redis_lock = threading.Lock()
-        self._local_cache = FileCache(max_entries=max_entries, max_size_mb=max_size_mb, enabled=enabled)
+        self._local_cache = FileCache(
+            max_entries=max_entries, max_size_mb=max_size_mb, enabled=enabled
+        )
 
         # Statistics
         self._redis_hits = 0
@@ -187,11 +191,11 @@ class RedisFileCache(FileCache):
 
                 if data is not None:
                     # Decode and validate
-                    entry_dict = json.loads(data.decode('utf-8'))
+                    entry_dict = json.loads(data.decode("utf-8"))
 
                     # Validate mtime
                     current_mtime = path.stat().st_mtime if path.exists() else None
-                    if current_mtime and current_mtime != entry_dict['mtime']:
+                    if current_mtime and current_mtime != entry_dict["mtime"]:
                         # File changed, invalidate
                         self.invalidate(path)
                         self._redis_misses += 1
@@ -202,14 +206,14 @@ class RedisFileCache(FileCache):
                         f"file_cache:{key}:meta",
                         mapping={
                             "accessed_at": datetime.now().isoformat(),
-                            "hit_count": str(int(entry_dict.get('hit_count', 0)) + 1),
-                        }
+                            "hit_count": str(int(entry_dict.get("hit_count", 0)) + 1),
+                        },
                     )
                     self._redis_client.expire(f"file_cache:{key}", self.ttl)
                     self._redis_client.expire(f"file_cache:{key}:meta", self.ttl)
 
                     self._redis_hits += 1
-                    return entry_dict['content']
+                    return entry_dict["content"]
 
             except (redis.RedisError, json.JSONDecodeError, KeyError) as e:
                 logger.debug(f"Redis get error: {e}")
@@ -270,9 +274,7 @@ class RedisFileCache(FileCache):
             try:
                 # Store in Redis with TTL
                 self._redis_client.setex(
-                    f"file_cache:{key}",
-                    self.ttl,
-                    json.dumps(entry).encode('utf-8')
+                    f"file_cache:{key}", self.ttl, json.dumps(entry).encode("utf-8")
                 )
 
                 # Store metadata
@@ -281,7 +283,7 @@ class RedisFileCache(FileCache):
                     mapping={
                         "size": str(content_size),
                         "cached_at": datetime.now().isoformat(),
-                    }
+                    },
                 )
                 self._redis_client.expire(f"file_cache:{key}:meta", self.ttl)
 
@@ -319,10 +321,7 @@ class RedisFileCache(FileCache):
         # Invalidate from Redis
         if self._ensure_connection():
             try:
-                count = self._redis_client.delete(
-                    f"file_cache:{key}",
-                    f"file_cache:{key}:meta"
-                )
+                count = self._redis_client.delete(f"file_cache:{key}", f"file_cache:{key}:meta")
                 if count > 0:
                     removed = True
             except redis.RedisError as e:
@@ -349,9 +348,7 @@ class RedisFileCache(FileCache):
                 cursor = 0
                 deleted = 0
                 while True:
-                    cursor, keys = self._redis_client.scan(
-                        cursor, match="file_cache:*", count=100
-                    )
+                    cursor, keys = self._redis_client.scan(cursor, match="file_cache:*", count=100)
                     if keys:
                         self._redis_client.delete(*keys)
                         deleted += len(keys)
@@ -389,11 +386,13 @@ class RedisFileCache(FileCache):
         if self._ensure_connection():
             try:
                 info = self._redis_client.info()
-                redis_stats.update({
-                    "redis_memory_used": info.get('used_memory_human', 'N/A'),
-                    "redis_connected_clients": info.get('connected_clients', 0),
-                    "redis_uptime_days": info.get('uptime_in_days', 0),
-                })
+                redis_stats.update(
+                    {
+                        "redis_memory_used": info.get("used_memory_human", "N/A"),
+                        "redis_connected_clients": info.get("connected_clients", 0),
+                        "redis_uptime_days": info.get("uptime_in_days", 0),
+                    }
+                )
             except redis.RedisError:
                 pass
 
@@ -418,9 +417,7 @@ class RedisFileCache(FileCache):
             # Get all file_cache keys
             cursor = 0
             while True:
-                cursor, keys = self._redis_client.scan(
-                    cursor, match="file_cache:*:meta", count=50
-                )
+                cursor, keys = self._redis_client.scan(cursor, match="file_cache:*:meta", count=50)
 
                 for meta_key in keys:
                     try:
@@ -436,11 +433,11 @@ class RedisFileCache(FileCache):
                             continue
 
                         # Parse and add to local cache
-                        entry_dict = json.loads(data.decode('utf-8'))
+                        entry_dict = json.loads(data.decode("utf-8"))
                         filepath = Path(cache_key.replace("file_cache:", ""))
 
                         if filepath.exists():
-                            self._local_cache.set(filepath, entry_dict['content'])
+                            self._local_cache.set(filepath, entry_dict["content"])
                             synced += 1
 
                     except (redis.RedisError, json.JSONDecodeError, KeyError) as e:
@@ -473,7 +470,7 @@ class RedisFileCache(FileCache):
             for key, entry in self._local_cache._cache.items():
                 try:
                     # Get filepath from key
-                    filepath = Path(key)
+                    _filepath = Path(key)
 
                     # Prepare entry data
                     entry_data = {
@@ -486,9 +483,7 @@ class RedisFileCache(FileCache):
 
                     # Store in Redis
                     self._redis_client.setex(
-                        f"file_cache:{key}",
-                        self.ttl,
-                        json.dumps(entry_data).encode('utf-8')
+                        f"file_cache:{key}", self.ttl, json.dumps(entry_data).encode("utf-8")
                     )
 
                     synced += 1
@@ -555,6 +550,7 @@ class GlobalRedisCache:
                     logger.warning(f"Failed to create Redis cache: {e}")
                     # Fall back to local cache
                     from .file_cache import get_file_cache
+
                     cls._instance = get_file_cache()  # type: ignore
             return cls._instance
 

@@ -22,6 +22,7 @@ MAX_DELEGATIONS_PER_REQUEST = 5
 @dataclass
 class DelegationRecord:
     """Record of a single delegation event."""
+
     from_model: str
     to_model: str
     reason: str
@@ -101,9 +102,7 @@ class DelegationTracker:
         ]
 
         for record in self.delegation_history:
-            lines.append(
-                f"  {record.delegation_number}. {record.from_model} -> {record.to_model}"
-            )
+            lines.append(f"  {record.delegation_number}. {record.from_model} -> {record.to_model}")
             lines.append(f"     Reason: {record.reason[:50]}...")
 
         return "\n".join(lines)
@@ -140,6 +139,7 @@ class DelegationContext:
 
     Contains everything the receiving model needs to continue the work.
     """
+
     from_model: str
     to_model: str
     task: str
@@ -173,19 +173,23 @@ class DelegationContext:
         ]
 
         if self.handoff_notes:
-            sections.extend([
-                "### Handoff Notes",
-                "",
-                self.handoff_notes,
-                "",
-            ])
+            sections.extend(
+                [
+                    "### Handoff Notes",
+                    "",
+                    self.handoff_notes,
+                    "",
+                ]
+            )
 
         files_read = self.state_summary.get("files_read", [])
         if files_read:
-            sections.extend([
-                "### Files Already Examined",
-                "",
-            ])
+            sections.extend(
+                [
+                    "### Files Already Examined",
+                    "",
+                ]
+            )
             for f in files_read[:10]:
                 sections.append(f"- `{f}`")
             if len(files_read) > 10:
@@ -194,21 +198,25 @@ class DelegationContext:
 
         decisions = self.state_summary.get("decisions", [])
         if decisions:
-            sections.extend([
-                "### Decisions Made",
-                "",
-            ])
+            sections.extend(
+                [
+                    "### Decisions Made",
+                    "",
+                ]
+            )
             for d in decisions:
                 sections.append(f"- {d}")
             sections.append("")
 
         remaining = self.get_remaining_delegations()
-        sections.extend([
-            "### Delegation Quota",
-            "",
-            f"**Remaining delegations:** {remaining}",
-            "",
-        ])
+        sections.extend(
+            [
+                "### Delegation Quota",
+                "",
+                f"**Remaining delegations:** {remaining}",
+                "",
+            ]
+        )
 
         if remaining <= 2:
             sections.append(

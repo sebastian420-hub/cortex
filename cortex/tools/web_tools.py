@@ -450,7 +450,7 @@ class WebSearchTool(Tool):
             if self.console:
                 self.console.print(f"[green]Found {len(formatted_results)} results[/green]")
                 for r in formatted_results[:3]:
-                    title_display = html.unescape(r['title'][:50])
+                    title_display = html.unescape(r["title"][:50])
                     self.console.print(f"  [dim]- {title_display}...[/dim]")
 
             return create_success_response(
@@ -466,8 +466,6 @@ class WebSearchTool(Tool):
             return create_error_response(
                 f"Search failed: {e}", ErrorType.EXECUTION, {"query": query}
             )
-
-
 
 
 def clear_fetch_cache() -> None:

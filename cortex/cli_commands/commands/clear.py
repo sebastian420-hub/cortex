@@ -40,7 +40,7 @@ class ResetContextCommand(Command):
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the reset-context command"""
         # Clear conversation but preserve memory bank
-        if hasattr(ctx.agent, 'memory_bank') and ctx.agent.memory_bank:
+        if hasattr(ctx.agent, "memory_bank") and ctx.agent.memory_bank:
             memory_class = type(ctx.agent.memory_bank)
             memory_backup = ctx.agent.memory_bank.to_dict()
             ctx.agent.clear_conversation()

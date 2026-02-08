@@ -25,19 +25,19 @@ logger = logging.getLogger(__name__)
 class PromptStyle(str, Enum):
     """Prompt verbosity style based on model capability."""
 
-    DETAILED = "detailed"      # Full documentation, examples, verbose guidance
-    CONCISE = "concise"        # Shorter format, key information only
-    EXPLICIT = "explicit"      # Very explicit step-by-step, for smaller models
+    DETAILED = "detailed"  # Full documentation, examples, verbose guidance
+    CONCISE = "concise"  # Shorter format, key information only
+    EXPLICIT = "explicit"  # Very explicit step-by-step, for smaller models
 
 
 class CapabilityLevel(str, Enum):
     """Capability level for a specific feature."""
 
-    EXCELLENT = "excellent"    # Top-tier capability
-    GOOD = "good"              # Reliable capability
-    MODERATE = "moderate"      # Works but may need guidance
-    LIMITED = "limited"        # Basic support, needs explicit guidance
-    NONE = "none"              # Not supported
+    EXCELLENT = "excellent"  # Top-tier capability
+    GOOD = "good"  # Reliable capability
+    MODERATE = "moderate"  # Works but may need guidance
+    LIMITED = "limited"  # Basic support, needs explicit guidance
+    NONE = "none"  # Not supported
 
 
 @dataclass
@@ -57,9 +57,13 @@ class ModelProfile:
     recommended_temperature: float = 0.7
     notes: str = ""
     exposes_thinking: bool = False  # Whether model exposes thinking process
-    thinking_field: Optional[str] = None  # API field name for thinking content (e.g., "reasoning_content", "reasoning")
+    thinking_field: Optional[str] = (
+        None  # API field name for thinking content (e.g., "reasoning_content", "reasoning")
+    )
     recommended_temperatures: Optional[Dict[str, float]] = None  # Temperature for different tasks
-    reasoning_budget: Optional[Dict[str, int]] = None  # Thinking token budget for different complexity levels
+    reasoning_budget: Optional[Dict[str, int]] = (
+        None  # Thinking token budget for different complexity levels
+    )
 
     def to_dict(self) -> Dict:
         """Convert to dictionary."""
@@ -122,7 +126,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         supports_vision=True,
         notes="Fast and efficient, good for simpler tasks",
     ),
-
     # -------------------------------------------------------------------------
     # OpenAI Models
     # -------------------------------------------------------------------------
@@ -169,7 +172,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=32,
         notes="Fast and cost-effective for simpler tasks",
     ),
-
     # -------------------------------------------------------------------------
     # DeepSeek Models
     # -------------------------------------------------------------------------
@@ -203,7 +205,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=32,
         notes="Enhanced reasoning with chain-of-thought",
     ),
-
     # -------------------------------------------------------------------------
     # Ollama / Local Models - Llama Family
     # -------------------------------------------------------------------------
@@ -247,7 +248,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=10,
         notes="Older model, needs explicit guidance",
     ),
-
     # -------------------------------------------------------------------------
     # Ollama / Local Models - Mistral Family
     # -------------------------------------------------------------------------
@@ -301,7 +301,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=20,
         notes="Development-focused Mistral variant",
     ),
-
     # -------------------------------------------------------------------------
     # Ollama / Local Models - Code Specialized
     # -------------------------------------------------------------------------
@@ -335,7 +334,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=15,
         notes="Code-focused model, needs explicit formatting",
     ),
-
     # -------------------------------------------------------------------------
     # Ollama / Local Models - Other
     # -------------------------------------------------------------------------
@@ -369,7 +367,6 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         max_tools_per_prompt=20,
         notes="Cohere model with RAG capabilities",
     ),
-
     # -------------------------------------------------------------------------
     # OpenRouter Models
     # -------------------------------------------------------------------------
@@ -462,6 +459,7 @@ DEFAULT_PROFILE = ModelProfile(
 # Public API
 # =============================================================================
 
+
 def get_model_profile(model_name: str) -> ModelProfile:
     """
     Get capability profile for a model.
@@ -551,20 +549,20 @@ def list_all_profiles() -> List[str]:
 def get_temperature_for_task(model_name: str, task_type: str) -> float:
     """
     Get recommended temperature for a specific task type.
-    
+
     Args:
         model_name: Model identifier
         task_type: "coding_planning", "debugging", "reasoning", "creative"
-    
+
     Returns:
         Recommended temperature
     """
     profile = get_model_profile(model_name)
-    
+
     # Use model-specific temperature mapping if available
-    if hasattr(profile, 'recommended_temperatures') and profile.recommended_temperatures:
+    if hasattr(profile, "recommended_temperatures") and profile.recommended_temperatures:
         return profile.recommended_temperatures.get(task_type, profile.recommended_temperature)
-    
+
     # Default fallback
     return profile.recommended_temperature
 
@@ -596,8 +594,9 @@ def get_models_by_capability(
 
     matching = []
     for name, profile in MODEL_PROFILES.items():
-        if (meets_requirement(profile.tool_following, min_tool_following) and
-            meets_requirement(profile.reasoning, min_reasoning)):
+        if meets_requirement(profile.tool_following, min_tool_following) and meets_requirement(
+            profile.reasoning, min_reasoning
+        ):
             matching.append(name)
 
     return matching

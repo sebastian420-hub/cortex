@@ -78,7 +78,7 @@ class DelegateToModelTool(Tool):
             return {
                 "success": False,
                 "error": f"Maximum delegations reached ({self.delegation_tracker.max_delegations}). "
-                        f"You must complete this task yourself.",
+                f"You must complete this task yourself.",
                 "action": "none",
                 "remaining_delegations": remaining,
             }
@@ -86,8 +86,7 @@ class DelegateToModelTool(Tool):
         # Validate target model exists and is available
         if self.model_registry:
             is_valid, reason = self.model_registry.validate_delegation(
-                self.current_model or "unknown",
-                target_model
+                self.current_model or "unknown", target_model
             )
             if not is_valid:
                 return {
@@ -113,8 +112,7 @@ class DelegateToModelTool(Tool):
             "handoff_notes": handoff_notes,
             "from_model": self.current_model,
             "remaining_delegations": (
-                self.delegation_tracker.get_remaining()
-                if self.delegation_tracker else None
+                self.delegation_tracker.get_remaining() if self.delegation_tracker else None
             ),
             "message": f"Delegating to {target_model}: {task}",
         }

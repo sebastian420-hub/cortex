@@ -69,13 +69,15 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
                 data["count"] = len(truncated_files)
                 data["total_count"] = original_count
                 data["truncated"] = True
-                data["truncation_reason"] = f"File list truncated to prevent context overflow. Showing {max_files} of {original_count} total files."
+                data["truncation_reason"] = (
+                    f"File list truncated to prevent context overflow. Showing {max_files} of {original_count} total files."
+                )
 
                 truncated = True
                 truncation_info = {
                     "original_count": original_count,
                     "truncated_count": len(truncated_files),
-                    "items_removed": original_count - len(truncated_files)
+                    "items_removed": original_count - len(truncated_files),
                 }
 
                 logger.warning(
@@ -99,13 +101,15 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
                 data["match_count"] = len(truncated_results)
                 data["total_matches"] = data.get("total_matches", original_count)
                 data["truncated"] = True
-                data["truncation_reason"] = f"Search results truncated. Showing {max_results} of {original_count} matches."
+                data["truncation_reason"] = (
+                    f"Search results truncated. Showing {max_results} of {original_count} matches."
+                )
 
                 truncated = True
                 truncation_info = {
                     "original_count": original_count,
                     "truncated_count": len(truncated_results),
-                    "items_removed": original_count - len(truncated_results)
+                    "items_removed": original_count - len(truncated_results),
                 }
 
                 logger.warning(
@@ -121,7 +125,7 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
             # Keep first portion and add truncation message
             truncated_content = content[:MAX_SINGLE_FILE_LENGTH]
             # Find last complete line
-            last_newline = truncated_content.rfind('\n')
+            last_newline = truncated_content.rfind("\n")
             if last_newline > 0:
                 truncated_content = truncated_content[:last_newline]
 
@@ -136,13 +140,47 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
             truncation_info = {
                 "original_size": original_length,
                 "truncated_size": len(truncated_content),
-                "bytes_removed": original_length - len(truncated_content)
+                "bytes_removed": original_length - len(truncated_content),
             }
 
             logger.warning(
                 f"Truncated {tool_name} result: {original_length} -> {len(truncated_content)} chars "
                 f"(saved ~{(original_length - len(truncated_content)) // 4000}K tokens)"
             )
+
+    # Handle AST tools (ast_extract, ast_search, ast_analyze)
+    elif tool_name in ("ast_extract", "ast_search", "ast_analyze"):
+        extracted = data.get("extracted", [])
+        if isinstance(extracted, list) and len(extracted) > 0:
+            # Calculate size
+            extracted_json = json.dumps(extracted, ensure_ascii=False)
+            max_structures = 150  # Limit to 150 structures
+
+            if len(extracted_json) > MAX_SEARCH_RESULTS_LENGTH or len(extracted) > max_structures:
+                original_count = len(extracted)
+                truncated_extracted = extracted[:max_structures]
+
+                data["extracted"] = truncated_extracted
+                data["structure_count"] = len(truncated_extracted)
+                data["total_structures"] = original_count
+                data["truncated"] = True
+                data["truncation_reason"] = (
+                    f"AST results truncated to prevent context overflow. "
+                    f"Showing {len(truncated_extracted)} of {original_count} structures. "
+                    f"Use pattern filtering or narrow your search path to get specific results."
+                )
+
+                truncated = True
+                truncation_info = {
+                    "original_count": original_count,
+                    "truncated_count": len(truncated_extracted),
+                    "items_removed": original_count - len(truncated_extracted),
+                }
+
+                logger.warning(
+                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_extracted)} structures "
+                    f"(saved ~{estimate_token_count(extracted_json) // 1000}K tokens)"
+                )
 
     # Generic truncation for any large result
     else:
@@ -172,7 +210,9 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
     return result_copy
 
 
-def _truncate_dict_strings(data: Dict[str, Any], max_total_length: int, current_length: int = 0) -> bool:
+def _truncate_dict_strings(
+    data: Dict[str, Any], max_total_length: int, current_length: int = 0
+) -> bool:
     """
     Recursively truncate string values in a dictionary.
 

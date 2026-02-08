@@ -39,7 +39,9 @@ class RecoveryAction:
             "message": self.message,
             "confidence": self.confidence,
             "requires_user_confirmation": self.requires_user_confirmation,
-            "suggested_checkpoint_id": self.suggested_checkpoint.id if self.suggested_checkpoint else None,
+            "suggested_checkpoint_id": (
+                self.suggested_checkpoint.id if self.suggested_checkpoint else None
+            ),
             "repair_details": self.repair_details,
         }
 
@@ -64,8 +66,12 @@ class RecoveryOrchestrator:
         self.health_monitor = health_monitor
         self.logger = logging.getLogger(__name__)
 
-    def analyze_and_recommend(self, session_id: str, conversation_history: List[Dict[str, Any]],
-                            recent_errors: Optional[List[Dict[str, Any]]] = None) -> RecoveryAction:
+    def analyze_and_recommend(
+        self,
+        session_id: str,
+        conversation_history: List[Dict[str, Any]],
+        recent_errors: Optional[List[Dict[str, Any]]] = None,
+    ) -> RecoveryAction:
         """
         Analyze session health and recommend recovery action.
 
@@ -86,15 +92,18 @@ class RecoveryOrchestrator:
         # Create recovery action with details
         action = self._create_recovery_action(strategy, health_report, session_id)
 
-        self.logger.info(f"Recovery analysis for session {session_id}: "
-                        f"health={health_report.overall_score:.2f}, "
-                        f"strategy={strategy.value}, "
-                        f"confidence={action.confidence:.2f}")
+        self.logger.info(
+            f"Recovery analysis for session {session_id}: "
+            f"health={health_report.overall_score:.2f}, "
+            f"strategy={strategy.value}, "
+            f"confidence={action.confidence:.2f}"
+        )
 
         return action
 
-    def execute_recovery(self, action: RecoveryAction, conversation_history: List[Dict[str, Any]],
-                        session_id: str) -> Dict[str, Any]:
+    def execute_recovery(
+        self, action: RecoveryAction, conversation_history: List[Dict[str, Any]], session_id: str
+    ) -> Dict[str, Any]:
         """
         Execute a recovery action.
 
@@ -106,7 +115,9 @@ class RecoveryOrchestrator:
         Returns:
             Recovery result with new conversation history and status
         """
-        self.logger.info(f"Executing recovery action: {action.strategy.value} for session {session_id}")
+        self.logger.info(
+            f"Executing recovery action: {action.strategy.value} for session {session_id}"
+        )
 
         result = {
             "success": False,
@@ -123,15 +134,21 @@ class RecoveryOrchestrator:
                 result["message"] = "No recovery action needed"
 
             elif action.strategy == RecoveryStrategy.AUTO_REPAIR:
-                repair_result = self._execute_auto_repair(conversation_history, action.repair_details)
+                repair_result = self._execute_auto_repair(
+                    conversation_history, action.repair_details
+                )
                 result.update(repair_result)
 
             elif action.strategy == RecoveryStrategy.CHECKPOINT_ROLLBACK:
-                rollback_result = self._execute_checkpoint_rollback(session_id, action.suggested_checkpoint)
+                rollback_result = self._execute_checkpoint_rollback(
+                    session_id, action.suggested_checkpoint
+                )
                 result.update(rollback_result)
 
             elif action.strategy == RecoveryStrategy.MANUAL_REPAIR:
-                repair_result = self._execute_manual_repair(conversation_history, action.repair_details)
+                repair_result = self._execute_manual_repair(
+                    conversation_history, action.repair_details
+                )
                 result.update(repair_result)
 
             elif action.strategy == RecoveryStrategy.EMERGENCY_RESET:
@@ -143,7 +160,7 @@ class RecoveryOrchestrator:
                 checkpoint = self.checkpoint_manager.create_checkpoint(
                     session_id,
                     result["new_history"],
-                    metadata={"recovery_action": action.strategy.value}
+                    metadata={"recovery_action": action.strategy.value},
                 )
                 result["checkpoint_created"] = checkpoint.id
 
@@ -154,7 +171,9 @@ class RecoveryOrchestrator:
 
         return result
 
-    def _determine_recovery_strategy(self, health_report: HealthReport, session_id: str) -> RecoveryStrategy:
+    def _determine_recovery_strategy(
+        self, health_report: HealthReport, session_id: str
+    ) -> RecoveryStrategy:
         """
         Determine the appropriate recovery strategy based on health analysis.
 
@@ -166,7 +185,7 @@ class RecoveryOrchestrator:
         """
         score = health_report.overall_score
         critical_issues = [i for i in health_report.issues if i.get("severity") == "critical"]
-        high_issues = [i for i in health_report.issues if i.get("severity") == "high"]
+        _high_issues = [i for i in health_report.issues if i.get("severity") == "high"]
 
         # Check if checkpoints are available for rollback
         has_checkpoints = len(self.checkpoint_manager.list_checkpoints(session_id)) > 0
@@ -198,8 +217,9 @@ class RecoveryOrchestrator:
         # Default fallback
         return RecoveryStrategy.MANUAL_REPAIR
 
-    def _create_recovery_action(self, strategy: RecoveryStrategy, health_report: HealthReport,
-                              session_id: str) -> RecoveryAction:
+    def _create_recovery_action(
+        self, strategy: RecoveryStrategy, health_report: HealthReport, session_id: str
+    ) -> RecoveryAction:
         """Create a detailed recovery action based on strategy."""
 
         if strategy == RecoveryStrategy.NO_ACTION:
@@ -207,31 +227,35 @@ class RecoveryOrchestrator:
                 strategy=strategy,
                 message="Session is healthy - no recovery needed",
                 confidence=1.0,
-                requires_user_confirmation=False
+                requires_user_confirmation=False,
             )
 
         elif strategy == RecoveryStrategy.AUTO_REPAIR:
             repair_details = self._analyze_repair_details(health_report)
-            confidence = min(0.8, health_report.overall_score + 0.2)  # Boost confidence for auto-repair
+            confidence = min(
+                0.8, health_report.overall_score + 0.2
+            )  # Boost confidence for auto-repair
 
             return RecoveryAction(
                 strategy=strategy,
                 message=f"Auto-repair {len(repair_details)} detected issues",
                 confidence=confidence,
                 requires_user_confirmation=False,
-                repair_details=repair_details
+                repair_details=repair_details,
             )
 
         elif strategy == RecoveryStrategy.CHECKPOINT_ROLLBACK:
             checkpoint = self._select_rollback_checkpoint(session_id, health_report)
-            confidence = 0.9 if checkpoint and checkpoint.health_score > health_report.overall_score else 0.7
+            confidence = (
+                0.9 if checkpoint and checkpoint.health_score > health_report.overall_score else 0.7
+            )
 
             return RecoveryAction(
                 strategy=strategy,
                 message=f"Rollback to checkpoint from {checkpoint.timestamp.strftime('%H:%M:%S') if checkpoint else 'unknown'}",
                 confidence=confidence,
                 requires_user_confirmation=True,
-                suggested_checkpoint=checkpoint
+                suggested_checkpoint=checkpoint,
             )
 
         elif strategy == RecoveryStrategy.MANUAL_REPAIR:
@@ -242,7 +266,7 @@ class RecoveryOrchestrator:
                 message=f"Manual repair needed for {len(health_report.issues)} issues",
                 confidence=0.6,
                 requires_user_confirmation=True,
-                repair_details=repair_details
+                repair_details=repair_details,
             )
 
         elif strategy == RecoveryStrategy.EMERGENCY_RESET:
@@ -250,7 +274,7 @@ class RecoveryOrchestrator:
                 strategy=strategy,
                 message="Emergency reset - start fresh session",
                 confidence=0.8,
-                requires_user_confirmation=True
+                requires_user_confirmation=True,
             )
 
         # Fallback
@@ -258,7 +282,7 @@ class RecoveryOrchestrator:
             strategy=RecoveryStrategy.MANUAL_REPAIR,
             message="Manual review recommended",
             confidence=0.5,
-            requires_user_confirmation=True
+            requires_user_confirmation=True,
         )
 
     def _analyze_repair_details(self, health_report: HealthReport) -> Dict[str, Any]:
@@ -270,7 +294,11 @@ class RecoveryOrchestrator:
             issue_type = issue.get("type", "")
 
             # Issues that can be auto-repaired
-            if issue_type in ["invalid_assistant_message", "invalid_tool_result", "duplicate_content"]:
+            if issue_type in [
+                "invalid_assistant_message",
+                "invalid_tool_result",
+                "duplicate_content",
+            ]:
                 repairable_issues.append(issue)
             else:
                 manual_issues.append(issue)
@@ -279,10 +307,12 @@ class RecoveryOrchestrator:
             "repairable_issues": repairable_issues,
             "manual_issues": manual_issues,
             "can_auto_repair": len(repairable_issues) > 0,
-            "estimated_fixes": len(repairable_issues)
+            "estimated_fixes": len(repairable_issues),
         }
 
-    def _select_rollback_checkpoint(self, session_id: str, health_report: HealthReport) -> Optional[Checkpoint]:
+    def _select_rollback_checkpoint(
+        self, session_id: str, health_report: HealthReport
+    ) -> Optional[Checkpoint]:
         """Select the best checkpoint for rollback."""
         checkpoints = self.checkpoint_manager.list_checkpoints(session_id)
 
@@ -290,7 +320,9 @@ class RecoveryOrchestrator:
             return None
 
         # Prefer checkpoints with better health scores
-        healthy_checkpoints = [cp for cp in checkpoints if cp.health_score > health_report.overall_score]
+        healthy_checkpoints = [
+            cp for cp in checkpoints if cp.health_score > health_report.overall_score
+        ]
 
         if healthy_checkpoints:
             # Return most recent healthy checkpoint
@@ -299,8 +331,9 @@ class RecoveryOrchestrator:
         # Fallback: most recent checkpoint
         return checkpoints[0]
 
-    def _execute_auto_repair(self, conversation_history: List[Dict[str, Any]],
-                           repair_details: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_auto_repair(
+        self, conversation_history: List[Dict[str, Any]], repair_details: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Execute automatic repair of conversation issues."""
         new_history = conversation_history.copy()
         issues_fixed = 0
@@ -326,23 +359,27 @@ class RecoveryOrchestrator:
                     # Fix invalid tool result
                     msg = new_history[index]
                     if not isinstance(msg.get("content"), str):
-                        msg["content"] = '{"success": false, "error": "Repaired invalid result format"}'
+                        msg["content"] = (
+                            '{"success": false, "error": "Repaired invalid result format"}'
+                        )
                         issues_fixed += 1
 
         return {
             "success": True,
             "message": f"Auto-repaired {issues_fixed} issues",
             "new_history": new_history,
-            "issues_resolved": issues_fixed
+            "issues_resolved": issues_fixed,
         }
 
-    def _execute_checkpoint_rollback(self, session_id: str, checkpoint: Checkpoint) -> Dict[str, Any]:
+    def _execute_checkpoint_rollback(
+        self, session_id: str, checkpoint: Checkpoint
+    ) -> Dict[str, Any]:
         """Execute checkpoint rollback."""
         if not checkpoint:
             return {
                 "success": False,
                 "message": "No checkpoint available for rollback",
-                "new_history": []
+                "new_history": [],
             }
 
         try:
@@ -351,17 +388,14 @@ class RecoveryOrchestrator:
                 "success": True,
                 "message": f"Rolled back to checkpoint {checkpoint.id}",
                 "new_history": new_history,
-                "checkpoint_used": checkpoint.id
+                "checkpoint_used": checkpoint.id,
             }
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"Rollback failed: {str(e)}",
-                "new_history": []
-            }
+            return {"success": False, "message": f"Rollback failed: {str(e)}", "new_history": []}
 
-    def _execute_manual_repair(self, conversation_history: List[Dict[str, Any]],
-                             repair_details: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_manual_repair(
+        self, conversation_history: List[Dict[str, Any]], repair_details: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Prepare for manual repair (returns suggestions, doesn't modify)."""
         repairable = repair_details.get("repairable_issues", [])
         manual = repair_details.get("manual_issues", [])
@@ -374,7 +408,7 @@ class RecoveryOrchestrator:
             "success": True,
             "message": f"Manual repair prepared - {len(repairable)} auto-fixable, {len(manual)} manual issues",
             "new_history": conversation_history,  # No changes made
-            "repair_suggestions": suggestions
+            "repair_suggestions": suggestions,
         }
 
     def _execute_emergency_reset(self, session_id: str) -> Dict[str, Any]:
@@ -386,7 +420,7 @@ class RecoveryOrchestrator:
                 [],  # Empty history for reset
                 health_score=1.0,
                 metadata={"emergency_reset": True},
-                force=True
+                force=True,
             )
         except Exception as e:
             self.logger.warning(f"Failed to create pre-reset checkpoint: {e}")
@@ -395,5 +429,5 @@ class RecoveryOrchestrator:
             "success": True,
             "message": "Emergency reset completed - session history cleared",
             "new_history": [],  # Fresh start
-            "emergency_reset": True
+            "emergency_reset": True,
         }

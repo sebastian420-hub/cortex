@@ -196,10 +196,10 @@ The system will automatically:
 def get_delegation_guidance(remaining_delegations: int = 5) -> str:
     """
     Get delegation guidance with current status.
-    
+
     Args:
         remaining_delegations: Number of delegations remaining
-        
+
     Returns:
         Formatted delegation guidance
     """

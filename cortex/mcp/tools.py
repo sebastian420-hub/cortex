@@ -109,7 +109,7 @@ class MCPManager:
             self.mcp_client.start()
 
             if self.console:
-                self.console.print(f"[green]MCP client started[/green]")
+                self.console.print("[green]MCP client started[/green]")
                 tool_count = len(self.mcp_client.get_tools())
                 self.console.print(f"[dim]Discovered {tool_count} MCP tools[/dim]")
 

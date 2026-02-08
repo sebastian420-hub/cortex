@@ -33,7 +33,9 @@ class AgentOutputMixin:
             formatted = self.formatter.format_response(response)
             self.formatter.write(formatted)
 
-    def _output_tool_result(self, tool_name: str, result: Dict[str, Any], arguments: Optional[Dict[str, Any]] = None) -> None:
+    def _output_tool_result(
+        self, tool_name: str, result: Dict[str, Any], arguments: Optional[Dict[str, Any]] = None
+    ) -> None:
         """Output a tool result using the appropriate formatter."""
         if not self._is_text_output():
             formatted = self.formatter.format_tool_result(tool_name, result)
@@ -104,22 +106,26 @@ class AgentOutputMixin:
             # Validate assistant messages - must have content or tool_calls
             if role == "assistant":
                 if not content and not tool_calls:
-                    issues.append({
-                        "index": i,
-                        "type": "invalid_assistant_message",
-                        "message": f"Assistant message at index {i} has no content or tool_calls",
-                        "severity": "critical"  # Will cause API errors
-                    })
+                    issues.append(
+                        {
+                            "index": i,
+                            "type": "invalid_assistant_message",
+                            "message": f"Assistant message at index {i} has no content or tool_calls",
+                            "severity": "critical",  # Will cause API errors
+                        }
+                    )
 
             # Validate tool messages - content must be string
             elif role == "tool":
                 if not isinstance(msg.get("content", ""), str):
-                    issues.append({
-                        "index": i,
-                        "type": "invalid_tool_result",
-                        "message": f"Tool result at index {i} has non-string content",
-                        "severity": "warning"
-                    })
+                    issues.append(
+                        {
+                            "index": i,
+                            "type": "invalid_tool_result",
+                            "message": f"Tool result at index {i} has non-string content",
+                            "severity": "warning",
+                        }
+                    )
 
         return {
             "valid": len(issues) == 0,
@@ -127,11 +133,13 @@ class AgentOutputMixin:
             "message_count": len(messages),
             "severity_levels": {
                 "critical": len([i for i in issues if i["severity"] == "critical"]),
-                "warning": len([i for i in issues if i["severity"] == "warning"])
-            }
+                "warning": len([i for i in issues if i["severity"] == "warning"]),
+            },
         }
 
-    def _repair_messages_for_api(self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _repair_messages_for_api(
+        self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Attempt to automatically repair critical message validation issues.
 
@@ -153,11 +161,15 @@ class AgentOutputMixin:
                 if msg.get("reasoning_content"):
                     content = f"[Reasoning: {msg['reasoning_content'][:200]}{'...' if len(msg['reasoning_content']) > 200 else ''}]"
                     repaired_messages[idx]["content"] = content
-                    logger.debug(f"Repaired assistant message at index {idx} by converting reasoning to content")
+                    logger.debug(
+                        f"Repaired assistant message at index {idx} by converting reasoning to content"
+                    )
                 else:
                     # Fallback: add minimal content
                     repaired_messages[idx]["content"] = "[Repaired empty assistant response]"
-                    logger.debug(f"Repaired assistant message at index {idx} by adding minimal content")
+                    logger.debug(
+                        f"Repaired assistant message at index {idx} by adding minimal content"
+                    )
 
         return repaired_messages
 
@@ -177,11 +189,13 @@ class AgentOutputMixin:
 
         # Check for excessive message count
         if history_validation["message_count"] > 100:
-            issues.append({
-                "type": "high_message_count",
-                "message": f"Session has {history_validation['message_count']} messages, which may impact performance",
-                "severity": "warning"
-            })
+            issues.append(
+                {
+                    "type": "high_message_count",
+                    "message": f"Session has {history_validation['message_count']} messages, which may impact performance",
+                    "severity": "warning",
+                }
+            )
             recommendations.append("Consider clearing old messages or starting a new session")
 
         # Check for repeated errors in recent history
@@ -198,16 +212,20 @@ class AgentOutputMixin:
                     pass
 
         if error_count > 5:
-            issues.append({
-                "type": "frequent_errors",
-                "message": f"{error_count} errors in recent messages, indicating potential issues",
-                "severity": "warning"
-            })
+            issues.append(
+                {
+                    "type": "frequent_errors",
+                    "message": f"{error_count} errors in recent messages, indicating potential issues",
+                    "severity": "warning",
+                }
+            )
             recommendations.append("Review recent tool executions for patterns")
 
         # Generate recovery recommendations based on issues
         if history_validation["severity_levels"]["critical"] > 0:
-            recommendations.insert(0, "CRITICAL: Session has corrupted messages. Use '/clear' to start fresh")
+            recommendations.insert(
+                0, "CRITICAL: Session has corrupted messages. Use '/clear' to start fresh"
+            )
         elif history_validation["severity_levels"]["warning"] > 0:
             recommendations.insert(0, "Session has warnings. Monitor for issues")
 
@@ -215,7 +233,7 @@ class AgentOutputMixin:
             "healthy": len([i for i in issues if i["severity"] == "critical"]) == 0,
             "issues": issues,
             "recommendations": recommendations,
-            "validation": history_validation
+            "validation": history_validation,
         }
 
     # Token estimation

@@ -35,33 +35,39 @@ def get_model_adaptation_notes(model_name: str) -> str:
 
     # Add notes for limited tool following
     if profile.tool_following in (CapabilityLevel.MODERATE, CapabilityLevel.LIMITED):
-        notes.append("""
+        notes.append(
+            """
 ## Tool Usage Reminders
 
 - Use ONE tool at a time
 - Wait for results before next action
 - Follow exact parameter formats
-- Check results before proceeding""")
+- Check results before proceeding"""
+        )
 
     # Add notes for limited reasoning
     if profile.reasoning in (CapabilityLevel.MODERATE, CapabilityLevel.LIMITED):
-        notes.append("""
+        notes.append(
+            """
 ## Problem-Solving Approach
 
 - Break complex tasks into simple steps
 - Complete one step before starting the next
-- Verify each step's result""")
+- Verify each step's result"""
+        )
 
     # Add explicit formatting for smaller models
     if profile.prompt_style == PromptStyle.EXPLICIT:
-        notes.append("""
+        notes.append(
+            """
 ## Response Format
 
 When using tools, format carefully:
 1. State what you're doing
 2. Call the tool with correct parameters
 3. Wait for the result
-4. Explain what happened""")
+4. Explain what happened"""
+        )
 
     if notes:
         return "\n".join(notes)

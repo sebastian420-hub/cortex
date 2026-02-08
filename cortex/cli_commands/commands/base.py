@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,7 @@ class CommandContext:
     This provides a clean way to inject dependencies into commands without
     coupling them to the CLI class internals.
     """
+
     agent: Any  # Cortex agent instance
     config: Any  # AgentConfig instance
     hook_manager: Any  # HookManager instance
@@ -139,13 +140,9 @@ class CommandRegistry:
         for alias in command.aliases:
             if alias in self._aliases:
                 existing = self._aliases[alias]
-                raise ValueError(
-                    f"Alias '{alias}' already registered for command '{existing}'"
-                )
+                raise ValueError(f"Alias '{alias}' already registered for command '{existing}'")
             if alias in self._commands:
-                raise ValueError(
-                    f"Alias '{alias}' conflicts with command name"
-                )
+                raise ValueError(f"Alias '{alias}' conflicts with command name")
 
         # Register command
         self._commands[command.name] = command

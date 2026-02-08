@@ -21,16 +21,15 @@ class TestEstimateTokens:
     def test_estimate_tokens_with_tiktoken_available(self):
         """Test token estimation when tiktoken is available."""
         test_text = "Hello, world! This is a test."
-        
+
+        mock_encoding = MagicMock()
+        mock_encoding.encode.return_value = [1, 2, 3, 4, 5]
+
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.tiktoken', create=True) as mock_tiktoken:
-                mock_encoding = MagicMock()
-                mock_encoding.encode.return_value = [1, 2, 3, 4, 5]
-                mock_tiktoken.encoding_for_model.return_value = mock_encoding
-                
+            with patch('cortex.core.context.get_encoding_for_model', return_value=mock_encoding) as mock_get_enc:
                 token_count = estimate_tokens(test_text, model="gpt-4")
-                
-                mock_tiktoken.encoding_for_model.assert_called_once_with("gpt-4")
+
+                mock_get_enc.assert_called_once_with("gpt-4")
                 mock_encoding.encode.assert_called_once_with(test_text)
                 assert token_count == 5
     
@@ -467,17 +466,28 @@ class TestGetEncodingForModel:
     
     def test_get_encoding_for_deepseek_model(self):
         """Test getting encoding for DeepSeek model."""
-        with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.tiktoken', create=True) as mock_tiktoken:
-                mock_tiktoken.encoding_for_model.side_effect = KeyError("Model not found")
-                mock_encoding = MagicMock()
-                mock_tiktoken.get_encoding.return_value = mock_encoding
-                
-                from cortex.core.context import get_encoding_for_model
-                result = get_encoding_for_model("deepseek-chat")
-                
-                assert result is mock_encoding
-                mock_tiktoken.get_encoding.assert_called_once_with("cl100k_base")
+        from cortex.core.context import _ENCODING_CACHE
+
+        # Clear cache so mock is used instead of cached real encoding
+        cached_value = _ENCODING_CACHE.pop("deepseek-chat", None)
+        try:
+            with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
+                with patch('cortex.core.context.tiktoken', create=True) as mock_tiktoken:
+                    mock_tiktoken.encoding_for_model.side_effect = KeyError("Model not found")
+                    mock_encoding = MagicMock()
+                    mock_tiktoken.get_encoding.return_value = mock_encoding
+
+                    from cortex.core.context import get_encoding_for_model
+                    result = get_encoding_for_model("deepseek-chat")
+
+                    assert result is mock_encoding
+                    mock_tiktoken.get_encoding.assert_called_once_with("cl100k_base")
+        finally:
+            # Clean up: remove mock encoding from cache
+            _ENCODING_CACHE.pop("deepseek-chat", None)
+            # Restore original if there was one
+            if cached_value is not None:
+                _ENCODING_CACHE["deepseek-chat"] = cached_value
 
 
 class TestModuleConfiguration:

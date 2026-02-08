@@ -293,7 +293,7 @@ class TestEnhancedCortexIntegration:
     
     def test_enhanced_agent_with_mocked_provider(self, tmp_project_dir, mock_ollama_provider):
         """Test enhanced agent integration with mocked provider."""
-        with patch('cortex.agent_enhanced.ProviderFactory.get_provider', return_value=mock_ollama_provider):
+        with patch('cortex.core.providers.ProviderFactory.get_provider', return_value=mock_ollama_provider):
             agent = EnhancedCortex(
                 model="llama3.2",
                 project_dir=str(tmp_project_dir),

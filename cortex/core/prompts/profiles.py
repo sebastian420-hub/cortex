@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 @dataclass
 class PromptProfile:
     """A prompt profile for a specific model role."""
+
     name: str
     role_description: str
     capabilities: List[str]
@@ -19,7 +20,9 @@ class PromptProfile:
     delegation_guidance: str
     return_guidance: str
 
-    def render(self, available_delegates: Optional[List[str]] = None, remaining_delegations: int = 5) -> str:
+    def render(
+        self, available_delegates: Optional[List[str]] = None, remaining_delegations: int = 5
+    ) -> str:
         """Render the full prompt profile as a string."""
         delegates = available_delegates or []
 
@@ -35,53 +38,61 @@ class PromptProfile:
         for cap in self.capabilities:
             sections.append(f"- {cap}")
 
-        sections.extend([
-            "",
-            "### Your Workflow",
-            "",
-            self.workflow,
-            "",
-        ])
+        sections.extend(
+            [
+                "",
+                "### Your Workflow",
+                "",
+                self.workflow,
+                "",
+            ]
+        )
 
         if delegates:
-            sections.extend([
-                "### When to Delegate",
-                "",
-                self.delegation_guidance,
-                "",
-                "**Available models to delegate to:**",
-            ])
+            sections.extend(
+                [
+                    "### When to Delegate",
+                    "",
+                    self.delegation_guidance,
+                    "",
+                    "**Available models to delegate to:**",
+                ]
+            )
             for delegate in delegates:
                 sections.append(f"- `{delegate}`")
 
-            sections.extend([
-                "",
-                f"**Remaining delegations this request:** {remaining_delegations}",
-                "",
-                "Use the `delegate_to_model` tool to hand off work:",
-                "```",
-                'delegate_to_model(',
-                '    model="model-name",',
-                '    task="Clear description of what to do",',
-                '    handoff_notes="Context and decisions made so far"',
-                ')',
-                "```",
-                "",
-            ])
+            sections.extend(
+                [
+                    "",
+                    f"**Remaining delegations this request:** {remaining_delegations}",
+                    "",
+                    "Use the `delegate_to_model` tool to hand off work:",
+                    "```",
+                    "delegate_to_model(",
+                    '    model="model-name",',
+                    '    task="Clear description of what to do",',
+                    '    handoff_notes="Context and decisions made so far"',
+                    ")",
+                    "```",
+                    "",
+                ]
+            )
 
-        sections.extend([
-            "### When to Return",
-            "",
-            self.return_guidance,
-            "",
-            "Use the `return_to_coordinator` tool when done:",
-            "```",
-            'return_to_coordinator(',
-            '    summary="What was accomplished",',
-            '    files_changed=["list", "of", "files"]',
-            ')',
-            "```",
-        ])
+        sections.extend(
+            [
+                "### When to Return",
+                "",
+                self.return_guidance,
+                "",
+                "Use the `return_to_coordinator` tool when done:",
+                "```",
+                "return_to_coordinator(",
+                '    summary="What was accomplished",',
+                '    files_changed=["list", "of", "files"]',
+                ")",
+                "```",
+            ]
+        )
 
         return "\n".join(sections)
 
@@ -124,7 +135,6 @@ DO NOT delegate for:
         return_guidance="""As coordinator, you rarely need to return - you ARE the coordinator.
 Only return if another model explicitly delegated to you for a specific task.""",
     ),
-
     "reasoner": PromptProfile(
         name="Reasoning Specialist",
         role_description="""You excel at deep thinking and complex problem solving. You were delegated a task
@@ -156,7 +166,6 @@ Include your plan/analysis in the handoff_notes so the next model has full conte
 
 Always include your full analysis/plan in the summary.""",
     ),
-
     "coder": PromptProfile(
         name="Coding Specialist",
         role_description="""You are optimized for Cortex tool usage and coding tasks. You were delegated
@@ -192,7 +201,6 @@ Include:
 - List of files changed
 - Any issues or notes for follow-up""",
     ),
-
     "reviewer": PromptProfile(
         name="Quality Reviewer",
         role_description="""You are called for high-stakes code review. Your analysis is trusted
@@ -227,7 +235,6 @@ After review, always return to coordinator with your findings.""",
 
 **Approval Status**: APPROVED / NEEDS_CHANGES / BLOCKED""",
     ),
-
     "debugger": PromptProfile(
         name="Debugging Specialist",
         role_description="""You are an expert debugger. You were delegated a task that requires
@@ -261,7 +268,6 @@ Always document your debugging process in handoff notes.""",
 - **Verification**: How you confirmed the fix works
 - **Prevention**: Suggestions to prevent similar issues""",
     ),
-
     "researcher": PromptProfile(
         name="Web Research Specialist",
         role_description="""You are a web research specialist. You were delegated a task that requires
@@ -355,10 +361,12 @@ def get_delegation_context_prompt(
     ]
 
     if files_read:
-        sections.extend([
-            "### Files Already Examined",
-            "",
-        ])
+        sections.extend(
+            [
+                "### Files Already Examined",
+                "",
+            ]
+        )
         for f in files_read[:10]:  # Limit to 10
             sections.append(f"- `{f}`")
         if len(files_read) > 10:
@@ -366,21 +374,25 @@ def get_delegation_context_prompt(
         sections.append("")
 
     if decisions:
-        sections.extend([
-            "### Decisions Made",
-            "",
-        ])
+        sections.extend(
+            [
+                "### Decisions Made",
+                "",
+            ]
+        )
         for d in decisions:
             sections.append(f"- {d}")
         sections.append("")
 
-    sections.extend([
-        "### Delegation Quota",
-        "",
-        f"**Remaining delegations:** {remaining_delegations}",
-        "",
-        "Use delegations wisely. When quota is exhausted, you must complete the task yourself.",
-    ])
+    sections.extend(
+        [
+            "### Delegation Quota",
+            "",
+            f"**Remaining delegations:** {remaining_delegations}",
+            "",
+            "Use delegations wisely. When quota is exhausted, you must complete the task yourself.",
+        ]
+    )
 
     return "\n".join(sections)
 

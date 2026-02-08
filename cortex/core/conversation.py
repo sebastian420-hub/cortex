@@ -5,6 +5,7 @@ from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 from datetime import datetime
 from .context import truncate_history, get_conversation_tokens
 from ..utils.encoding import sanitize_object
+from .model_context_limits import auto_configure_context, get_model_context_info
 
 if TYPE_CHECKING:
     from .summarization import ConversationSummarizer, SummaryChunk
@@ -18,7 +19,7 @@ class ConversationManager:
     def __init__(
         self,
         system_prompt: str,
-        max_tokens: int = 100000,
+        max_tokens: Optional[int] = None,
         keep_recent: int = 20,
         model: str = "gpt-4",
         warn_on_truncation: bool = True,
@@ -32,7 +33,7 @@ class ConversationManager:
 
         Args:
             system_prompt: Initial system prompt
-            max_tokens: Maximum tokens in context
+            max_tokens: Maximum tokens in context (None = auto-detect from model)
             keep_recent: Minimum messages to keep on truncation
             model: Model name for token counting
             warn_on_truncation: Whether to log warnings on truncation
@@ -42,9 +43,21 @@ class ConversationManager:
             summarization_threshold: Token threshold (0-1) to trigger summarization
         """
         self.system_prompt = system_prompt
-        self.max_tokens = max_tokens
-        self.keep_recent = keep_recent
         self.model = model
+
+        # Auto-configure max_tokens based on model if not specified
+        if max_tokens is None:
+            self.max_tokens = auto_configure_context(model)
+            context_info = get_model_context_info(model)
+            logger.info(
+                f"Auto-configured context window for {model}: {self.max_tokens:,} tokens "
+                f"(model limit: {context_info['full_context_limit']:,})"
+            )
+        else:
+            # User-specified max_tokens - validate against model limits
+            self.max_tokens = auto_configure_context(model, max_tokens)
+
+        self.keep_recent = keep_recent
         self.warn_on_truncation = warn_on_truncation
         self._on_truncation = on_truncation
         self.summarizer = summarizer
@@ -74,8 +87,16 @@ class ConversationManager:
             # Check if this is reasoning-only response or truly invalid
             if reasoning_content:
                 # Check if reasoning contains tool syntax (indicates model confusion)
-                tool_syntax_patterns = ['<tool_call>', '</tool_call>', 'function_call', 'tool_use', '<function_call>']
-                has_tool_syntax = any(pattern in reasoning_content.lower() for pattern in tool_syntax_patterns)
+                tool_syntax_patterns = [
+                    "<tool_call>",
+                    "</tool_call>",
+                    "function_call",
+                    "tool_use",
+                    "<function_call>",
+                ]
+                has_tool_syntax = any(
+                    pattern in reasoning_content.lower() for pattern in tool_syntax_patterns
+                )
 
                 if has_tool_syntax:
                     logger.warning(
@@ -85,15 +106,19 @@ class ConversationManager:
                     )
                 else:
                     # Normal reasoning-only response (e.g., model thinking without output yet)
-                    logger.debug("Reasoning-only assistant message (no content or tool_calls). "
-                                "Converting reasoning_content to content.")
+                    logger.debug(
+                        "Reasoning-only assistant message (no content or tool_calls). "
+                        "Converting reasoning_content to content."
+                    )
 
                 # Convert reasoning to content for valid message structure
                 content = f"[Reasoning: {reasoning_content[:200]}{'...' if len(reasoning_content) > 200 else ''}]"
             else:
                 # Truly empty response - this shouldn't happen
-                logger.warning("Attempted to add completely empty assistant message (no content, tool_calls, or reasoning). "
-                              "Adding placeholder content to prevent API errors.")
+                logger.warning(
+                    "Attempted to add completely empty assistant message (no content, tool_calls, or reasoning). "
+                    "Adding placeholder content to prevent API errors."
+                )
                 content = "[Empty assistant response]"
 
         msg: Dict[str, Any] = {"role": "assistant"}
@@ -122,7 +147,9 @@ class ConversationManager:
             {
                 "role": "tool",
                 "tool_call_id": tool_call_id,
-                "content": json.dumps(sanitize_object(result), ensure_ascii=False),  # Keep JSON but ensure format
+                "content": json.dumps(
+                    sanitize_object(result), ensure_ascii=False
+                ),  # Keep JSON but ensure format
             }
         )
         self._optimize()
@@ -159,13 +186,13 @@ class ConversationManager:
         utilization = current_tokens / self.max_tokens if self.max_tokens > 0 else 0
 
         # Progressive warnings at 70%, 80%, 90%
-        if utilization >= 0.9 and not getattr(self, '_warned_90', False):
+        if utilization >= 0.9 and not getattr(self, "_warned_90", False):
             logger.warning(f"⚠️ Context window at {utilization*100:.1f}% capacity!")
             self._warned_90 = True
-        elif utilization >= 0.8 and not getattr(self, '_warned_80', False):
+        elif utilization >= 0.8 and not getattr(self, "_warned_80", False):
             logger.warning(f"Context window at {utilization*100:.1f}% capacity")
             self._warned_80 = True
-        elif utilization >= 0.7 and not getattr(self, '_warned_70', False):
+        elif utilization >= 0.7 and not getattr(self, "_warned_70", False):
             logger.info(f"Context window at {utilization*100:.1f}% capacity")
             self._warned_70 = True
 
@@ -260,11 +287,34 @@ class ConversationManager:
         Update the model reference for token counting.
 
         This is used when switching models while maintaining conversation history.
+        Also updates max_tokens based on new model's context limits.
 
         Args:
             new_model: New model name to use for token counting
         """
+        old_model = self.model
         self.model = new_model
+
+        # Update max_tokens to match new model's capabilities
+        old_max_tokens = self.max_tokens
+        self.max_tokens = auto_configure_context(new_model)
+
+        if old_max_tokens != self.max_tokens:
+            context_info = get_model_context_info(new_model)
+            logger.info(
+                f"Model switch: {old_model} -> {new_model}. "
+                f"Context window adjusted: {old_max_tokens:,} -> {self.max_tokens:,} tokens "
+                f"(model limit: {context_info['full_context_limit']:,})"
+            )
+
+            # If new model has smaller context, might need immediate optimization
+            current_tokens = self.get_token_count()
+            if current_tokens > self.max_tokens:
+                logger.warning(
+                    f"Current conversation ({current_tokens:,} tokens) exceeds new model's limit "
+                    f"({self.max_tokens:,} tokens). Triggering optimization..."
+                )
+                self._optimize()
 
     def get_truncation_stats(self) -> Dict[str, Any]:
         """
@@ -283,8 +333,12 @@ class ConversationManager:
             "current_message_count": current_messages,
             "current_token_count": current_tokens,
             "max_tokens": self.max_tokens,
-            "token_utilization": (current_tokens / self.max_tokens) * 100 if self.max_tokens > 0 else 0,
-            "tokens_remaining": self.max_tokens - current_tokens if self.max_tokens > current_tokens else 0,
+            "token_utilization": (
+                (current_tokens / self.max_tokens) * 100 if self.max_tokens > 0 else 0
+            ),
+            "tokens_remaining": (
+                self.max_tokens - current_tokens if self.max_tokens > current_tokens else 0
+            ),
             "avg_tokens_per_message": current_tokens / max(1, current_messages),
             "keep_recent": self.keep_recent,
             "summarization_enabled": self.enable_summarization,
@@ -311,22 +365,26 @@ class ConversationManager:
             # Validate assistant messages
             if role == "assistant":
                 if not content and not tool_calls:
-                    issues.append({
-                        "index": i,
-                        "type": "invalid_assistant_message",
-                        "message": f"Assistant message at index {i} has no content or tool_calls",
-                        "severity": "critical"  # Will cause API errors
-                    })
+                    issues.append(
+                        {
+                            "index": i,
+                            "type": "invalid_assistant_message",
+                            "message": f"Assistant message at index {i} has no content or tool_calls",
+                            "severity": "critical",  # Will cause API errors
+                        }
+                    )
 
             # Validate tool results
             elif role == "tool":
                 if not isinstance(msg.get("content", ""), str):
-                    issues.append({
-                        "index": i,
-                        "type": "invalid_tool_result",
-                        "message": f"Tool result at index {i} has non-string content",
-                        "severity": "warning"
-                    })
+                    issues.append(
+                        {
+                            "index": i,
+                            "type": "invalid_tool_result",
+                            "message": f"Tool result at index {i} has non-string content",
+                            "severity": "warning",
+                        }
+                    )
 
         return {
             "valid": len(issues) == 0,
@@ -334,6 +392,6 @@ class ConversationManager:
             "message_count": len(self.history),
             "severity_levels": {
                 "critical": len([i for i in issues if i["severity"] == "critical"]),
-                "warning": len([i for i in issues if i["severity"] == "warning"])
-            }
+                "warning": len([i for i in issues if i["severity"] == "warning"]),
+            },
         }

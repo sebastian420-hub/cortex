@@ -144,7 +144,9 @@ def test_recovery_message_ordering(tmp_path):
     )
 
     with patch.object(agent, "_call_model", return_value=mock_response):
-        with patch.object(agent, "execute_tool", return_value=error_result):
+        with patch.object(agent, "execute_tool", return_value=error_result) as mock_exec:
+            # Also patch the parallel executor's stored reference to execute_tool
+            agent.parallel_executor.execute_fn = mock_exec
             with patch.object(agent.loop_guard, "check_repeated_error", return_value=True):
                 with patch.object(
                     agent.loop_guard, "get_recovery_action", return_value=recovery_action

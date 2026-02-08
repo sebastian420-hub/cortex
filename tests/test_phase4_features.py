@@ -258,7 +258,7 @@ class TestThinkingDisplay:
         mock_console.print.assert_called_once()
         # Should be a simple dim one-liner, not a panel
         call_args = str(mock_console.print.call_args)
-        assert "💭" in call_args
+        assert "THINK" in call_args
         assert "dim" in call_args.lower()
 
     @patch("cortex.ui.display.console")

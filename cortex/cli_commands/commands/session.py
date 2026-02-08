@@ -59,7 +59,9 @@ class LoadSessionCommand(Command):
             if session_data:
                 ctx.agent.conversation.history = session_data["conversation_history"]
                 ctx.agent.model = session_data.get("model", ctx.agent.model)
-                ctx.agent.permission_mode = session_data.get("permission_mode", ctx.agent.permission_mode)
+                ctx.agent.permission_mode = session_data.get(
+                    "permission_mode", ctx.agent.permission_mode
+                )
                 console.print("[green]✓[/green] Session loaded")
         else:
             console.print("[red]Usage: /load <session_name>[/red]")
@@ -126,11 +128,9 @@ class SessionRecoveryCommand(Command):
         if health_report.get("issues"):
             console.print("\n[bold]Issues Found:[/bold]")
             for issue in health_report["issues"]:
-                severity_color = {
-                    "critical": "red",
-                    "warning": "yellow",
-                    "info": "blue"
-                }.get(issue.get("severity", "info"), "white")
+                severity_color = {"critical": "red", "warning": "yellow", "info": "blue"}.get(
+                    issue.get("severity", "info"), "white"
+                )
                 console.print(f"  [{severity_color}]• {issue['message']}[/{severity_color}]")
 
         # Display recommendations
@@ -211,12 +211,14 @@ class SessionRecoveryCommand(Command):
         console.print("[cyan]📝 Creating checkpoint...[/cyan]")
 
         session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        health_report = ctx.agent.health_monitor.analyze_health(ctx.agent.get_conversation_history())
+        health_report = ctx.agent.health_monitor.analyze_health(
+            ctx.agent.get_conversation_history()
+        )
 
         checkpoint = ctx.agent.checkpoint_manager.create_checkpoint(
             session_id,
             ctx.agent.get_conversation_history(),
-            health_score=health_report.overall_score
+            health_score=health_report.overall_score,
         )
 
         console.print("[green]✅ Checkpoint created[/green]")

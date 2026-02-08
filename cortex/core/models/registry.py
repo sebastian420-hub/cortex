@@ -12,6 +12,7 @@ from typing import Dict, List, Optional, Any, Tuple
 
 class ModelCapability(str, Enum):
     """Capabilities that models can have."""
+
     GENERAL = "general"
     CHAT = "chat"
     COORDINATION = "coordination"
@@ -34,21 +35,24 @@ class ModelCapability(str, Enum):
 
 class ModelRole(str, Enum):
     """Role a model plays in the orchestration system."""
+
     COORDINATOR = "coordinator"  # Main model that orchestrates
-    SPECIALIST = "specialist"    # Specialized model for specific tasks
+    SPECIALIST = "specialist"  # Specialized model for specific tasks
 
 
 class CostTier(str, Enum):
     """Cost tier for models."""
-    FREE = "free"      # Local models (Ollama)
-    LOW = "low"        # Cheap API models
+
+    FREE = "free"  # Local models (Ollama)
+    LOW = "low"  # Cheap API models
     MEDIUM = "medium"  # Moderate cost
-    HIGH = "high"      # Expensive models (Claude, GPT-4)
+    HIGH = "high"  # Expensive models (Claude, GPT-4)
 
 
 @dataclass
 class ModelConfig:
     """Configuration for a model in the orchestration system."""
+
     name: str
     provider: str
     role: ModelRole
@@ -107,18 +111,17 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
         ],
         can_delegate_to=[
             "deepseek-reasoner",  # Planning/reasoning
-            "hermes-3-405b",      # Debugging/security
-            "dolphin-24b",        # Security
-            "sonar-pro-search",   # Web research
-            "gpt-5.1-codex-mini", # Coding
-            "grok-code-fast-1",   # Fast coding
+            "hermes-3-405b",  # Debugging/security
+            "dolphin-24b",  # Security
+            "sonar-pro-search",  # Web research
+            "gpt-5.1-codex-mini",  # Coding
+            "grok-code-fast-1",  # Fast coding
         ],
         prompt_profile="coordinator",
         cost_tier=CostTier.FREE,
         api_model_name="xiaomi/mimo-v2-flash:free",
         description="Xiaomi MiMo V2 Flash - Default coordinator for chat and orchestration",
     ),
-
     # =====================================================
     # PLANNING & REASONING SPECIALIST
     # =====================================================
@@ -133,16 +136,15 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
             ModelCapability.COMPLEX_PROBLEMS,
         ],
         can_delegate_to=[
-            "mimo-v2-flash",      # Return to coordinator
-            "gpt-5.1-codex-mini", # Coding implementation
-            "grok-code-fast-1",   # Fast coding
+            "mimo-v2-flash",  # Return to coordinator
+            "gpt-5.1-codex-mini",  # Coding implementation
+            "grok-code-fast-1",  # Fast coding
         ],
         prompt_profile="reasoner",
         cost_tier=CostTier.MEDIUM,
         max_thinking_tokens=8000,
         description="DeepSeek Reasoner - Deep thinking, planning, and complex reasoning",
     ),
-
     # =====================================================
     # DEBUGGING SPECIALIST
     # =====================================================
@@ -158,16 +160,15 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
             ModelCapability.TOOL_USE,
         ],
         can_delegate_to=[
-            "mimo-v2-flash",      # Return to coordinator
+            "mimo-v2-flash",  # Return to coordinator
             "deepseek-reasoner",  # Complex analysis
-            "gpt-5.1-codex-mini", # Fix implementation
+            "gpt-5.1-codex-mini",  # Fix implementation
         ],
         prompt_profile="debugger",
         cost_tier=CostTier.FREE,
         api_model_name="nousresearch/hermes-3-llama-3.1-405b:free",
         description="Hermes 3 405B - Debugging and security analysis specialist",
     ),
-
     # =====================================================
     # SECURITY SPECIALIST
     # =====================================================
@@ -182,15 +183,14 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
             ModelCapability.QUALITY,
         ],
         can_delegate_to=[
-            "mimo-v2-flash",      # Return to coordinator
-            "hermes-3-405b",      # Deep debugging
+            "mimo-v2-flash",  # Return to coordinator
+            "hermes-3-405b",  # Deep debugging
         ],
         prompt_profile="reviewer",
         cost_tier=CostTier.FREE,
         api_model_name="cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
         description="Dolphin 24B - Security review and vulnerability analysis",
     ),
-
     # =====================================================
     # WEB RESEARCH SPECIALIST
     # =====================================================
@@ -204,14 +204,13 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
             ModelCapability.GENERAL,
         ],
         can_delegate_to=[
-            "mimo-v2-flash",      # Return to coordinator
+            "mimo-v2-flash",  # Return to coordinator
         ],
         prompt_profile="researcher",
         cost_tier=CostTier.MEDIUM,
         api_model_name="perplexity/sonar-pro-search",
         description="Sonar Pro Search - Web research and information gathering",
     ),
-
     # =====================================================
     # CODING SPECIALISTS
     # =====================================================
@@ -227,16 +226,15 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
             ModelCapability.TOOL_USE,
         ],
         can_delegate_to=[
-            "mimo-v2-flash",      # Return to coordinator
+            "mimo-v2-flash",  # Return to coordinator
             "deepseek-reasoner",  # Complex planning
-            "hermes-3-405b",      # Debugging help
+            "hermes-3-405b",  # Debugging help
         ],
         prompt_profile="coder",
         cost_tier=CostTier.LOW,
         api_model_name="openai/gpt-5.1-codex-mini",
         description="GPT 5.1 Codex Mini - Primary coding and implementation model",
     ),
-
     "grok-code-fast-1": ModelConfig(
         name="grok-code-fast-1",
         provider="openrouter",
@@ -248,15 +246,14 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
             ModelCapability.TOOL_USE,
         ],
         can_delegate_to=[
-            "mimo-v2-flash",      # Return to coordinator
-            "gpt-5.1-codex-mini", # Complex coding
+            "mimo-v2-flash",  # Return to coordinator
+            "gpt-5.1-codex-mini",  # Complex coding
         ],
         prompt_profile="coder",
         cost_tier=CostTier.FREE,
         api_model_name="x-ai/grok-code-fast-1",
         description="Grok Code Fast - Quick coding tasks and rapid implementation",
     ),
-
     # =====================================================
     # LEGACY/BACKUP MODELS (kept for compatibility)
     # =====================================================
@@ -275,7 +272,6 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
         enabled=True,  # Available as backup
         description="DeepSeek Chat - Backup general chat model",
     ),
-
     # User's fine-tuned coding models (Ollama/local) - for future use
     "cortex-coder-14b": ModelConfig(
         name="cortex-coder-14b",
@@ -294,7 +290,6 @@ MODEL_REGISTRY: Dict[str, ModelConfig] = {
         enabled=False,  # Disabled until user's model is available
         description="Cortex Coder 14B - User's fine-tuned coding model (local)",
     ),
-
     "cortex-coder-32b": ModelConfig(
         name="cortex-coder-32b",
         provider="ollama",
@@ -456,7 +451,9 @@ class ModelRegistry:
         """Disable a model."""
         return self.update_model(name, enabled=False)
 
-    def get_model_for_capability(self, capability: ModelCapability, exclude: Optional[List[str]] = None) -> Optional[ModelConfig]:
+    def get_model_for_capability(
+        self, capability: ModelCapability, exclude: Optional[List[str]] = None
+    ) -> Optional[ModelConfig]:
         """
         Get the best model for a specific capability.
 

@@ -19,20 +19,20 @@ from ..planning import Plan, PlanStep, PlanStepStatus
 
 class AgentFocus(str, Enum):
     """What the agent is currently focused on."""
-    
-    EXPLORING = "exploring"           # Understanding the problem/codebase
-    PLANNING = "planning"             # Creating a plan
-    EXECUTING = "executing"           # Executing plan steps
-    DEBUGGING = "debugging"           # Debugging an issue
-    REFLECTING = "reflecting"         # Reflecting on results
-    ADAPTING = "adapting"             # Adapting plan based on feedback
+
+    EXPLORING = "exploring"  # Understanding the problem/codebase
+    PLANNING = "planning"  # Creating a plan
+    EXECUTING = "executing"  # Executing plan steps
+    DEBUGGING = "debugging"  # Debugging an issue
+    REFLECTING = "reflecting"  # Reflecting on results
+    ADAPTING = "adapting"  # Adapting plan based on feedback
 
 
 @dataclass
 class AgentState:
     """
     Comprehensive agent state tracking.
-    
+
     Tracks:
     - Current focus and goals
     - Working memory (short-term context)
@@ -40,46 +40,48 @@ class AgentState:
     - Execution state (current tool, results)
     - Learning state (insights, patterns)
     """
-    
+
     # Identity
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     last_updated: str = field(default_factory=lambda: datetime.now().isoformat())
-    
+
     # Current focus
     focus: AgentFocus = AgentFocus.EXPLORING
     primary_goal: Optional[str] = None
     sub_goals: List[str] = field(default_factory=list)
     current_sub_goal: Optional[str] = None
-    
+
     # Memory layers
     working_memory: WorkingMemory = field(default_factory=lambda: WorkingMemory(max_items=20))
-    session_memory: EnhancedMemoryBank = field(default_factory=lambda: EnhancedMemoryBank(max_items=100))
-    
+    session_memory: EnhancedMemoryBank = field(
+        default_factory=lambda: EnhancedMemoryBank(max_items=100)
+    )
+
     # Planning state
     active_plan: Optional[Plan] = None
     current_plan_step: Optional[PlanStep] = None
     completed_plans: List[Plan] = field(default_factory=list)
-    
+
     # Execution state
     current_tool: Optional[str] = None
     tool_chain: List[Dict[str, Any]] = field(default_factory=list)  # Recent tool executions
     last_result: Optional[Dict[str, Any]] = None
-    
+
     # Progress tracking
     iteration_count: int = 0
     successful_tools: int = 0
     failed_tools: int = 0
     total_tool_calls: int = 0
-    
+
     # Learning state
     insights_generated: int = 0
     patterns_recognized: int = 0
     adaptations_made: int = 0
-    
+
     # Task-specific state
     task_state: Dict[str, Any] = field(default_factory=dict)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -93,7 +95,9 @@ class AgentState:
             "working_memory": self.working_memory.to_dict(),
             "session_memory": self.session_memory.to_dict(),
             "active_plan": self.active_plan.to_dict() if self.active_plan else None,
-            "current_plan_step": self.current_plan_step.to_dict() if self.current_plan_step else None,
+            "current_plan_step": (
+                self.current_plan_step.to_dict() if self.current_plan_step else None
+            ),
             "completed_plans": [plan.to_dict() for plan in self.completed_plans],
             "current_tool": self.current_tool,
             "tool_chain": self.tool_chain,
@@ -107,14 +111,14 @@ class AgentState:
             "adaptations_made": self.adaptations_made,
             "task_state": self.task_state,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "AgentState":
         """Create from dictionary."""
         from .working import WorkingMemory
         from .session import EnhancedMemoryBank
         from ..planning import Plan, PlanStep
-        
+
         state = cls(
             session_id=data.get("session_id", str(uuid.uuid4())),
             created_at=data.get("created_at", datetime.now().isoformat()),
@@ -135,29 +139,29 @@ class AgentState:
             adaptations_made=data.get("adaptations_made", 0),
             task_state=data.get("task_state", {}),
         )
-        
+
         # Restore working memory
         if "working_memory" in data:
             state.working_memory = WorkingMemory.from_dict(data["working_memory"])
-        
+
         # Restore session memory
         if "session_memory" in data:
             state.session_memory = EnhancedMemoryBank.from_dict(data["session_memory"])
-        
+
         # Restore active plan
         if data.get("active_plan"):
             state.active_plan = Plan.from_dict(data["active_plan"])
-        
+
         # Restore current plan step
         if data.get("current_plan_step"):
             state.current_plan_step = PlanStep.from_dict(data["current_plan_step"])
-        
+
         # Restore completed plans
         if "completed_plans" in data:
             state.completed_plans = [Plan.from_dict(plan) for plan in data["completed_plans"]]
-        
+
         return state
-    
+
     def update_timestamp(self) -> None:
         """Update last updated timestamp."""
         self.last_updated = datetime.now().isoformat()
@@ -166,7 +170,7 @@ class AgentState:
 class StateManager:
     """
     Manages agent state across planning and execution cycles.
-    
+
     Responsibilities:
     1. Maintain consistent agent state
     2. Coordinate between memory layers
@@ -174,11 +178,11 @@ class StateManager:
     4. Facilitate state transitions
     5. Provide state summaries for the LLM
     """
-    
+
     def __init__(self, project_dir: Path):
         """
         Initialize state manager.
-        
+
         Args:
             project_dir: Project directory for context
         """
@@ -186,20 +190,21 @@ class StateManager:
         self.state = AgentState()
         self.state_history: List[AgentState] = []
         self.checkpoints: Dict[str, AgentState] = {}
-        
+
     def set_primary_goal(self, goal: str) -> None:
         """
         Set the primary goal for the agent.
-        
+
         Args:
             goal: Primary goal description
         """
         self.state.primary_goal = goal
         self.state.working_memory.set_task(goal)
         self.state.update_timestamp()
-        
+
         # Add to session memory
         from ..memory import MemoryItem, MemoryType, MemorySource
+
         self.state.session_memory.add(
             MemoryItem(
                 type=MemoryType.CONTEXT,
@@ -209,40 +214,40 @@ class StateManager:
                 metadata={"goal_set": True},
             )
         )
-    
+
     def add_sub_goal(self, sub_goal: str) -> None:
         """
         Add a sub-goal.
-        
+
         Args:
             sub_goal: Sub-goal description
         """
         self.state.sub_goals.append(sub_goal)
         self.state.update_timestamp()
-    
+
     def set_current_sub_goal(self, sub_goal: str) -> None:
         """
         Set the current active sub-goal.
-        
+
         Args:
             sub_goal: Current sub-goal
         """
         self.state.current_sub_goal = sub_goal
         self.state.update_timestamp()
-        
+
         # Update working memory task
         self.state.working_memory.set_task(sub_goal)
-    
+
     def set_focus(self, focus: AgentFocus) -> None:
         """
         Set agent focus.
-        
+
         Args:
             focus: New focus
         """
         self.state.focus = focus
         self.state.update_timestamp()
-    
+
     def record_tool_execution(
         self,
         tool_name: str,
@@ -251,7 +256,7 @@ class StateManager:
     ) -> None:
         """
         Record a tool execution.
-        
+
         Args:
             tool_name: Name of the tool
             arguments: Tool arguments
@@ -260,7 +265,7 @@ class StateManager:
         self.state.current_tool = tool_name
         self.state.last_result = result
         self.state.total_tool_calls += 1
-        
+
         # Track in tool chain (limit to 10 most recent)
         tool_record = {
             "tool": tool_name,
@@ -271,78 +276,78 @@ class StateManager:
         self.state.tool_chain.append(tool_record)
         if len(self.state.tool_chain) > 10:
             self.state.tool_chain = self.state.tool_chain[-10:]
-        
+
         # Update success/failure counts
         if result.get("success", False):
             self.state.successful_tools += 1
         else:
             self.state.failed_tools += 1
-        
+
         # Extract learnings to session memory
         self.state.session_memory.extract_learnings_from_tool_results([result])
-        
+
         # Add tool context to working memory
         purpose = f"Executing {tool_name}"
         if self.state.current_plan_step:
             purpose = f"Executing plan step: {self.state.current_plan_step.description}"
-        
+
         self.state.working_memory.add_tool_context(
             tool_name=tool_name,
             arguments=arguments,
             purpose=purpose,
             expected_outcome=None,  # Could be enhanced with plan step expectations
         )
-        
+
         self.state.update_timestamp()
-    
+
     def record_insight(self, insight: str, confidence: float = 1.0) -> None:
         """
         Record an insight.
-        
+
         Args:
             insight: Insight text
             confidence: Confidence score 0.0 to 1.0
         """
         self.state.insights_generated += 1
-        
+
         # Add to working memory
         self.state.working_memory.add_insight(insight, priority=3)
-        
+
         # Add to session memory
         from ..memory import MemorySource
-        
+
         self.state.session_memory.add_session_insight(
             insight=insight,
             confidence=confidence,
             source=MemorySource.INFERRED,
         )
-        
+
         self.state.update_timestamp()
-    
+
     def record_pattern(self, pattern: str, context: str, effectiveness: float = 1.0) -> None:
         """
         Record a recognized pattern.
-        
+
         Args:
             pattern: Pattern description
             context: Context where pattern was recognized
             effectiveness: Effectiveness score 0.0 to 1.0
         """
         self.state.patterns_recognized += 1
-        
+
         # Add to session memory
         self.state.session_memory.record_successful_pattern(
             pattern=pattern,
             context=context,
             effectiveness=effectiveness,
         )
-        
+
         self.state.update_timestamp()
-    
+
     def set_active_plan(self, plan: Plan) -> None:
         """
         Set the active plan.
-        
+
         Args:
             plan: Active plan
         """
@@ -350,11 +355,13 @@ class StateManager:
         if plan.steps:
             self.state.current_plan_step = plan.steps[0]
         self.state.update_timestamp()
-    
-    def update_plan_progress(self, step_id: str, status: PlanStepStatus, outcome: Optional[str] = None) -> None:
+
+    def update_plan_progress(
+        self, step_id: str, status: PlanStepStatus, outcome: Optional[str] = None
+    ) -> None:
         """
         Update progress on the active plan.
-        
+
         Args:
             step_id: ID of the plan step
             status: New status
@@ -362,11 +369,11 @@ class StateManager:
         """
         if not self.state.active_plan:
             return
-        
+
         step = self.state.active_plan.get_step_by_id(step_id)
         if not step:
             return
-        
+
         # Update step status
         if status == PlanStepStatus.COMPLETED:
             step.mark_completed(outcome)
@@ -376,30 +383,30 @@ class StateManager:
         elif status == PlanStepStatus.IN_PROGRESS:
             step.mark_started()
             self.state.current_plan_step = step
-        
+
         # Check if plan is complete
         if all(s.status == PlanStepStatus.COMPLETED for s in self.state.active_plan.steps):
             self.state.active_plan.mark_completed()
             self.state.completed_plans.append(self.state.active_plan)
             self.state.active_plan = None
             self.state.current_plan_step = None
-        
+
         self.state.update_timestamp()
-    
+
     def increment_iteration(self) -> None:
         """Increment iteration count."""
         self.state.iteration_count += 1
         self.state.update_timestamp()
-    
+
     def record_adaptation(self) -> None:
         """Record that an adaptation was made."""
         self.state.adaptations_made += 1
         self.state.update_timestamp()
-    
+
     def save_checkpoint(self, name: str) -> None:
         """
         Save current state as a checkpoint.
-        
+
         Args:
             name: Checkpoint name
         """
@@ -407,50 +414,50 @@ class StateManager:
         state_dict = self.state.to_dict()
         checkpoint_state = AgentState.from_dict(state_dict)
         self.checkpoints[name] = checkpoint_state
-        
+
         # Also save to history
         self.state_history.append(checkpoint_state)
-        
+
         # Limit history size
         if len(self.state_history) > 50:
             self.state_history = self.state_history[-50:]
-    
+
     def restore_checkpoint(self, name: str) -> bool:
         """
         Restore state from checkpoint.
-        
+
         Args:
             name: Checkpoint name
-            
+
         Returns:
             True if checkpoint was restored, False otherwise
         """
         if name not in self.checkpoints:
             return False
-        
+
         # Create a copy of the checkpoint state
         checkpoint_dict = self.checkpoints[name].to_dict()
         self.state = AgentState.from_dict(checkpoint_dict)
         return True
-    
+
     def get_state_summary(self) -> str:
         """
         Get a human-readable summary of agent state.
-        
+
         Returns:
             Formatted state summary
         """
         summary_parts = []
-        
+
         # Current focus and goals
         if self.state.primary_goal:
             summary_parts.append(f"Primary Goal: {self.state.primary_goal}")
-        
+
         if self.state.current_sub_goal:
             summary_parts.append(f"Current Focus: {self.state.current_sub_goal}")
-        
+
         summary_parts.append(f"Agent Mode: {self.state.focus.value.upper()}")
-        
+
         # Planning state
         if self.state.active_plan:
             progress = self.state.active_plan.get_progress()
@@ -459,15 +466,15 @@ class StateManager:
                 f"({progress['completed']}/{progress['total']} steps, "
                 f"{progress['completion_percentage']:.0f}% complete)"
             )
-        
+
         if self.state.current_plan_step:
             summary_parts.append(f"Current Step: {self.state.current_plan_step.description}")
-        
+
         # Working memory summary
         wm_summary = self.state.working_memory.get_summary()
         if wm_summary and wm_summary != "Working memory is empty.":
             summary_parts.append(wm_summary)
-        
+
         # Session memory summary (key points only)
         session_summary = self.state.session_memory.get_session_summary()
         if session_summary:
@@ -475,7 +482,7 @@ class StateManager:
             sections = session_summary.split("\\n\\n")
             if sections:
                 summary_parts.append(sections[0])  # First section only
-        
+
         # Execution statistics
         stats = [
             f"Iterations: {self.state.iteration_count}",
@@ -485,50 +492,46 @@ class StateManager:
             f"Adaptations: {self.state.adaptations_made}",
         ]
         summary_parts.append("Statistics: " + ", ".join(stats))
-        
+
         return "\\n\\n".join(summary_parts)
-    
+
     def get_llm_context(self) -> str:
         """
         Get state context formatted for LLM consumption.
-        
+
         Returns:
             Context string for LLM system prompt
         """
         context_parts = []
-        
+
         # Goals
         if self.state.primary_goal:
             context_parts.append(f"PRIMARY GOAL: {self.state.primary_goal}")
-        
+
         if self.state.current_sub_goal:
             context_parts.append(f"CURRENT SUB-GOAL: {self.state.current_sub_goal}")
-        
+
         # Focus
         context_parts.append(f"CURRENT FOCUS: {self.state.focus.value.upper()}")
-        
+
         # Working memory
         wm_summary = self.state.working_memory.get_summary()
         if wm_summary and wm_summary != "Working memory is empty.":
             context_parts.append("WORKING CONTEXT:\\n" + wm_summary)
-        
+
         # Session memory highlights
         failed_approaches = self.state.session_memory.failed_approaches[-2:]
         if failed_approaches:
-            failed_text = "\\n".join([
-                f"- {fa.approach}: {fa.error}"
-                for fa in failed_approaches
-            ])
+            failed_text = "\\n".join([f"- {fa.approach}: {fa.error}" for fa in failed_approaches])
             context_parts.append("RECENT FAILED APPROACHES:\\n" + failed_text)
-        
+
         successful_patterns = self.state.session_memory.successful_patterns[:2]
         if successful_patterns:
-            success_text = "\\n".join([
-                f"- {sp.pattern} (used {sp.applications}x)"
-                for sp in successful_patterns
-            ])
+            success_text = "\\n".join(
+                [f"- {sp.pattern} (used {sp.applications}x)" for sp in successful_patterns]
+            )
             context_parts.append("SUCCESSFUL PATTERNS:\\n" + success_text)
-        
+
         # Active plan
         if self.state.active_plan:
             progress = self.state.active_plan.get_progress()
@@ -536,14 +539,16 @@ class StateManager:
                 f"ACTIVE PLAN PROGRESS: {progress['completed']}/{progress['total']} "
                 f"steps ({progress['completion_percentage']:.0f}%)"
             )
-        
+
         if self.state.current_plan_step:
             context_parts.append(f"CURRENT PLAN STEP: {self.state.current_plan_step.description}")
             if self.state.current_plan_step.expected_outcome:
-                context_parts.append(f"EXPECTED OUTCOME: {self.state.current_plan_step.expected_outcome}")
-        
+                context_parts.append(
+                    f"EXPECTED OUTCOME: {self.state.current_plan_step.expected_outcome}"
+                )
+
         return "\\n\\n".join(context_parts)
-    
+
     def clear(self) -> None:
         """Clear all state (except session ID)."""
         session_id = self.state.session_id

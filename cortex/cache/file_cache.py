@@ -1,6 +1,5 @@
 """File content cache with mtime validation and LRU eviction."""
 
-import os
 import threading
 import logging
 from pathlib import Path
@@ -437,6 +436,7 @@ def patterns_match(filepath: Path, patterns: Optional[List[str]]) -> bool:
         # Check if pattern matches with wildcard
         if "*" in pattern:
             import fnmatch
+
             if fnmatch.fnmatch(filename, pattern):
                 return True
 

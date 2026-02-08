@@ -208,7 +208,7 @@ def _check_dangerous_commands(tokens: List[str]) -> bool:
             if dangerous_cmd == "rm":
                 # Check if rm is combined with dangerous flags/paths
                 # But allow relative paths (./ or ../ at start, or no leading /)
-                all_args_str = " ".join(tokens[1:])
+                _all_args_str = " ".join(tokens[1:])
                 has_relative_path = any(
                     arg.startswith("./")
                     or arg.startswith("../")

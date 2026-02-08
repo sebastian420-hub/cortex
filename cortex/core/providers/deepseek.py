@@ -161,14 +161,18 @@ class DeepSeekProvider(ModelProvider):
         DeepSeek returns reasoning_content field in message object.
         """
         # For non-streaming responses
-        if hasattr(response, 'choices') and response.choices:
+        if hasattr(response, "choices") and response.choices:
             message = response.choices[0].message
-            if hasattr(message, 'reasoning_content') and message.reasoning_content:
+            if hasattr(message, "reasoning_content") and message.reasoning_content:
                 return message.reasoning_content
         # For streaming chunks (delta)
-        elif hasattr(response, 'choices') and response.choices and hasattr(response.choices[0], 'delta'):
+        elif (
+            hasattr(response, "choices")
+            and response.choices
+            and hasattr(response.choices[0], "delta")
+        ):
             delta = response.choices[0].delta
-            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                 return delta.reasoning_content
         return None
 

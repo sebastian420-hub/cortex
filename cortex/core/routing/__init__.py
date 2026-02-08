@@ -22,7 +22,7 @@ from ..providers import (
     AnthropicProvider,
     OpenRouterProvider,
     ProviderError,
-    ProviderFactory as LegacyProviderFactory
+    ProviderFactory as LegacyProviderFactory,
 )
 
 # Export task analysis components
@@ -86,7 +86,6 @@ __all__ = [
     "OpenRouterProvider",
     "ProviderError",
     "LegacyProviderFactory",
-
     # Task analysis
     "TaskAnalysisEngine",
     "TaskAnalysis",
@@ -94,14 +93,12 @@ __all__ = [
     "TaskComplexity",
     "analyze_task",
     "get_task_analyzer",
-
     # Factory
     "EnhancedProviderFactory",
     "ProviderType",
     "ProviderConfig",
     "RoutingRule",
     "get_provider_factory",
-
     # Transparency
     "TransparencyLayer",
     "RoutingDecision",
@@ -111,7 +108,6 @@ __all__ = [
     "DisplayFormat",
     "show_decision",
     "get_transparency_layer",
-
     # Cost tracking
     "CostTracker",
     "CostEstimate",
@@ -121,7 +117,6 @@ __all__ = [
     "estimate_model_cost",
     "get_cost_tracker",
     "get_pricing_registry",
-
     # Orchestrator
     "RoutingOrchestrator",
     "RoutingConfig",

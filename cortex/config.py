@@ -2,8 +2,11 @@
 
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 import yaml
+
+if TYPE_CHECKING:
+    from .utils.timeouts import TimeoutConfig
 
 try:
     from pydantic import BaseModel, Field
@@ -127,12 +130,12 @@ class AgentConfig:
 
     def __init__(
         self,
-        model: str = "llama3.2",
+        model: str = "moonshotai/kimi-k2.5",
         permission_mode: str = "normal",
         max_iterations: int = 15,
         max_iterations_continue_default: bool = False,
         max_iterations_continue_amount: int = 10,
-        max_tokens: int = 100000,
+        max_tokens: Optional[int] = None,  # None = auto-detect from model
         keep_recent_messages: int = 20,
         auto_save: bool = False,
         # Output settings
@@ -286,6 +289,40 @@ class AgentConfig:
         """Get configuration for RoutingOrchestrator."""
         return self.routing
 
+    @staticmethod
+    def _parse_max_tokens(value: Any) -> Optional[int]:
+        """
+        Parse max_tokens from config value.
+
+        Handles:
+        - 'auto' or None -> None (auto-detect from model)
+        - Integer string -> int
+        - Integer -> int
+
+        Args:
+            value: Config value for max_tokens
+
+        Returns:
+            Parsed integer or None for auto-detect
+        """
+        if value is None:
+            return None
+
+        if isinstance(value, int):
+            return value
+
+        if isinstance(value, str):
+            value_lower = value.lower().strip()
+            if value_lower in ("auto", "none", ""):
+                return None
+            try:
+                return int(value)
+            except ValueError:
+                # Invalid value, default to auto
+                return None
+
+        return None
+
     @classmethod
     def from_file(cls, config_path: Path) -> "AgentConfig":
         """Load configuration from YAML file"""
@@ -295,6 +332,10 @@ class AgentConfig:
         try:
             with open(config_path, "r") as f:
                 config_data = yaml.safe_load(f) or {}
+
+            # Parse max_tokens if present (handle 'auto' string)
+            if "max_tokens" in config_data:
+                config_data["max_tokens"] = cls._parse_max_tokens(config_data["max_tokens"])
 
             return cls(**config_data)
         except Exception as e:
@@ -334,7 +375,7 @@ class AgentConfig:
             )
 
         return cls(
-            model=os.getenv("CORTEX_MODEL", "llama3.2"),
+            model=os.getenv("CORTEX_MODEL", "moonshotai/kimi-k2.5"),
             permission_mode=os.getenv("CORTEX_MODE", "normal"),
             max_iterations=int(os.getenv("CORTEX_MAX_ITERATIONS", "15")),
             max_iterations_continue_default=bool(
@@ -343,7 +384,7 @@ class AgentConfig:
             max_iterations_continue_amount=int(
                 os.getenv("CORTEX_MAX_ITERATIONS_CONTINUE_AMOUNT", "10")
             ),
-            max_tokens=int(os.getenv("CORTEX_MAX_TOKENS", "100000")),
+            max_tokens=cls._parse_max_tokens(os.getenv("CORTEX_MAX_TOKENS", "auto")),
             provider=os.getenv("CORTEX_PROVIDER", None),
             timeouts=timeouts if timeouts else None,
             session_retention=session_retention if session_retention else None,

@@ -55,4 +55,8 @@ def create_tool_call(
     tool_name: str, arguments: Dict[str, Any], call_id: str = "call_1"
 ) -> Dict[str, Any]:
     """Helper to create tool call"""
-    return {"id": call_id, "function": {"name": tool_name, "arguments": arguments}}
+    import json
+
+    # Arguments must be JSON string, matching real LLM API responses
+    args_str = json.dumps(arguments) if isinstance(arguments, dict) else arguments
+    return {"id": call_id, "function": {"name": tool_name, "arguments": args_str}}

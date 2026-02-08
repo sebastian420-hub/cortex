@@ -139,7 +139,7 @@ class LoopGuard:
         # Keep only last N errors to prevent memory growth
         if len(self.error_history) > self.buffer_size:
             self.error_history.pop(0)
-        
+
         # Track consecutive failures for reflection
         self.consecutive_failures += 1
         self._check_reflection_triggers()
@@ -173,7 +173,7 @@ class LoopGuard:
     def _check_reflection_triggers(self) -> None:
         """
         Check if reflection should be triggered based on configured thresholds.
-        
+
         Triggers reflection when:
         1. Iteration threshold reached (every N iterations)
         2. Consecutive failure threshold reached
@@ -181,23 +181,28 @@ class LoopGuard:
         """
         if not self.reflection_callback:
             return
-        
+
         triggers = []
-        
+
         # Check iteration threshold
         if self.reflection_threshold_iterations > 0:
             iterations_since_last_reflection = self.iteration_count - self.last_reflection_iteration
             if iterations_since_last_reflection >= self.reflection_threshold_iterations:
-                triggers.append(f"iteration_threshold ({iterations_since_last_reflection} iterations since last reflection)")
-        
+                triggers.append(
+                    f"iteration_threshold ({iterations_since_last_reflection} iterations since last reflection)"
+                )
+
         # Check consecutive failures threshold
-        if self.reflection_threshold_failures > 0 and self.consecutive_failures >= self.reflection_threshold_failures:
+        if (
+            self.reflection_threshold_failures > 0
+            and self.consecutive_failures >= self.reflection_threshold_failures
+        ):
             triggers.append(f"failure_threshold ({self.consecutive_failures} consecutive failures)")
-        
+
         # Check stuck state
         if self.check_stuck_state():
             triggers.append("stuck_state (no progress detected)")
-        
+
         # If any triggers, invoke callback
         if triggers:
             reflection_data = {
@@ -211,7 +216,7 @@ class LoopGuard:
                 "tool_calls_in_buffer": len(self.tool_call_history),
                 "errors_in_buffer": len(self.error_history),
             }
-            
+
             try:
                 self.reflection_callback("loop_guard_reflection", reflection_data)
                 # Update last reflection iteration to prevent immediate retriggering
@@ -219,6 +224,7 @@ class LoopGuard:
             except Exception as e:
                 # Don't let reflection callback failures break the loop
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.error(f"Reflection callback failed: {e}")
 
@@ -241,7 +247,7 @@ class LoopGuard:
             self.files_read.add(arguments["path"])
         elif tool_name == "write_file" and "path" in arguments:
             self.files_written.add(arguments["path"])
-        
+
         # Reset consecutive failures on successful operation
         self.consecutive_failures = 0
 
