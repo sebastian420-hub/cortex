@@ -58,6 +58,12 @@ from .core.recovery import (
     SessionHealthMonitor,
     RecoveryOrchestrator,
 )
+# New modular components
+from .core.agent_init import AgentInitializer
+from .core.agent_prompts import PromptGenerator
+from .core.agent_permissions import PermissionManager
+from .core.agent_tools import ToolExecutor
+from .core.agent_messaging import MessageProcessor
 from .core.summarization import (
     create_summarizer,
     SummarizationStrategy,
@@ -111,100 +117,55 @@ class Cortex:
         output_format: OutputFormat = OutputFormat.TEXT,
         on_max_iterations_reached: Optional[Callable[[int, int], Optional[int]]] = None,
     ):
+        """Initialize Cortex agent with all components."""
+        # Basic setup
         self.model = model
         self.project_dir = Path(project_dir).resolve()
         self.permission_mode = permission_mode
         self.config = config or AgentConfig()
         self.session_start = datetime.now()
-
-        # Initialize hook manager
         self.hook_manager = hook_manager or HookManager()
-
-        # Initialize output formatter
         self.output_format = output_format
-        self.formatter = create_formatter(output_format, console=console)
 
-        # Initialize history directory
-        self.history_dir = Path.home() / ".cortex" / "sessions"
-        self.history_dir.mkdir(parents=True, exist_ok=True)
-
-        # Load project context (must be before _get_system_prompt)
-        self.project_context = self._load_project_context()
-
-        # Initialize memory bank for tracking decisions and facts
-        self.memory_bank = create_memory_bank(max_items=50)
-        
-        # Initialize StateManager for task tracking and state management
-        self.state_manager = StateManager(project_dir=self.project_dir)
-
-        # Initialize conversation manager with summarization support
-        system_prompt = self._get_system_prompt()
-        warn_on_truncation = self.config.session_retention.get("warn_on_truncation", True)
-
-        # Create summarizer for intelligent context management
-        # Use simple summarization by default (no extra API calls)
-        # Can be upgraded to LLM-based or hybrid via config
-        summarization_config = getattr(self.config, "summarization", {})
-        enable_summarization = summarization_config.get("enabled", True)
-        strategy_name = summarization_config.get("strategy", "simple")
-
-        if strategy_name == "llm":
-            strategy = SummarizationStrategy.LLM_BASED
-        elif strategy_name == "hybrid":
-            strategy = SummarizationStrategy.HYBRID
-        else:
-            strategy = SummarizationStrategy.SIMPLE
-
-        summarizer = create_summarizer(strategy) if enable_summarization else None
-
-        self.conversation = ConversationManager(
-            system_prompt=system_prompt,
-            max_tokens=self.config.max_tokens,
-            keep_recent=self.config.keep_recent_messages,
-            model=self.model,
-            warn_on_truncation=warn_on_truncation,
-            on_truncation=self._on_context_truncation,
-            summarizer=summarizer,
-            enable_summarization=enable_summarization,
-            summarization_threshold=summarization_config.get("threshold", 0.8),
+        # Use AgentInitializer to handle complex initialization
+        initializer = AgentInitializer(
+            model=model,
+            project_dir=self.project_dir,
+            permission_mode=permission_mode,
+            config=self.config,
+            hook_manager=self.hook_manager,
+            output_format=output_format,
         )
 
-        # Initialize session recovery system
-        recovery_config = getattr(self.config, "recovery", {})
-        checkpoint_dir = self.history_dir / "checkpoints"
-        checkpoint_dir.mkdir(exist_ok=True)
+        # Copy initialized components from initializer
+        self.history_dir = initializer.history_dir
+        self.memory_bank = initializer.memory_bank
+        self.state_manager = initializer.state_manager
+        self.conversation = initializer.conversation
+        self.checkpoint_manager = initializer.checkpoint_manager
+        self.health_monitor = initializer.health_monitor
+        self.recovery_orchestrator = initializer.recovery_orchestrator
+        self.loop_guard = initializer.loop_guard
+        self.rate_limiter = initializer.rate_limiter
+        self.rate_limiter_enabled = initializer.is_rate_limiting_enabled()
+        self._timeout_config = initializer.timeout_config
+        self.file_cache = initializer.file_cache
+        self.provider = initializer.provider
+        self.router = initializer.router
+        self._routing_enabled = initializer.is_routing_enabled()
+        self.tool_registry = initializer.tool_registry
+        self.formatter = initializer.formatter
 
-        self.checkpoint_manager = CheckpointManager(
-            checkpoint_dir=checkpoint_dir,
-            max_checkpoints=recovery_config.get("max_checkpoints", 10),
-            auto_checkpoint_interval=recovery_config.get("auto_checkpoint_interval", 50),
-            compression_enabled=recovery_config.get("compression_enabled", True),
-            retention_days=recovery_config.get("retention_days", 7),
-        )
+        # Orchestration system
+        self._orchestration_enabled = initializer.orchestration_enabled
+        self._model_registry = initializer.model_registry
+        self._delegation_tracker = initializer.delegation_tracker
+        self._delegation_context = initializer.delegation_context
+        self._orchestration = initializer.orchestration
 
-        self.health_monitor = SessionHealthMonitor()
-        self.recovery_orchestrator = RecoveryOrchestrator(
-            self.checkpoint_manager, self.health_monitor
-        )
-
-        # Initialize loop guard with recovery manager if enabled
-        recovery_manager = None
-        if self.config.error_recovery.get("enable_smart_recovery", False):
-            from .core.recovery_strategies import create_recovery_manager_from_config
-
-            recovery_manager = create_recovery_manager_from_config(self.config.error_recovery)
-
-        self.loop_guard = LoopGuard(
-            max_repeats=self.config.error_recovery.get("max_repeats", 3),
-            stuck_threshold=self.config.error_recovery.get("stuck_threshold", 5),
-            buffer_size=self.config.error_recovery.get("buffer_size", 10),
-            recovery_manager=recovery_manager,
-        )
-
-        # Initialize parallel tool executor
+        # Initialize parallel executor (needs self.execute_tool, so done after initializer)
         parallel_config = self.config.get_parallel_execution_config()
         max_workers = parallel_config.get("max_workers", 0)
-        # Auto-detect if set to 0 or "auto"
         if max_workers == 0 or max_workers == "auto":
             import os
             max_workers = min(4, os.cpu_count() or 2)
@@ -215,114 +176,36 @@ class Cortex:
             batch_size=parallel_config.get("batch_size", 10),
         )
 
-        # Initialize rate limiter (if enabled)
-        rate_limit_config = self.config.rate_limit
-        self.rate_limiter_enabled = rate_limit_config.get("enabled", False)
-        if self.rate_limiter_enabled:
-            rate_limit_cfg = RateLimitConfig(
-                requests_per_minute=rate_limit_config.get("requests_per_minute", 60),
-                tokens_per_minute=rate_limit_config.get("tokens_per_minute", 100000),
-                burst_multiplier=rate_limit_config.get("burst_multiplier", 1.5),
-            )
-            self.rate_limiter = get_rate_limiter(rate_limit_cfg)
-            logger.info(f"Rate limiting enabled: {rate_limit_config.get('requests_per_minute')} RPM, {rate_limit_config.get('tokens_per_minute')} TPM")
-        else:
-            self.rate_limiter = None
+        # Initialize new modular components
+        self.prompt_generator = PromptGenerator(self)
+        self.permission_manager = PermissionManager(self)
+        self.tool_executor = ToolExecutor(self)
+        self.message_processor = MessageProcessor(self)
 
-        # Initialize timeout configuration
-        self._timeout_config = self.config.get_timeout_config()
-
-        # Initialize file cache and cache warming (if enabled)
-        cache_warming_config = self.config.cache_warming
-        
-        # Prepare cache configuration (support Redis)
-        cache_config = {**self.config.file_cache}
-        
-        # Add Redis settings if Redis cache is enabled
-        if self.config.redis_cache.get("enabled", False):
-            cache_config["use_redis"] = True
-            cache_config["redis_host"] = self.config.redis_cache.get("host", "localhost")
-            cache_config["redis_port"] = self.config.redis_cache.get("port", 6379)
-            cache_config["redis_db"] = self.config.redis_cache.get("db", 0)
-            cache_config["redis_password"] = self.config.redis_cache.get("password")
-            cache_config["redis_ttl"] = self.config.redis_cache.get("ttl", 3600)
-            cache_config["redis_fallback"] = self.config.redis_cache.get("fallback_to_local", True)
-        
-        self.file_cache = get_file_cache(cache_config)
-        
-        if cache_warming_config.get("enabled", False):
-            try:
-                cache_stats = self.file_cache.pre_cache(
-                    patterns=cache_warming_config.get("patterns"),
-                    source=cache_warming_config.get("source", "git_history"),
-                    max_files=cache_warming_config.get("max_files", 50),
-                    directory=Path(cache_warming_config.get("directory")) if cache_warming_config.get("directory") else None,
-                )
-                if cache_stats["cached"] > 0:
-                    logger.info(f"Cache warming complete: {cache_stats['cached']} files cached")
-            except Exception as e:
-                logger.warning(f"Cache warming failed: {e}")
-
-        # Initialize model provider
-        provider_override = getattr(self.config, "provider", None)
-        try:
-            self.provider = ProviderFactory.get_provider(self.model, provider_override)
-            # Validate API key for cloud providers
-            if not self.provider.validate_api_key():
-                raise ProviderError(
-                    f"API key not set for {ProviderFactory.get_provider_name(self.model)} provider. "
-                    f"Please set the required environment variable."
-                )
-        except ProviderError as e:
-            raise ProviderError(f"Failed to initialize provider: {e}") from e
-
-        # Initialize intelligent routing (if enabled and available)
-        self.router = None
-        self._routing_enabled = False
-        routing_config = self.config.get_routing_config()
-        if ROUTING_AVAILABLE and routing_config.get("enabled", False):
-            try:
-                self.router = RoutingOrchestrator(RoutingConfig(
-                    enabled=True,
-                    mode=routing_config.get("mode", "rule_based"),
-                    prefer_local_models=routing_config.get("prefer_local_models", True),
-                    allow_cloud_fallback=routing_config.get("allow_cloud_fallback", True),
-                    task_analysis_enabled=routing_config.get("task_analysis_enabled", True),
-                    cost_optimization_enabled=routing_config.get("cost_optimization_enabled", True),
-                    transparency_enabled=routing_config.get("transparency_enabled", True),
-                    cache_decisions=routing_config.get("cache_decisions", True),
-                    log_decisions=routing_config.get("log_decisions", False),
-                    log_file=routing_config.get("log_file"),
-                ))
-                self._routing_enabled = True
-                logger.info("Intelligent model routing enabled")
-            except Exception as e:
-                logger.warning(f"Failed to initialize routing system: {e}")
+        # Update conversation system prompt now that PromptGenerator is ready
+        self.project_context = self.prompt_generator.load_project_context()
+        system_prompt = self.prompt_generator.generate()
+        self.conversation.system_prompt = system_prompt
+        self.conversation.on_truncation = self._on_context_truncation
 
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
 
-        # Initialize model orchestration system
-        self._init_orchestration()
-
         # Shutdown flag for graceful termination
         self._shutdown_requested = False
-        self._session_dirty = False  # Track if session needs saving
-        
+        self._session_dirty = False
+
         # Interrupt handling
         self._is_processing = False
         self._interrupt_requested = False
 
         # Display settings
-        self.show_thinking = False  # Toggle for reasoning display
+        self.show_thinking = False
 
         # Set default callback if configured
         if on_max_iterations_reached is None and self.config.max_iterations_continue_default:
-
             def default_callback(current: int, max_iter: int) -> Optional[int]:
-                # Auto-continue with configured amount
                 return self.config.max_iterations_continue_amount
-
             self._on_max_iterations_reached = default_callback
         else:
             self._on_max_iterations_reached = on_max_iterations_reached
@@ -338,73 +221,8 @@ class Cortex:
                 f"({remaining} remaining)"
             )
 
-    def _init_orchestration(self) -> None:
-        """Initialize the model orchestration system."""
-        # Get orchestration configuration
-        orchestration_config = getattr(self.config, "orchestration", {})
-        self._orchestration_enabled = orchestration_config.get("enabled", True)
-
-        if not self._orchestration_enabled:
-            self._orchestration = None
-            self._model_registry = None
-            self._delegation_tracker = None
-            return
-
-        # Initialize model registry
-        self._model_registry = get_model_registry()
-
-        # Initialize orchestration manager
-        default_coordinator = orchestration_config.get("default_model", "xiaomi/mimo-v2-flash:free")
-        max_delegations = orchestration_config.get("max_delegations_per_request", 5)
-
-        self._orchestration = OrchestrationManager(
-            default_coordinator=default_coordinator,
-            max_delegations=max_delegations,
-        )
-
-        # Delegation tracker will be created per-request
-        self._delegation_tracker = None
-
-        # Track current delegation context
-        self._delegation_context: Optional[DelegationContext] = None
-
-        logger.info(f"Model orchestration initialized (coordinator: {default_coordinator})")
-
-    def _get_orchestration_prompt(self) -> str:
-        """Generate orchestration-specific prompt injection for current model."""
-        # Check if orchestration has been initialized yet
-        if not hasattr(self, "_orchestration_enabled") or not self._orchestration_enabled:
-            return ""
-        if not hasattr(self, "_model_registry") or not self._model_registry:
-            return ""
-
-        # Get model config
-        model_config = self._model_registry.get_model(self.model)
-        if not model_config:
-            return ""
-
-        # Get available delegation targets
-        available_delegates = self._model_registry.get_delegation_targets(self.model)
-
-        # Get remaining delegations
-        remaining = 5  # Default
-        if self._delegation_tracker:
-            remaining = self._delegation_tracker.get_remaining()
-
-        # Get prompt profile
-        profile_name = model_config.prompt_profile
-        prompt = get_delegation_instructions(
-            current_model=self.model,
-            available_delegates=available_delegates,
-            remaining_delegations=remaining,
-            profile_name=profile_name,
-        )
-
-        # Add delegation context if present
-        if self._delegation_context:
-            prompt = f"{self._delegation_context.to_system_context()}\n\n{prompt}"
-
-        return prompt
+    # Note: _init_orchestration() and _get_orchestration_prompt() have been
+    # moved to AgentInitializer and PromptGenerator respectively
 
     def _handle_delegation_action(self, result: Dict[str, Any]) -> bool:
         """
@@ -641,182 +459,12 @@ class Cortex:
         return self.router.get_statistics()
 
     def _load_project_context(self) -> str:
-        """Load AGENT.md or README.md for project context"""
-        context_files = ["AGENT.md", "CLAUDE.md", "README.md"]
-
-        for filename in context_files:
-            filepath = self.project_dir / filename
-            if filepath.exists():
-                try:
-                    content = filepath.read_text(encoding="utf-8-sig")
-                    console.print(f"[dim]Loaded project context from {filename}[/dim]")
-                    return content[:2000]  # Limit context size
-                except (UnicodeDecodeError, IOError, OSError) as e:
-                    logger.debug(f"Failed to read {filename}: {e}")
-                    pass
-        return ""
+        """Load AGENT.md or README.md for project context (delegates to PromptGenerator)"""
+        return self.prompt_generator.load_project_context()
 
     def _get_system_prompt(self) -> str:
-        """Generate comprehensive system prompt for the agent"""
-        mode_instructions = {
-            PermissionMode.NORMAL: "Ask for user approval before making changes.",
-            PermissionMode.AUTO_APPROVE: "You can make changes without asking. Be careful!",
-            PermissionMode.PLAN: "You are in PLAN MODE - read-only. Do not write files or execute commands. Only analyze and create plans.",
-        }
-
-        # Get memory summary if available
-        memory_summary = ""
-        if hasattr(self, "memory_bank") and self.memory_bank:
-            memory_summary = self.memory_bank.get_summary()
-
-        base_prompt = f"""You are Cortex, a powerful AI coding assistant working in: {self.project_dir}
-
-Permission Mode: {self.permission_mode.upper()}
-{mode_instructions[self.permission_mode]}
-
-{f"Project Context:{chr(10)}{self.project_context}" if self.project_context else ""}
-{f"Session Memory:{chr(10)}{memory_summary}" if memory_summary else ""}
-{f"Current State:{chr(10)}{self.state_manager.get_llm_context()}" if hasattr(self, 'state_manager') and self.state_manager else ""}
-
-# Mental Model for Codebase Understanding
-
-When exploring a new codebase, build understanding systematically:
-
-## Phase 1: Structure Discovery (1-2 tool calls)
-```
-glob(pattern="**/*.py")  # Map all source files
-```
-From this, identify:
-- Entry points (main.py, cli.py, app.py, __main__.py)
-- Core packages (src/, lib/, cortex/)
-- Tests location (tests/, test_*)
-- Config files (*.yaml, *.json, *.toml)
-
-## Phase 2: Architecture Understanding (2-3 tool calls)
-```
-grep(pattern="^class ", file_type="py")           # Find all classes
-grep(pattern="^def |^async def ", file_type="py") # Find top-level functions
-```
-Build a mental map:
-- Entry points -> Core logic -> Utilities -> Data models
-
-## Phase 3: Targeted Deep Dives
-Only read files when you have a specific reason. Track what you've read to avoid re-reading.
-
-**Efficiency Rule**: Always use `files_with_matches` mode first for breadth, then `content` mode only when narrowing down.
-
-# Self-Awareness
-
-## Your Capabilities
-- **Search**: glob for files, grep for content - these are your eyes
-- **Read**: Deep understanding of specific files
-- **Edit**: Surgical changes with exact string replacement
-- **Write**: Create new files or replace content entirely
-- **Execute**: Run commands, tests, git operations
-- **AST Analysis**: Structural code understanding with ast_search, ast_extract, ast_analyze
-
-## AST Tools (Code Analysis)
-Use these for deeper code understanding beyond text search:
-
-- **ast_search**: Find functions/classes/imports by structure (better than grep for code patterns)
-  - `ast_search(pattern="process_", search_type="function")` - find all functions starting with "process_"
-  - `ast_search(pattern="Manager", search_type="class")` - find all Manager classes
-
-- **ast_extract**: Get full code structures with metadata (docstrings, decorators, parameters)
-  - `ast_extract(path="src/", extract_type="function")` - list all functions with details
-  - `ast_extract(path="file.py", pattern="main", extract_type="function")` - get specific function
-
-- **ast_analyze**: Code complexity and quality analysis
-  - `ast_analyze(path="src/", analysis_type="complexity")` - get metrics (lines, functions, complexity)
-  - `ast_analyze(analysis_type="issues")` - find code smells (long functions, too many params)
-
-**When to use grep vs ast_search:**
-- grep: text patterns, strings, comments, quick searches
-- ast_search: function/class definitions, imports, structural patterns
-
-## Your Limitations
-- Cannot see file changes until you re-read them
-- Cannot run interactive commands (vi, less, etc.)
-- Cannot access external URLs without web tools
-- Token-limited: be efficient, avoid reading entire codebases
-
-## Decision Making
-- **Confident action**: When you know exactly what to do, do it
-- **Ask first**: When requirements are ambiguous or risky
-- **Investigate first**: When you need more context before deciding
-
-# Efficiency Patterns
-
-## Minimize Tool Calls
-BAD: Read every file to find a function
-GOOD: grep(pattern="def target_function") -> read only the matching file
-
-BAD: Multiple greps for related things
-GOOD: Single grep with OR pattern: "class.*Service|def.*service"
-
-## Optimal Search Strategy
-1. **File discovery**: glob("**/*.ext") - understand what exists
-2. **Content search**: grep with files_with_matches mode - find where
-3. **Targeted read**: read_file only files you need
-
-## Edit vs Write
-- **edit**: Changes < 20 lines, or multiple small changes in a file
-- **write_file**: New files, or changes > 50% of file content
-
-# Proactive Behavior
-
-## When to Act Without Asking
-- Obvious bug fixes (typos, missing imports)
-- Direct requests with clear requirements
-- Following established patterns in the codebase
-
-## When to Ask First
-- Architectural decisions
-- Multiple valid approaches exist
-- Destructive operations (delete, overwrite)
-- Changes affecting multiple files
-
-## When to Investigate First
-- "Fix the bug" (need to find and understand it)
-- "Improve performance" (need to profile first)
-- "Add feature X" (need to understand existing patterns)
-
-# Help System Reference
-
-For detailed reference information, use the `/help` command:
-- Use `/help tool reference` for complete tool reference with examples
-- Use `/help error recovery` for error handling and troubleshooting guidance
-- Use `/help cli commands` for all CLI command reference
-
-
-
-# Response Style
-
-- **Be direct**: Get to the point, avoid filler phrases
-- **Be specific**: Use file:line format (e.g., `main.py:42`)
-- **Be helpful**: Explain what you're doing and why
-- **Be honest**: Say "I don't know" rather than guess
-- **Be efficient**: Minimize unnecessary tool calls
-
-
-
-**Read before modifying** | **Search before creating** | **Test after changing**
-
-Remember: You are a skilled developer's assistant. Think systematically, act precisely, communicate clearly."""
-
-        # Add orchestration prompt if enabled
-        orchestration_prompt = self._get_orchestration_prompt()
-        if orchestration_prompt:
-            base_prompt += f"\n\n{orchestration_prompt}"
-
-        # Adapt prompt based on model capabilities (now uses MiMo adapter)
-        adapted_prompt = adapt_prompt_for_model(base_prompt, self.model)
-
-        # Log profile info for debugging
-        profile_info = get_profile_info(self.model)
-        logger.debug(f"Model profile: {profile_info}")
-
-        return adapted_prompt
+        """Generate comprehensive system prompt (delegates to PromptGenerator)"""
+        return self.prompt_generator.generate()
 
     def _dispatch_session_start(self) -> None:
         """Dispatch session start event to hooks."""
@@ -1044,6 +692,14 @@ Remember: You are a skilled developer's assistant. Think systematically, act pre
             # Use modified arguments from hook
             tool_name = pre_result.modified_data.get("tool_name", tool_name)
             arguments = pre_result.modified_data.get("arguments", arguments)
+
+        # Permission check (delegates to PermissionManager)
+        if not self.permission_manager.check(tool_name, arguments):
+            return create_error_response(
+                "Operation not permitted",
+                ErrorType.PERMISSION,
+                {"tool_name": tool_name, "permission_mode": self.permission_mode},
+            )
 
         # Track tool usage
         self._tools_used.append(tool_name)

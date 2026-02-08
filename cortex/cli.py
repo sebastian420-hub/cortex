@@ -37,6 +37,7 @@ from .storage.history import get_history_file
 from .storage.sessions import SessionManager
 from .output import OutputFormat
 from .hooks import HookManager
+from .cli_commands.commands import CommandRegistry, CommandContext
 
 __version__ = "1.0.0"
 
@@ -498,6 +499,9 @@ def run_interactive(
     history_file = get_history_file(Path.home())
     repl = REPL(str(history_file))
 
+    # Initialize command registry
+    command_registry = init_command_registry(session_manager)
+
     # Show banner
     repl.show_banner(
         project_name=agent.project_dir.name,
@@ -572,7 +576,7 @@ def run_interactive(
 
             # Handle commands
             if user_input.startswith("/"):
-                handle_command(user_input, agent, session_manager, repl)
+                handle_command(user_input, agent, session_manager, repl, command_registry)
                 continue
 
             # Process with agent
@@ -629,569 +633,147 @@ def run_interactive(
             break
 
 
-def handle_command(command: str, agent: Cortex, session_manager: SessionManager, repl: REPL):
+def init_command_registry(session_manager: SessionManager) -> 'CommandRegistry':
+    """
+    Initialize and populate the command registry.
+
+    Args:
+        session_manager: Session manager for session-related commands
+
+    Returns:
+        Populated CommandRegistry instance
+    """
+    from .cli_commands.commands import (
+        CommandRegistry,
+        # Basic commands
+        ClearCommand,
+        ResetContextCommand,
+        HelpCommand,
+        ExitCommand,
+        # Mode commands
+        PermissionModeCommand,
+        UIModeCommand,
+        PlanCommand,
+        # Model commands
+        ModelCommand,
+        ProfileCommand,
+        # Memory commands
+        MemoryCommand,
+        FocusCommand,
+        ThinkingCommand,
+        SummaryCommand,
+        # Session commands
+        SaveSessionCommand,
+        LoadSessionCommand,
+        ListSessionsCommand,
+        SessionRecoveryCommand,
+        # Stats commands
+        ProjectCommand,
+        StatsCommand,
+        RoutingCommand,
+        StorageCommand,
+        CleanupCommand,
+        # Transaction/Cache commands
+        CacheCommand,
+        RollbackCommand,
+        TransactionsCommand,
+    )
+
+    registry = CommandRegistry()
+
+    # Register basic commands
+    registry.register(ClearCommand())
+    registry.register(ResetContextCommand())
+    registry.register(HelpCommand())
+    registry.register(ExitCommand())
+
+    # Register mode commands
+    registry.register(PermissionModeCommand())
+    registry.register(UIModeCommand())
+    registry.register(PlanCommand())
+
+    # Register model commands
+    registry.register(ModelCommand())
+    registry.register(ProfileCommand())
+
+    # Register memory commands
+    registry.register(MemoryCommand())
+    registry.register(FocusCommand())
+    registry.register(ThinkingCommand())
+    registry.register(SummaryCommand())
+
+    # Register session commands (need session_manager)
+    registry.register(SaveSessionCommand(session_manager))
+    registry.register(LoadSessionCommand(session_manager))
+    registry.register(ListSessionsCommand(session_manager))
+    registry.register(SessionRecoveryCommand())
+
+    # Register stats commands
+    registry.register(ProjectCommand())
+    registry.register(StatsCommand())
+    registry.register(RoutingCommand())
+    registry.register(StorageCommand(session_manager))
+    registry.register(CleanupCommand(session_manager))
+
+    # Register transaction/cache commands
+    registry.register(CacheCommand())
+    registry.register(RollbackCommand())
+    registry.register(TransactionsCommand())
+
+    return registry
+
+
+def handle_command(
+    command: str,
+    agent: Cortex,
+    session_manager: SessionManager,
+    repl: REPL,
+    command_registry: Optional[CommandRegistry] = None
+):
     """Handle special commands"""
     from datetime import datetime
     from .ui.modes import UIMode, set_ui_mode, get_ui_mode
 
     logger = logging.getLogger(__name__) # Initialize logger here
     logger.debug(f"Handling command: '{command}'")
-    
-    cmd = command.lower().strip()
-    logger.debug(f"Processed cmd: '{cmd}'")
 
-    if cmd.startswith("/help"):
-        from .help import HelpSystem
+    # Initialize registry if not provided
+    if command_registry is None:
+        command_registry = init_command_registry(session_manager)
 
-        help_system = HelpSystem(project_dir=agent.project_dir, console=console)
-        # Extract arguments after /help
-        args = command[5:].strip() if len(command) > 5 else ""
-        help_system.handle_help_command(args)
-
-    elif cmd == "/clear":
-        agent.clear_conversation()
-        console.print("[green]✓[/green] Conversation cleared")
-
-    elif cmd.startswith("/model"):
-        logger.debug(f"Matched /model handler, cmd='{cmd}'")
-        parts = cmd.split()
-        logger.debug(f"Split into parts: {parts}, len={len(parts)}")
-        if len(parts) > 1:
-            new_model = parts[1]
-            logger.debug(f"Calling agent.switch_model with model='{new_model}', provider='{agent.config.provider}'")
-            try:
-                agent.switch_model(new_model, agent.config.provider)
-                console.print(f"[green]✓[/green] Model switched to: {agent.model}")
-                # Update system prompt in case it contains model-specific instructions
-                agent.conversation.history[0]["content"] = agent._get_system_prompt()
-            except ProviderError as e:
-                console.print(f"[red]Error switching model:[/red] {e}")
-            except Exception as e:
-                console.print(f"[red]An unexpected error occurred:[/red] {e}")
-        else:
-            console.print(f"Current model: {agent.model}")
-            console.print("[dim]Usage: /model <model_name>[/dim]")
-
-    elif cmd.startswith("/profile"):
-        # Show model capability profile
-        parts = cmd.split()
-        model_to_check = parts[1] if len(parts) > 1 else agent.model
-
-        profile = get_model_profile(model_to_check)
-        adapter_info = get_adapter_info(model_to_check)
-
-        # Create a table for the profile
-        table = Table(title=f"Model Profile: {profile.name}", show_header=True, header_style="bold cyan")
-        table.add_column("Property", style="dim")
-        table.add_column("Value")
-
-        table.add_row("Model", model_to_check)
-        table.add_row("Profile Name", profile.name)
-        table.add_row("Context Window", f"{profile.context_window:,} tokens")
-        table.add_row("Prompt Style", profile.prompt_style.value)
-        table.add_row("Tool Following", profile.tool_following.value)
-        table.add_row("Reasoning", profile.reasoning.value)
-        table.add_row("Max Tools", str(profile.max_tools_per_prompt))
-        table.add_row("JSON Mode", "Yes" if profile.supports_json_mode else "No")
-        table.add_row("Streaming", "Yes" if profile.supports_streaming else "No")
-        table.add_row("Vision", "Yes" if profile.supports_vision else "No")
-        table.add_row("Adapter", adapter_info.get("adapter", "none"))
-        if profile.notes:
-            table.add_row("Notes", profile.notes)
-
-        console.print(table)
-        console.print(f"\n[dim]Usage: /profile [model_name] - Check any model's profile[/dim]")
-
-    elif cmd.startswith("/mode"):
-        parts = cmd.split()
-        if len(parts) > 1:
-            mode = parts[1]
-            if mode in [PermissionMode.NORMAL, PermissionMode.AUTO_APPROVE, PermissionMode.PLAN]:
-                agent.permission_mode = mode
-                # Update system prompt
-                agent.conversation.history[0]["content"] = agent._get_system_prompt()
-                console.print(f"[green]✓[/green] Mode changed to: {mode}")
-            else:
-                console.print("[red]Invalid mode. Use: normal, auto, or plan[/red]")
-        else:
-            console.print(f"Current mode: {agent.permission_mode}")
-            
-    elif cmd.startswith("/ui"):
-        parts = cmd.split()
-        if len(parts) > 1:
-            mode_str = parts[1]
-            try:
-                mode = UIMode(mode_str)
-                set_ui_mode(mode)
-                console.print(f"[green]✓[/green] UI mode changed to: {mode.value}")
-            except ValueError:
-                console.print(f"[red]Invalid UI mode. Use: minimal, normal, or debug[/red]")
-        else:
-            current_mode = get_ui_mode()
-            console.print(f"Current UI mode: {current_mode.value}")
-            console.print(f"[dim]Usage: /ui <minimal|normal|debug>[/dim]")
-            console.print(f"[dim]  minimal: Claude Code style (clean, no panels)[/dim]")
-            console.print(f"[dim]  normal: Rich panels and detailed displays[/dim]")
-            console.print(f"[dim]  debug: Development details and timing[/dim]")
-
-    elif cmd == "/project":
-        info = f"""
-[bold]Project Information[/bold]
-Path: {agent.project_dir}
-Mode: {agent.permission_mode}
-Model: {agent.model}
-Session: {(datetime.now() - agent.session_start).seconds // 60} minutes
-Tokens: {agent.conversation.get_token_count()}
-"""
-        console.print(Panel(info, title="Project"))
-
-    elif cmd == "/stats":
-        # Show detailed session statistics
-        from rich.table import Table
-
-        stats = agent.conversation.get_truncation_stats()
-
-        table = Table(title="Session Statistics", show_header=True, header_style="bold cyan")
-        table.add_column("Metric", style="cyan")
-        table.add_column("Value", style="green", justify="right")
-
-        # Token statistics
-        table.add_row("Current Tokens", f"{stats['current_token_count']:,}")
-        table.add_row("Max Tokens", f"{stats['max_tokens']:,}")
-        table.add_row("Utilization", f"{stats['token_utilization']:.1f}%")
-        table.add_row("Remaining", f"{stats['tokens_remaining']:,}")
-        table.add_row("", "")
-
-        # Message statistics
-        table.add_row("Messages", str(stats['current_message_count']))
-        table.add_row("Avg Tokens/Msg", f"{stats['avg_tokens_per_message']:.0f}")
-        table.add_row("", "")
-
-        # Optimization statistics
-        table.add_row("Truncations", str(stats['truncation_count']))
-        table.add_row("Summarizations", str(stats['summarization_count']))
-        table.add_row("Messages Removed", str(stats['total_messages_removed']))
-
-        console.print(table)
-
-    elif cmd.startswith("/save"):
-        parts = cmd.split()
-        session_name = (
-            parts[1] if len(parts) > 1 else f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
-        session_manager.save_session(
-            session_name,
-            agent.get_conversation_history(),
-            str(agent.project_dir),
-            agent.model,
-            agent.permission_mode,
-        )
-
-    elif cmd.startswith("/load"):
-        parts = cmd.split()
-        if len(parts) > 1:
-            session_name = parts[1]
-            session_data = session_manager.load_session(session_name)
-            if session_data:
-                agent.conversation.history = session_data["conversation_history"]
-                agent.model = session_data.get("model", agent.model)
-                agent.permission_mode = session_data.get("permission_mode", agent.permission_mode)
-                console.print("[green]✓[/green] Session loaded")
-        else:
-            console.print("[red]Usage: /load <session_name>[/red]")
-
-    elif cmd == "/sessions":
-        session_manager.show_sessions()
-
-    elif cmd == "/storage":
-        # Show storage statistics
-        from .storage.cleanup import SessionCleanupManager
-
-        cleanup_manager = SessionCleanupManager(
-            sessions_dir=session_manager.sessions_dir,
-            max_age_days=agent.config.session_retention.get("max_age_days", 30),
-            max_count=agent.config.session_retention.get("max_count", 100),
-            max_total_size_mb=agent.config.session_retention.get("max_total_size_mb", 500),
-        )
-        stats = cleanup_manager.get_storage_stats()
-        info = f"""
-[bold]Storage Statistics[/bold]
-Sessions: {stats['session_count']} / {stats['limit_count']} ({stats['usage_percent_count']}%)
-Size: {stats['total_size_mb']} MB / {stats['limit_size_mb']} MB ({stats['usage_percent_size']}%)
-Max Age: {stats['limit_age_days']} days
-
-Oldest: {stats['oldest_session'] or 'N/A'}
-Newest: {stats['newest_session'] or 'N/A'}
-"""
-        console.print(Panel(info, title="Storage"))
-
-    elif cmd == "/cleanup":
-        # Manual cleanup
-        from .storage.cleanup import SessionCleanupManager
-
-        cleanup_manager = SessionCleanupManager(
-            sessions_dir=session_manager.sessions_dir,
-            max_age_days=agent.config.session_retention.get("max_age_days", 30),
-            max_count=agent.config.session_retention.get("max_count", 100),
-            max_total_size_mb=agent.config.session_retention.get("max_total_size_mb", 500),
-        )
-        stats = cleanup_manager.run_full_cleanup()
-        if stats.sessions_removed > 0:
-            console.print(
-                f"[green]✓[/green] Removed {stats.sessions_removed} sessions, "
-                f"freed {stats.bytes_freed // 1024} KB"
-            )
-        else:
-            console.print("[green]✓[/green] No sessions needed cleanup")
-        if stats.errors:
-            for error in stats.errors:
-                console.print(f"[red]Error:[/red] {error}")
-
-    elif cmd == "/exit":
-        raise KeyboardInterrupt
-
-    elif cmd.startswith("/cache"):
-        # Cache management command
-        from .cache import get_file_cache, clear_cache
-
-        parts = cmd.split()
-        cache = get_file_cache(agent.config.get_file_cache_config())
-
-        if len(parts) > 1 and parts[1] == "clear":
-            clear_cache()
-            console.print("[green]✓[/green] File cache cleared")
-        else:
-            # Show cache stats
-            stats = cache.get_stats()
-            info = f"""
-[bold]File Cache Statistics[/bold]
-Enabled: {stats['enabled']}
-Entries: {stats['entries']} / {stats['max_entries']}
-Size: {stats['size_mb']:.2f} MB / {stats['max_size_mb']:.2f} MB
-Hit Rate: {stats['hit_rate']*100:.1f}% ({stats['hits']} hits, {stats['misses']} misses)
-"""
-            console.print(Panel(info, title="Cache"))
-
-    elif cmd == "/rollback":
-        # Rollback active transaction
-        from .core.transaction import get_transaction_manager
-
-        tm = get_transaction_manager(agent.config.get_transactions_config())
-
-        if tm.has_active_transaction():
-            tx = tm.get_current_transaction()
-            files = tx.get_files_modified()
-            if tm.rollback():
-                console.print(f"[green]✓[/green] Rolled back {len(files)} file(s)")
-                for f in files:
-                    console.print(f"  [dim]- {f}[/dim]")
-            else:
-                console.print("[red]Error:[/red] Rollback failed")
-        else:
-            console.print("[yellow]No active transaction to rollback[/yellow]")
-            # Show last transaction info
-            last_tx = tm.get_last_transaction()
-            if last_tx:
-                console.print(f"[dim]Last transaction: {last_tx.id} ({last_tx.state.value})[/dim]")
-
-    elif cmd == "/transactions":
-        # Show transaction statistics
-        from .core.transaction import get_transaction_manager
-
-        tm = get_transaction_manager(agent.config.get_transactions_config())
-        stats = tm.get_stats()
-        info = f"""
-[bold]Transaction Statistics[/bold]
-Enabled: {stats['enabled']}
-Active Transaction: {stats['active_transaction'] or 'None'}
-History: {stats['history_count']} / {stats['max_backups']}
-Committed: {stats['committed']}
-Rolled Back: {stats['rolled_back']}
-Backup Dir: {stats['backup_dir']}
-"""
-        console.print(Panel(info, title="Transactions"))
-
-    # Phase 4: New slash commands
-    elif cmd == "/summary":
-        # Show conversation summary
-        from .core.summarization import SimpleSummarizer
-
-        summarizer = SimpleSummarizer()
-        history = agent.get_conversation_history()
-        if len(history) > 1:  # More than just system prompt
-            summary = summarizer.summarize(history[1:])  # Skip system prompt
-            summary_msg = summary.to_message()
-            console.print(
-                Panel(
-                    summary_msg.get("content", "No summary available"),
-                    title="[bold]Conversation Summary[/bold]",
-                    border_style="cyan",
-                )
-            )
-        else:
-            console.print("[dim]No conversation to summarize yet.[/dim]")
-
-    elif cmd == "/plan":
-        # Enter planning mode
-        agent.permission_mode = PermissionMode.PLAN
-        agent.conversation.history[0]["content"] = agent._get_system_prompt()
-        console.print("[cyan]📋 Entered PLAN mode (read-only)[/cyan]")
-        console.print("[dim]Use /mode normal to return to normal mode[/dim]")
-
-    elif cmd.startswith("/reset-context"):
-        # Clear conversation but preserve memory bank
-        if hasattr(agent, 'memory_bank') and agent.memory_bank:
-            memory_class = type(agent.memory_bank)
-            memory_backup = agent.memory_bank.to_dict()
-            agent.clear_conversation()
-            agent.memory_bank = memory_class.from_dict(memory_backup)
-            # Re-inject memory into system prompt
-            agent.conversation.history[0]["content"] = agent._get_system_prompt()
-        else:
-            agent.clear_conversation()
-        console.print("[green]✓[/green] Context cleared. Memory preserved.")
-        console.print(
-            f"[dim]Memory items: {len(agent.memory_bank.items) if agent.memory_bank else 0}[/dim]"
-        )
-
-    elif cmd.startswith("/focus"):
-        # Focus on a specific directory
+    # Try using the command registry (new modular system)
+    if command_registry:
+        # Extract command name and args
         parts = command.split(maxsplit=1)
-        if len(parts) > 1:
-            from pathlib import Path
-            from .core.memory import MemorySource
+        cmd_name = parts[0][1:] if parts[0].startswith("/") else parts[0]  # Remove leading /
+        cmd_args = parts[1] if len(parts) > 1 else None
 
-            focus_path = Path(parts[1]).resolve()
-            if focus_path.exists() and focus_path.is_dir():
-                # Add to memory as a fact
-                agent.memory_bank.add_fact(
-                    f"User focused on directory: {focus_path}", source=MemorySource.USER
+        # Look up command in registry
+        cmd_obj = command_registry.get(cmd_name)
+        if cmd_obj:
+            logger.debug(f"Using command registry for: {cmd_name}")
+            try:
+                # Create command context
+                ctx = CommandContext(
+                    agent=agent,
+                    config=agent.config,
+                    hook_manager=agent.hook_manager,
+                    output_format=agent.output_format.value,
+                    verbose=False
                 )
-                console.print(f"[green]✓[/green] Focus set to: {focus_path}")
-                console.print("[dim]Future searches will prioritize this directory[/dim]")
-            else:
-                console.print(f"[red]Directory not found: {parts[1]}[/red]")
-        else:
-            console.print("[dim]Usage: /focus <directory_path>[/dim]")
-
-    elif cmd.startswith("/thinking"):
-        # Toggle thinking display
-        parts = cmd.split()
-        if len(parts) > 1:
-            toggle = parts[1].lower()
-            if toggle == "on":
-                agent.show_thinking = True
-                console.print("[green]✓[/green] Thinking display enabled")
-            elif toggle == "off":
-                agent.show_thinking = False
-                console.print("[green]✓[/green] Thinking display disabled")
-            else:
-                console.print("[red]Usage: /thinking [on|off][/red]")
-        else:
-            agent.show_thinking = not agent.show_thinking
-            status = "enabled" if agent.show_thinking else "disabled"
-            console.print(f"[green]✓[/green] Thinking display {status}")
-
-    elif cmd == "/memory":
-        # Show memory bank contents
-        if agent.memory_bank and agent.memory_bank.items:
-            console.print(
-                Panel(
-                    agent.memory_bank.get_full_display(),
-                    title="[bold]Memory Bank[/bold]",
-                    border_style="yellow",
-                )
-            )
-        else:
-            console.print("[dim]Memory bank is empty.[/dim]")
-
-    elif cmd == "/stats":
-        # Show session statistics
-        history = agent.get_conversation_history()
-        truncation_stats = agent.conversation.get_truncation_stats()
-        loop_stats = agent.loop_guard.get_stats()
-
-        stats_text = f"""
-[bold]Session Statistics[/bold]
-
-Messages: {len(history)}
-Tokens: {agent.conversation.get_token_count()}
-Tools Used: {len(set(agent._tools_used))} unique / {len(agent._tools_used)} total
-
-[bold]Context Management[/bold]
-Truncations: {truncation_stats.get('truncation_count', 0)}
-Summarizations: {truncation_stats.get('summarization_count', 0)}
-Messages Removed: {truncation_stats.get('total_messages_removed', 0)}
-
-[bold]Loop Guard[/bold]
-Iterations: {loop_stats.get('current_iteration', 0)}
-Unique Operations: {loop_stats.get('unique_operations_count', 0)}
-Files Read: {loop_stats.get('files_read_count', 0)}
-Files Written: {loop_stats.get('files_written_count', 0)}
-
-[bold]Memory Bank[/bold]
-Items: {len(agent.memory_bank.items) if agent.memory_bank else 0}
-"""
-        console.print(Panel(stats_text, title="Stats", border_style="cyan"))
-
-    elif cmd == "/routing":
-        # Show routing statistics
-        if hasattr(agent, 'get_routing_statistics'):
-            routing_stats = agent.get_routing_statistics()
-            if routing_stats:
-                stats_text = f"""
-[bold]Routing Statistics[/bold]
-
-Total Requests: {routing_stats.get('total_requests', 0)}
-Cache Hits: {routing_stats.get('cache_hits', 0)}
-Cache Misses: {routing_stats.get('cache_misses', 0)}
-Cache Hit Rate: {routing_stats.get('cache_hit_rate', 0):.1%}
-Errors: {routing_stats.get('errors', 0)}
-
-[bold]Performance[/bold]
-Avg Task Analysis: {routing_stats.get('avg_task_analysis_time_ms', 0):.1f}ms
-Avg Routing Time: {routing_stats.get('avg_routing_time_ms', 0):.1f}ms
-
-[bold]Cache[/bold]
-Entries: {routing_stats.get('cache_size', 0)}
-"""
-                console.print(Panel(stats_text, title="Routing Stats", border_style="cyan"))
-            else:
-                console.print("[dim]Routing is not enabled. Use --routing flag to enable.[/dim]")
-        else:
-            console.print("[dim]Routing is not available.[/dim]")
-
-    # Session Recovery Commands
-    elif cmd.startswith("/session"):
-        parts = cmd.split()
-        subcommand = parts[1] if len(parts) > 1 else "help"
-
-        if subcommand == "validate":
-            # Validate current session health
-            console.print("[cyan]🔍 Validating session health...[/cyan]")
-            health_report = agent.validate_session_health()
-
-            if health_report["healthy"]:
-                console.print("[green]✅ Session is healthy[/green]")
-            else:
-                console.print("[red]❌ Session has issues[/red]")
-
-            # Display issues
-            if health_report.get("issues"):
-                console.print("\n[bold]Issues Found:[/bold]")
-                for issue in health_report["issues"]:
-                    severity_color = {
-                        "critical": "red",
-                        "warning": "yellow",
-                        "info": "blue"
-                    }.get(issue.get("severity", "info"), "white")
-                    console.print(f"  [{severity_color}]• {issue['message']}[/{severity_color}]")
-
-            # Display recommendations
-            if health_report.get("recommendations"):
-                console.print("\n[bold]Recommendations:[/bold]")
-                for rec in health_report["recommendations"]:
-                    console.print(f"  [cyan]• {rec}[/cyan]")
-
-        elif subcommand == "repair":
-            # Trigger recovery repair
-            strategy = parts[2] if len(parts) > 2 else None
-
-            console.print("[cyan]🔧 Attempting to repair session...[/cyan]")
-
-            # Get session health first
-            health_report = agent.validate_session_health()
-
-            if health_report["healthy"]:
-                console.print("[green]✅ Session is already healthy - no repair needed[/green]")
+                # Execute command
+                cmd_obj.execute(ctx, cmd_args)
+                return
+            except Exception as e:
+                console.print(f"[red]Error executing command:[/red] {e}")
+                logger.exception(f"Command execution failed: {cmd_name}")
                 return
 
-            # Analyze and recommend recovery
-            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            action = agent.recovery_orchestrator.analyze_and_recommend(
-                session_id, agent.get_conversation_history()
-            )
-
-            console.print(f"[cyan]Recommended strategy: {action.strategy.value}[/cyan]")
-
-            # Execute recovery
-            result = agent.recovery_orchestrator.execute_recovery(
-                action, agent.get_conversation_history(), session_id
-            )
-
-            if result["success"]:
-                console.print("[green]✅ Session repair completed successfully[/green]")
-                console.print(f"[dim]Strategy used: {result['strategy']}[/dim]")
-            else:
-                console.print("[red]❌ Session repair failed[/red]")
-                console.print("[dim]Consider using /clear to start fresh[/dim]")
-
-        elif subcommand == "rollback":
-            # Rollback to checkpoint
-            checkpoint_id = parts[2] if len(parts) > 2 else None
-
-            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            checkpoints = agent.checkpoint_manager.list_checkpoints(session_id)
-
-            if not checkpoints:
-                console.print("[yellow]❌ No checkpoints available for rollback[/yellow]")
-                console.print("[dim]Checkpoints are created automatically during sessions[/dim]")
-                return
-
-            if checkpoint_id:
-                # Specific checkpoint requested
-                checkpoint = next((cp for cp in checkpoints if cp.id == checkpoint_id), None)
-                if not checkpoint:
-                    console.print(f"[red]❌ Checkpoint '{checkpoint_id}' not found[/red]")
-                    console.print("[dim]Available checkpoints:[/dim]")
-                    for cp in checkpoints[:5]:  # Show first 5
-                        console.print(f"  [dim]- {cp.id} ({cp.timestamp})[/dim]")
-                    return
-            else:
-                # Use most recent checkpoint
-                checkpoint = checkpoints[0]  # Already sorted by timestamp desc
-                console.print(f"[cyan]Using latest checkpoint: {checkpoint.id}[/cyan]")
-
-            console.print("[cyan]🔄 Rolling back to checkpoint...[/cyan]")
-
-            # Restore checkpoint
-            restored_history = agent.checkpoint_manager.restore_checkpoint(checkpoint)
-
-            if restored_history:
-                agent.conversation.history = restored_history
-                console.print("[green]✅ Session rolled back successfully[/green]")
-                console.print(f"[dim]Restored {len(restored_history)} messages[/dim]")
-            else:
-                console.print("[red]❌ Failed to restore checkpoint[/red]")
-
-        elif subcommand == "checkpoint":
-            # Create manual checkpoint
-            console.print("[cyan]📝 Creating checkpoint...[/cyan]")
-
-            session_id = f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            health_report = agent.health_monitor.analyze_health(agent.get_conversation_history())
-
-            checkpoint = agent.checkpoint_manager.create_checkpoint(
-                session_id,
-                agent.get_conversation_history(),
-                health_score=health_report.overall_score
-            )
-
-            console.print("[green]✅ Checkpoint created[/green]")
-            console.print(f"[dim]ID: {checkpoint.id}[/dim]")
-            console.print(f"[dim]Messages: {checkpoint.message_count}[/dim]")
-            console.print(f"[dim]Health Score: {health_report.overall_score:.1f}[/dim]")
-        else:
-            console.print("[dim]Session recovery commands:[/dim]")
-            console.print("  [cyan]/session validate[/cyan]  - Check session health")
-            console.print("  [cyan]/session repair[/cyan]    - Attempt automatic repair")
-            console.print("  [cyan]/session rollback[/cyan]  - Rollback to checkpoint")
-            console.print("  [cyan]/session checkpoint[/cyan] - Create manual checkpoint")
-
-    else:
-        logger.debug(f"No handler matched for cmd='{cmd}'")
-        console.print(f"[red]Unknown command: {command}[/red]")
-        console.print("[dim]Type /help for available commands[/dim]")
+    # Unknown command - not in registry
+    cmd_name = command.split()[0][1:] if command.startswith("/") else command.split()[0]
+    logger.debug(f"Unknown command: '{cmd_name}'")
+    console.print(f"[red]Unknown command: {command}[/red]")
+    console.print("[dim]Type /help for available commands[/dim]")
 
 
 if __name__ == "__main__":
