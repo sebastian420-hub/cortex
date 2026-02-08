@@ -22,9 +22,14 @@ def mock_agent():
     agent.conversation.update_model = MagicMock() # Mock the method
 
     agent._get_system_prompt.return_value = "You are Cortex updated system prompt." # Mock system prompt update
-    
+
     # Ensure switch_model is a mock method that can be configured
     agent.switch_model = MagicMock()
+
+    # Add attributes needed for CommandContext
+    agent.hook_manager = MagicMock()
+    agent.output_format = MagicMock()
+    agent.output_format.value = "text"
 
     return agent
 
