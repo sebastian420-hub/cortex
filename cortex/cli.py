@@ -37,6 +37,7 @@ from .storage.history import get_history_file
 from .storage.sessions import SessionManager
 from .output import OutputFormat
 from .hooks import HookManager
+from .cli_commands.commands import CommandRegistry, CommandContext
 
 __version__ = "1.0.0"
 
@@ -498,6 +499,9 @@ def run_interactive(
     history_file = get_history_file(Path.home())
     repl = REPL(str(history_file))
 
+    # Initialize command registry
+    command_registry = init_command_registry(session_manager)
+
     # Show banner
     repl.show_banner(
         project_name=agent.project_dir.name,
@@ -572,7 +576,7 @@ def run_interactive(
 
             # Handle commands
             if user_input.startswith("/"):
-                handle_command(user_input, agent, session_manager, repl)
+                handle_command(user_input, agent, session_manager, repl, command_registry)
                 continue
 
             # Process with agent
@@ -629,16 +633,141 @@ def run_interactive(
             break
 
 
-def handle_command(command: str, agent: Cortex, session_manager: SessionManager, repl: REPL):
+def init_command_registry(session_manager: SessionManager) -> 'CommandRegistry':
+    """
+    Initialize and populate the command registry.
+
+    Args:
+        session_manager: Session manager for session-related commands
+
+    Returns:
+        Populated CommandRegistry instance
+    """
+    from .cli_commands.commands import (
+        CommandRegistry,
+        # Basic commands
+        ClearCommand,
+        ResetContextCommand,
+        HelpCommand,
+        ExitCommand,
+        # Mode commands
+        PermissionModeCommand,
+        UIModeCommand,
+        PlanCommand,
+        # Model commands
+        ModelCommand,
+        ProfileCommand,
+        # Memory commands
+        MemoryCommand,
+        FocusCommand,
+        ThinkingCommand,
+        SummaryCommand,
+        # Session commands
+        SaveSessionCommand,
+        LoadSessionCommand,
+        ListSessionsCommand,
+        SessionRecoveryCommand,
+        # Stats commands
+        ProjectCommand,
+        StatsCommand,
+        RoutingCommand,
+        StorageCommand,
+        CleanupCommand,
+        # Transaction/Cache commands
+        CacheCommand,
+        RollbackCommand,
+        TransactionsCommand,
+    )
+
+    registry = CommandRegistry()
+
+    # Register basic commands
+    registry.register(ClearCommand())
+    registry.register(ResetContextCommand())
+    registry.register(HelpCommand())
+    registry.register(ExitCommand())
+
+    # Register mode commands
+    registry.register(PermissionModeCommand())
+    registry.register(UIModeCommand())
+    registry.register(PlanCommand())
+
+    # Register model commands
+    registry.register(ModelCommand())
+    registry.register(ProfileCommand())
+
+    # Register memory commands
+    registry.register(MemoryCommand())
+    registry.register(FocusCommand())
+    registry.register(ThinkingCommand())
+    registry.register(SummaryCommand())
+
+    # Register session commands (need session_manager)
+    registry.register(SaveSessionCommand(session_manager))
+    registry.register(LoadSessionCommand(session_manager))
+    registry.register(ListSessionsCommand(session_manager))
+    registry.register(SessionRecoveryCommand())
+
+    # Register stats commands
+    registry.register(ProjectCommand())
+    registry.register(StatsCommand())
+    registry.register(RoutingCommand())
+    registry.register(StorageCommand(session_manager))
+    registry.register(CleanupCommand(session_manager))
+
+    # Register transaction/cache commands
+    registry.register(CacheCommand())
+    registry.register(RollbackCommand())
+    registry.register(TransactionsCommand())
+
+    return registry
+
+
+def handle_command(
+    command: str,
+    agent: Cortex,
+    session_manager: SessionManager,
+    repl: REPL,
+    command_registry: Optional[CommandRegistry] = None
+):
     """Handle special commands"""
     from datetime import datetime
     from .ui.modes import UIMode, set_ui_mode, get_ui_mode
 
     logger = logging.getLogger(__name__) # Initialize logger here
     logger.debug(f"Handling command: '{command}'")
-    
+
+    # Try using the command registry first (new modular system)
+    if command_registry:
+        # Extract command name and args
+        parts = command.split(maxsplit=1)
+        cmd_name = parts[0][1:] if parts[0].startswith("/") else parts[0]  # Remove leading /
+        cmd_args = parts[1] if len(parts) > 1 else None
+
+        # Look up command in registry
+        cmd_obj = command_registry.get(cmd_name)
+        if cmd_obj:
+            logger.debug(f"Using command registry for: {cmd_name}")
+            try:
+                # Create command context
+                ctx = CommandContext(
+                    agent=agent,
+                    config=agent.config,
+                    hook_manager=agent.hook_manager,
+                    output_format=agent.output_format.value,
+                    verbose=False
+                )
+                # Execute command
+                cmd_obj.execute(ctx, cmd_args)
+                return
+            except Exception as e:
+                console.print(f"[red]Error executing command:[/red] {e}")
+                logger.exception(f"Command execution failed: {cmd_name}")
+                return
+
+    # Fall back to legacy command handling for commands not yet migrated
     cmd = command.lower().strip()
-    logger.debug(f"Processed cmd: '{cmd}'")
+    logger.debug(f"Using legacy handler for: '{cmd}'")
 
     if cmd.startswith("/help"):
         from .help import HelpSystem
