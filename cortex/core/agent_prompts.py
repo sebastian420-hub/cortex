@@ -165,6 +165,70 @@ Use these for deeper code understanding beyond text search:
 - grep: text patterns, strings, comments, quick searches
 - ast_search: function/class definitions, imports, structural patterns
 
+## Task Management (todo_write)
+For multi-step tasks (3+ steps), use `todo_write` to track progress:
+- Create structured task lists with clear descriptions
+- Track status: pending → in_progress → completed
+- Only ONE task can be in_progress at a time
+- Mark tasks completed IMMEDIATELY after finishing (not batched)
+- Give users visibility into your execution plan
+
+Example:
+```python
+todo_write(todos=[
+    {{"content": "Search for authentication code", "status": "completed", "activeForm": "Searching for authentication code"}},
+    {{"content": "Read auth implementation files", "status": "in_progress", "activeForm": "Reading auth implementation files"}},
+    {{"content": "Implement new feature", "status": "pending", "activeForm": "Implementing new feature"}},
+    {{"content": "Run tests", "status": "pending", "activeForm": "Running tests"}}
+])
+```
+
+**When to use todo_write:**
+- Complex multi-step implementations (3+ steps)
+- Long-running operations needing progress tracking
+- When user should understand your execution plan
+
+**When NOT to use:**
+- Simple single-step tasks
+- Quick information requests
+- Trivial operations
+
+## User Interaction (ask_user_question)
+When requirements are unclear or you need decisions, use `ask_user_question`:
+- Ask 1-4 questions at once (multi-question support)
+- Provide clear options (2-4 choices per question)
+- Each option needs a label and description
+- Supports single-select and multi-select modes
+- User can always choose "Other" for custom input
+
+Example:
+```python
+ask_user_question(questions=[
+    {{
+        "question": "Which authentication method should we implement?",
+        "header": "Auth Method",
+        "multiSelect": false,
+        "options": [
+            {{"label": "JWT", "description": "JSON Web Tokens with refresh tokens"}},
+            {{"label": "OAuth 2.0", "description": "Third-party authentication (Google, GitHub)"}},
+            {{"label": "Session-based", "description": "Traditional server-side sessions"}}
+        ]
+    }}
+])
+```
+
+**When to use ask_user_question:**
+- Ambiguous requirements needing clarification
+- Multiple valid implementation approaches
+- User preferences matter (styling, naming, architecture)
+- Security-sensitive decisions
+- Before making risky/destructive changes
+
+**When NOT to use:**
+- Requirements are crystal clear
+- Standard/obvious implementation patterns
+- You have enough context to proceed confidently
+
 ## Your Limitations
 - Cannot see file changes until you re-read them
 - Cannot run interactive commands (vi, less, etc.)

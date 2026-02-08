@@ -267,6 +267,18 @@ class ToolRegistry:
             RETURN_TO_COORDINATOR_SCHEMA,
         )
 
+        # User interaction tools
+        from .ask_user_tool import (
+            AskUserQuestionTool,
+            ASK_USER_TOOL_SCHEMA,
+        )
+
+        # Todo/task management tools
+        from .todo_tool import (
+            TodoWriteTool,
+            TODO_TOOL_SCHEMA,
+        )
+
         # Tool class mapping
         builtin_tools = {
             "read_file": ReadFileTool,
@@ -305,6 +317,10 @@ class ToolRegistry:
             # Delegation tools (model orchestration)
             "delegate_to_model": DelegateToModelTool,
             "return_to_coordinator": ReturnToCoordinatorTool,
+            # User interaction tools
+            "ask_user_question": AskUserQuestionTool,
+            # Todo/task management tools
+            "todo_write": TodoWriteTool,
         }
 
         # Tool schemas (inline definitions)
@@ -859,6 +875,10 @@ class ToolRegistry:
             # Delegation tools (model orchestration)
             "delegate_to_model": DELEGATE_TO_MODEL_SCHEMA,
             "return_to_coordinator": RETURN_TO_COORDINATOR_SCHEMA,
+            # User interaction tools
+            "ask_user_question": ASK_USER_TOOL_SCHEMA,
+            # Todo/task management tools
+            "todo_write": TODO_TOOL_SCHEMA,
         }
 
         # Register all builtin tools
