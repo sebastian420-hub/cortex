@@ -157,7 +157,7 @@ class Cortex:
         self.project_context = self.prompt_generator.load_project_context()
         system_prompt = self.prompt_generator.generate()
         self.conversation.system_prompt = system_prompt
-        self.conversation.on_truncation = self._on_context_truncation
+        self.conversation._on_truncation = self._on_context_truncation
 
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
