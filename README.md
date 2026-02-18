@@ -1,51 +1,38 @@
 # Cortex
 
-A unified agent for coding, cybersecurity, and personal assistance. Cortex supports both local LLM models (via Ollama) and cloud APIs (DeepSeek, Anthropic), and can integrate with MCP servers for third-party services. Work with your codebase, security tools, and more through natural language with flexible model options.
+A high-performance, hybrid AI agent for coding, cybersecurity, and personal assistance. Cortex combines the flexibility of Python with the speed of **Rust** and **Go** to provide a robust, production-ready engineering assistant.
+
+Cortex supports local LLM models (via Ollama), cloud APIs (DeepSeek, Anthropic, OpenAI), and integrates seamlessly with **MCP (Model Context Protocol)** servers.
 
 ## Features
 
-- **Flexible Models**: Use local models (Ollama) or cloud APIs (DeepSeek, Anthropic Claude)
-- **Cost-Effective**: Choose between free local models or affordable cloud APIs
-- **Privacy Options**: Use local models for complete privacy, or cloud APIs for better performance
-- **Offline-Capable**: Works without internet when using local models
-- **Extensible**: Easy to add new tools and capabilities
-- **Safe**: Built-in permission system and dangerous operation blocking
-- **Rich Terminal UI**: Beautiful syntax highlighting, markdown rendering, and progress indicators
+- **Hybrid Performance**: Offloads critical tasks (AST parsing, tokenization, search) to native Rust and Go extensions for maximum speed.
+- **Smart Context Management**: Uses chunked memory and token budgeting to work with massive codebases without overflowing context limits.
+- **Hierarchical Planning**: Breaks down complex requests into structured plans with self-reflection and auto-correction.
+- **Transactional Safety**: Protects your codebase with a built-in transaction manager that supports `begin/commit/rollback` for all file operations.
+- **Flexible Models**: Support for local models (Ollama) and high-performance cloud APIs (DeepSeek, Anthropic, OpenAI).
+- **Rich Terminal UI**: Beautiful syntax highlighting, markdown rendering, and real-time plan progress visualization.
+- **MCP Integrated**: Support for third-party services through the Model Context Protocol.
 
 ## Installation
 
 ### Prerequisites
 
 - Python 3.8+
-- For local models: [Ollama](https://ollama.ai/) installed and running
-- For cloud APIs: API keys (see [Cloud API Setup](#cloud-api-setup))
+- [Ollama](https://ollama.ai/) (for local models)
+- Rust toolchain (for native extensions)
+- Go (for high-performance services)
 
 ### Install Cortex
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cortex.git
+git clone https://github.com/sebastian420-hub/cortex.git
 cd cortex
 
-# Install dependencies
+# Install dependencies and build native extensions
 pip install -r requirements.txt
-
-# Install in development mode
-pip install -e .
-```
-
-### Pull a Model
-
-```bash
-# Start Ollama (if not already running)
-ollama serve
-
-# Pull a model (in a new terminal)
-ollama pull llama3.2          # 3B - Fast, good for testing
-# OR
-ollama pull llama3.3:70b      # 70B - Much smarter, needs good GPU
-# OR
-ollama pull qwen2.5:32b       # 32B - Good balance
+pip install -e .[hybrid]
 ```
 
 ## Quick Start
@@ -58,282 +45,78 @@ cd ~/my-project
 cortex
 
 # Or use one-shot mode
-cortex -p "add logging to api.py"
+cortex -p "Refactor the authentication logic in auth.py to use JWT"
 ```
 
-## Usage
+## Core Architecture
 
-### Interactive Mode
+Cortex is built on a modular, multi-layered architecture:
 
-```bash
-cortex
-
-> add logging to api.py
-> create a README file
-> fix the bug in line 45 of database.py
-> explain how authentication works
-> write tests for the user service
-```
-
-### One-Shot Mode
-
-```bash
-cortex -p "list all Python files"
-cortex -p "add type hints to utils.py"
-```
-
-### Different Models
-
-#### Local Models (Ollama)
-
-```bash
-# Use Llama 3.3 70B (much smarter)
-cortex --model llama3.3:70b
-
-# Use Qwen 2.5 (good at coding)
-cortex --model qwen2.5:32b
-
-# Use DeepSeek R1 (local via Ollama)
-cortex --model deepseek-r1:8b
-```
-
-#### Cloud APIs
-
-```bash
-# Use DeepSeek Chat (cheapest cloud option, excellent for coding)
-cortex --model deepseek-chat
-
-# Use DeepSeek Coder (specialized for coding)
-cortex --model deepseek-coder
-
-# Use Claude 3 Haiku (fast and affordable)
-cortex --model claude-3-haiku-20240307
-
-# Use Claude 3.5 Sonnet (best quality, similar to Claude Code)
-cortex --model claude-3-5-sonnet-20241022
-```
-
-### Cloud API Setup
-
-#### DeepSeek API
-
-1. Get your API key from [DeepSeek Platform](https://platform.deepseek.com/)
-2. Set environment variable:
-   ```bash
-   export DEEPSEEK_API_KEY=your_key_here
-   ```
-3. Use DeepSeek models:
-   ```bash
-   cortex --model deepseek-chat
-   ```
-
-#### Anthropic Claude API
-
-1. Get your API key from [Anthropic Console](https://console.anthropic.com/)
-2. Set environment variable:
-   ```bash
-   export ANTHROPIC_API_KEY=your_key_here
-   ```
-3. Use Claude models:
-   ```bash
-   cortex --model claude-3-haiku-20240307
-   ```
-
-#### List Available Providers
-
-```bash
-cortex --list-providers
-```
-
-Shows all available providers, models, and API key status.
-
-### Provider Auto-Detection
-
-Cortex automatically detects the provider from the model name:
-
-- Models starting with `deepseek-` → DeepSeek API
-- Models starting with `claude-` → Anthropic API
-- All others → Ollama (local)
-
-You can also explicitly specify the provider:
-
-```bash
-cortex --provider deepseek --model deepseek-chat
-```
-
-### Cost Comparison
-
-| Model | Provider | Input/1M | Output/1M | Best For |
-|-------|----------|----------|-----------|----------|
-| **DeepSeek-V3.2** | DeepSeek | $0.28 | $0.42 | Coding (cheapest) |
-| **Claude 3 Haiku** | Anthropic | $0.25 | $1.25 | General coding |
-| **Claude 3.5 Sonnet** | Anthropic | $3.00 | $15.00 | Best quality (Claude Code) |
-| **Local Models** | Ollama | Free | Free | Privacy, offline use |
-
-*Note: Pricing as of 2024. Check provider websites for current rates.*
-
-### Permission Modes
-
-```bash
-# Normal mode (asks for everything) - DEFAULT
-cortex
-
-# Auto-approve mode (dangerous! use in containers)
-cortex --auto-approve
-
-# Plan mode (read-only, no changes)
-cortex --plan-mode
-```
-
-### Session Management
-
-```bash
-# Save current session
-cortex --save-session mywork
-
-# Load a saved session
-cortex --load-session mywork
-
-# List all sessions
-cortex --list-sessions
-```
-
-### Configuration File
-
-Create a `config.yaml`:
-
-```yaml
-model: llama3.3:70b
-permission_mode: normal
-max_iterations: 20
-max_tokens: 100000
-keep_recent_messages: 20
-```
-
-Then use it:
-
-```bash
-cortex --config config.yaml
-```
-
-## In-Session Commands
-
-While in interactive mode, you can use these commands:
-
-- `/help` - Show help
-- `/clear` - Clear conversation history
-- `/mode [normal|auto|plan]` - Change permission mode
-- `/project` - Show project info
-- `/save [name]` - Save current session
-- `/load [name]` - Load a saved session
-- `/sessions` - List saved sessions
-- `/exit` - Exit Cortex
+- **UI Layer (`cortex.ui`)**: Handles terminal interaction and markdown rendering.
+- **Agent Layer (`cortex.agent`)**: Orchestrates execution, planning, and tool selection.
+- **Core Services (`cortex.core`)**:
+    - **Planning Engine**: Manages task decomposition and execution state.
+    - **Context Window Manager**: Handles dynamic code injection and token budgeting.
+    - **Memory System**: Layered memory for short-term history and long-term chunked storage.
+- **Native Layer (`cortex.native`)**:
+    - **Rust Core**: Ultra-fast AST parsing (tree-sitter) and tokenization.
+    - **Go Services**: High-concurrency search and gRPC service integrations.
 
 ## Available Tools
 
-Cortex comes with a comprehensive set of tools:
+Cortex provides a powerful suite of engineering tools:
+
+### Advanced Editing
+- `read_file_chunked`: Efficiently read large files using paging.
+- `chunked_edit`: Surgically modify large files with precision.
+- `transactional_apply`: Apply changes within a safe transaction block.
 
 ### File Operations
-- `read_file` - Read file contents
-- `write_file` - Write or overwrite files
+- `read_file` / `write_file`: Standard I/O operations.
+- `execute_command`: Secure shell command execution.
 
-### Command Execution
-- `execute_command` - Run shell commands
+### Discovery & Search
+- `list_files`: Intelligent file listing with gitignore awareness.
+- `search_files`: High-speed regex search across the project.
+- `ast_search`: Search for specific code symbols (classes, functions) using native AST parsing.
 
-### File Discovery
-- `list_files` - List files in directory
-- `search_files` - Search for text across files
+### Git & Testing
+- Full Git suite (`status`, `diff`, `commit`, `log`).
+- `run_tests`: Automatic test detection and execution (Pytest/Unittest).
 
-### Git Integration
-- `git_status` - Show git status
-- `git_diff` - Show git diff
-- `git_commit` - Commit changes
-- `git_log` - Show recent commits
+## Configuration
 
-### Testing
-- `run_tests` - Run test suite (auto-detects pytest/unittest)
+Cortex can be customized via `config.yaml`:
 
-## Project Configuration
-
-Create an `AGENT.md` file in your project root to give the agent context:
-
-```markdown
-# My Project
-
-## Tech Stack
-- Python 3.11 + FastAPI
-- PostgreSQL + SQLAlchemy
-- Redis for caching
-
-## Architecture
-- `api/`: FastAPI routes and schemas
-- `service/`: Business logic layer
-- `repository/`: Database access
-
-## Code Style
-- Use type hints everywhere
-- Follow PEP 8 strictly
-- Write docstrings for all functions
-
-## Testing
-- Use pytest
-- Write tests BEFORE implementation
-- Aim for 80%+ coverage
+```yaml
+model: deepseek-chat
+max_tokens: 128000
+permission_mode: normal  # normal, auto, plan
+features:
+  rust_ast: true
+  rust_tokenizer: true
+  go_cache: true
 ```
 
-The agent will automatically read this and follow your conventions!
+## Project Context (`GEMINI.md` / `AGENT.md`)
 
-## Architecture
-
-Cortex is organized into clean, modular components:
-
-```
-cortex/
-├── agent.py          # Main agent class
-├── cli.py            # Command-line interface
-├── config.py         # Configuration management
-├── models.py         # Data models
-├── tools/            # Tool implementations
-├── core/             # Core functionality (security, context, streaming)
-├── ui/               # User interface components
-├── storage/          # Session and history management
-└── utils/            # Utilities (errors, validation)
-```
+Cortex automatically reads `GEMINI.md` or `AGENT.md` files in your project root to understand your specific tech stack, architecture, and coding standards.
 
 ## Development
 
-### Setup Development Environment
+### Running Tests
+
+Cortex maintains a high bar for stability with a comprehensive test suite:
 
 ```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
+# Run all unit tests
+pytest tests/unit
 
-# Install pre-commit hooks
-pre-commit install
+# Run benchmarks
+pytest tests/benchmarks
 ```
 
-### Run Tests
-
-```bash
-pytest tests/ -v --cov=cortex
-```
-
-### Code Quality
-
-```bash
-# Format code
-black cortex tests
-
-# Lint
-flake8 cortex tests
-
-# Type check
-mypy cortex
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+Current test status: **453/455 tests passing (~99.5%)**.
 
 ## License
 
@@ -341,7 +124,6 @@ MIT License - see LICENSE file for details
 
 ## Acknowledgments
 
-- Inspired by Claude Code and similar AI coding assistants
-- Built with [Ollama](https://ollama.ai/) for local LLM inference
-- Uses [Rich](https://github.com/Textualize/rich) for beautiful terminal UI
-
+- Inspired by the evolution of AI coding assistants.
+- Built with **Ollama**, **Tree-sitter**, and **Rich**.
+- Performance powered by **Rust** and **Go**.
