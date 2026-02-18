@@ -110,6 +110,40 @@ DEFAULT_ROUTING = {
     "log_file": None,
 }
 
+# Default profiling settings
+DEFAULT_PROFILING = {
+    "enabled": False,
+    "output_dir": ".cortex/profiles",
+    "auto_report": False,
+    "track_memory": True,
+}
+
+# Default feature flags settings
+DEFAULT_FEATURE_FLAGS = {
+    "rust_search": False,
+    "rust_ast": False,
+    "rust_tokenizer": False,
+    "go_cache": False,
+    "go_model_manager": False,
+    "profiling": False,
+}
+
+# Default services settings (Go gRPC services)
+DEFAULT_SERVICES = {
+    "enabled": False,
+    "cache": {
+        "host": "localhost",
+        "port": 50051,
+        "auto_start": True,
+    },
+    "model_manager": {
+        "host": "localhost",
+        "port": 50052,
+        "auto_start": True,
+        "health_interval": 30,
+    },
+}
+
 # Default context compression/summarization settings
 DEFAULT_CONTEXT_COMPRESSION = {
     "summarization_threshold": 0.75,  # Trigger at 75% (was 0.8)
@@ -175,6 +209,10 @@ class AgentConfig:
         rate_limit: Optional[Dict[str, Any]] = None,
         # Routing settings (new)
         routing: Optional[Dict[str, Any]] = None,
+        # Hybrid architecture settings
+        profiling: Optional[Dict[str, Any]] = None,
+        feature_flags: Optional[Dict[str, Any]] = None,
+        services: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
         # Core settings
@@ -244,6 +282,11 @@ class AgentConfig:
         # Routing settings (merge with defaults)
         self.routing = {**DEFAULT_ROUTING, **(routing or {})}
 
+        # Hybrid architecture settings (merge with defaults)
+        self.profiling = {**DEFAULT_PROFILING, **(profiling or {})}
+        self.feature_flags = {**DEFAULT_FEATURE_FLAGS, **(feature_flags or {})}
+        self.services = {**DEFAULT_SERVICES, **(services or {})}
+
         # Extra settings for extensibility
         self.extra = kwargs
 
@@ -288,6 +331,18 @@ class AgentConfig:
     def get_routing_config(self) -> Dict[str, Any]:
         """Get configuration for RoutingOrchestrator."""
         return self.routing
+
+    def get_profiling_config(self) -> Dict[str, Any]:
+        """Get configuration for PerformanceProfiler."""
+        return self.profiling
+
+    def get_feature_flags_config(self) -> Dict[str, Any]:
+        """Get configuration for FeatureManager."""
+        return self.feature_flags
+
+    def get_services_config(self) -> Dict[str, Any]:
+        """Get configuration for Go gRPC services."""
+        return self.services
 
     @staticmethod
     def _parse_max_tokens(value: Any) -> Optional[int]:
@@ -473,4 +528,8 @@ class AgentConfig:
             "file_cache": self.file_cache,
             "transactions": self.transactions,
             "routing": self.routing,
+            # Hybrid architecture
+            "profiling": self.profiling,
+            "feature_flags": self.feature_flags,
+            "services": self.services,
         }

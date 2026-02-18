@@ -45,3 +45,11 @@ tools:
 
   # Tools to explicitly enable (re-enable defaults)
   # enabled: []
+
+# Feature flags for hybrid (Rust/Go) components
+features:
+  rust_search: true
+  rust_ast: true
+  rust_tokenizer: true
+  go_cache: true
+  go_model_manager: true

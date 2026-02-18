@@ -37,10 +37,16 @@ dependencies = [
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
+    "pytest-benchmark>=4.0",
     "mypy>=1.0",
     "black>=23.0",
     "flake8>=6.0",
     "pre-commit>=3.0",
+]
+hybrid = [
+    "maturin>=1.0",
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
 ]
 
 [project.scripts]

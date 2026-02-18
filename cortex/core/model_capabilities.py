@@ -440,6 +440,41 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
             "complex": 8000,
         },
     ),
+    # -------------------------------------------------------------------------
+    # Moonshot AI / Kimi Models (via OpenRouter)
+    # -------------------------------------------------------------------------
+    "moonshotai/kimi-k2.5": ModelProfile(
+        name="Kimi K2.5 (OpenRouter)",
+        context_window=256000,
+        tool_following=CapabilityLevel.GOOD,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=32,
+        supports_streaming=True,
+        supports_vision=True,
+        supports_function_calling=True,
+        recommended_temperature=0.3,
+        notes="Moonshot AI's native multimodal model. Uses native token-based tool format that requires special parsing.",
+        exposes_thinking=True,
+        thinking_field="reasoning_content",
+    ),
+    "moonshotai/kimi-k2": ModelProfile(
+        name="Kimi K2 (OpenRouter)",
+        context_window=256000,
+        tool_following=CapabilityLevel.GOOD,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=32,
+        supports_streaming=True,
+        supports_vision=True,
+        supports_function_calling=True,
+        recommended_temperature=0.3,
+        notes="1T parameter MoE model with 32B active per forward pass. Native tool format requires special parsing.",
+        exposes_thinking=True,
+        thinking_field="reasoning_content",
+    ),
 }
 
 # Default profile for unknown models
@@ -501,6 +536,8 @@ def get_model_profile(model_name: str) -> ModelProfile:
         "gpt-4": "gpt-4-turbo",
         "gpt-3": "gpt-3.5-turbo",
         "deepseek": "deepseek-chat",
+        "kimi": "moonshotai/kimi-k2.5",
+        "moonshot": "moonshotai/kimi-k2.5",
         "qwen": "qwen2.5-coder",
         "codellama": "codellama",
         "phi": "phi3",

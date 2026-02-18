@@ -35,6 +35,7 @@ from .storage.sessions import SessionManager
 from .output import OutputFormat
 from .hooks import HookManager
 from .cli_commands.commands import CommandRegistry, CommandContext
+from .core.feature_flags import FeatureManager
 
 __version__ = "1.0.0"
 
@@ -284,6 +285,9 @@ Examples:
         console.print(f"[dim]Loaded config from {config_path}[/dim]")
     else:
         config = AgentConfig()
+
+    # Initialize FeatureManager with loaded config
+    FeatureManager.get_instance(config.get_feature_flags_config())
 
     # Track if model was explicitly provided (for session loading logic)
     model_explicitly_provided = args.model is not None

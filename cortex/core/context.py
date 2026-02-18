@@ -102,6 +102,22 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
         except (TypeError, ValueError):
             text = str(text)
 
+    # Try native Rust tokenizer first (Phase 2 hybrid)
+    try:
+        from .feature_flags import FeatureFlag, FeatureManager
+
+        fm = FeatureManager.get_instance()
+        if fm.is_enabled(FeatureFlag.RUST_TOKENIZER):
+            from ..native import native_count_tokens, NATIVE_AVAILABLE
+
+            if NATIVE_AVAILABLE and native_count_tokens is not None:
+                try:
+                    return native_count_tokens(text, model)
+                except Exception:
+                    pass
+    except ImportError:
+        pass
+
     if TIKTOKEN_AVAILABLE:
         encoding = get_encoding_for_model(model)
         if encoding is not None:

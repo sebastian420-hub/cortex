@@ -536,16 +536,7 @@ class ConsolidatedDisplay:
 
     def _show_minimal_summary(self):
         """Show final summary in minimal mode."""
-        completed = sum(
-            1 for op in self._operations.values() if op.status == OperationStatus.COMPLETED
-        )
-        failed = sum(1 for op in self._operations.values() if op.status == OperationStatus.FAILED)
-        total = len(self._operations)
-
-        if failed == 0:
-            self.console.print(f"[green]✓ Completed {completed}/{total} operations[/green]")
-        else:
-            self.console.print(f"[yellow]⚠ Completed {completed}/{total}, {failed} failed[/yellow]")
+        pass
 
     def _show_detailed_summary(self):
         """Show final summary in detailed mode."""

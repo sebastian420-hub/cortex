@@ -62,8 +62,9 @@ class ChunkedEditTool(Tool):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.agent = kwargs.get("agent") or kwargs.get("parent_agent")
         self.chunker = FileChunker(max_chunk_size=2000, strategy=ChunkingStrategy.SMART)
-        self.context_window = ContextWindowManager(max_tokens=100000)
+        self.context_window = ContextWindowManager(model=self.agent.model, max_tokens=100000)
         self.chunk_cache: Dict[str, EditChunk] = {}
         self.file_contexts: Dict[str, ContextWindowManager] = {}
 
@@ -289,7 +290,7 @@ class ChunkedEditTool(Tool):
             # Load or retrieve file context
             if path not in self.file_contexts:
                 content = full_path.read_text(encoding="utf-8")
-                context = create_context_window_from_file(content, path)
+                context = create_context_window_from_file(content, path, model=self.agent.model)
                 self.file_contexts[path] = context
                 # Cache chunks
                 for chunk in context.available_chunks:
@@ -413,7 +414,7 @@ class ChunkedEditTool(Tool):
                 chunks = self.chunker.chunk_file(content, path)
 
                 # Cache the context
-                context = create_context_window_from_file(content, path)
+                context = create_context_window_from_file(content, path, model=self.agent.model)
                 self.file_contexts[path] = context
                 for chunk in chunks:
                     self.chunk_cache[chunk.chunk_id] = chunk
@@ -483,7 +484,7 @@ class ChunkedEditTool(Tool):
             # Load or retrieve file context
             if path not in self.file_contexts:
                 content = full_path.read_text(encoding="utf-8")
-                context = create_context_window_from_file(content, path)
+                context = create_context_window_from_file(content, path, model=self.agent.model)
                 self.file_contexts[path] = context
                 for chunk in context.available_chunks:
                     self.chunk_cache[chunk.chunk_id] = chunk

@@ -103,6 +103,7 @@ class ContextWindowManager:
 
     def __init__(
         self,
+        model: str,
         max_tokens: int = 100000,
         injection_strategy: ContextInjectionStrategy = ContextInjectionStrategy.SMART,
         budget_per_operation: bool = True,
@@ -111,10 +112,12 @@ class ContextWindowManager:
         Initialize context window manager.
 
         Args:
+            model: The model name for accurate token counting.
             max_tokens: Maximum tokens in context window
             injection_strategy: Strategy for selecting chunks to inject
             budget_per_operation: Whether to enforce per-operation budgets
         """
+        self.model = model
         self.max_tokens = max_tokens
         self.injection_strategy = injection_strategy
         self.budget_per_operation = budget_per_operation
@@ -515,15 +518,15 @@ class ContextWindowManager:
         """Estimate token count for messages."""
         total = 0
         for msg in messages:
-            # Use accurate message token counting with default model
-            # TODO: Pass actual model name to ContextWindowManager
-            total += count_message_tokens(msg, model="gpt-4")
+            # Use accurate message token counting with the configured model
+            total += count_message_tokens(msg, model=self.model)
         return total
 
 
 def create_context_window_from_file(
     content: str,
     file_path: str,
+    model: str,
     max_tokens: int = 100000,
     chunk_strategy: ChunkingStrategy = ChunkingStrategy.SMART,
 ) -> ContextWindowManager:
@@ -533,6 +536,7 @@ def create_context_window_from_file(
     Args:
         content: File content
         file_path: Path to the file
+        model: The model name for accurate token counting.
         max_tokens: Maximum tokens in context window
         chunk_strategy: Strategy for chunking the file
 
@@ -544,7 +548,7 @@ def create_context_window_from_file(
     chunks = chunker.chunk_file(content, file_path)
 
     # Create context window
-    context_window = ContextWindowManager(max_tokens=max_tokens)
+    context_window = ContextWindowManager(model=model, max_tokens=max_tokens)
     context_window.add_chunks(chunks)
 
     return context_window
