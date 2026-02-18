@@ -102,13 +102,15 @@ class ConversationManager:
                 )
 
                 if has_tool_syntax:
-                    logger.warning(
+                    # Only log at debug level - don't warn users about this anymore
+                    # The streaming layer should have already tried to extract tool calls
+                    logger.debug(
                         "Model returned reasoning with tool syntax but no actual tool_calls. "
-                        "This may indicate a provider parsing issue or model confusion. "
+                        "Converting to content. "
                         f"Reasoning preview: {reasoning_content[:150]}..."
                     )
                 else:
-                    # Normal reasoning-only response (e.g., model thinking without output yet)
+                    # Normal reasoning-only response - silent, no need to warn
                     logger.debug(
                         "Reasoning-only assistant message (no content or tool_calls). "
                         "Converting reasoning_content to content."
@@ -117,10 +119,10 @@ class ConversationManager:
                 # Convert reasoning to content for valid message structure
                 content = f"[Reasoning: {reasoning_content[:200]}{'...' if len(reasoning_content) > 200 else ''}]"
             else:
-                # Truly empty response - this shouldn't happen
-                logger.warning(
-                    "Attempted to add completely empty assistant message (no content, tool_calls, or reasoning). "
-                    "Adding placeholder content to prevent API errors."
+                # Truly empty response - this shouldn't happen but handle gracefully
+                # Log at debug level instead of warning to reduce noise
+                logger.debug(
+                    "Adding placeholder content for empty assistant message to prevent API errors."
                 )
                 content = "[Empty assistant response]"
 

@@ -1,9 +1,13 @@
 """OpenRouter provider (OpenAI-compatible)."""
 
 import os
+import re
+import logging
 from typing import Dict, Any, List, Iterator, Optional
 
 from .base import ModelProvider, ProviderError
+
+logger = logging.getLogger(__name__)
 
 
 class OpenRouterProvider(ModelProvider):
@@ -76,6 +80,25 @@ class OpenRouterProvider(ModelProvider):
                     )
                     for i, tc in enumerate(message.tool_calls)
                 ]
+            else:
+                # Fallback: Check for Kimi native tool call format
+                # OpenRouter may not always transpile Kimi's native format to OpenAI format
+                kimi_tools = self._extract_kimi_native_tool_calls(message.content or "")
+                if kimi_tools:
+                    from cortex.utils.tool_call_validation import validate_tool_call_data
+
+                    logger.info(
+                        f"Parsed {len(kimi_tools)} tool calls from Kimi native format "
+                        f"for model {model}"
+                    )
+                    result["message"]["tool_calls"] = [
+                        validate_tool_call_data(tc, index=i)
+                        for i, tc in enumerate(kimi_tools)
+                    ]
+                    # Remove tool syntax from content
+                    result["message"]["content"] = self._clean_kimi_tool_content(
+                        message.content or ""
+                    )
 
             # Extract reasoning_details if available
             if hasattr(message, "reasoning_details") and message.reasoning_details:
@@ -105,6 +128,10 @@ class OpenRouterProvider(ModelProvider):
 
             stream = self.client.chat.completions.create(**kwargs)
 
+            # Buffer for Kimi native tool call detection in streaming mode
+            content_buffer = ""
+            kimi_section_started = False
+
             for chunk in stream:
                 if chunk.choices:
                     choice = chunk.choices[0]
@@ -116,6 +143,14 @@ class OpenRouterProvider(ModelProvider):
                                 "content": delta.content or "",
                             }
                         }
+
+                        # Buffer content for Kimi native tool call detection
+                        if delta.content:
+                            content_buffer += delta.content
+                            # Check if we're entering a tool calls section
+                            if "<|tool_calls_section_begin|>" in content_buffer:
+                                kimi_section_started = True
+
                         if hasattr(delta, "tool_calls") and delta.tool_calls:
                             from cortex.utils.tool_call_validation import validate_tool_call_data
 
@@ -139,6 +174,28 @@ class OpenRouterProvider(ModelProvider):
                         # Extract reasoning_details if available
                         if hasattr(delta, "reasoning_details") and delta.reasoning_details:
                             result["message"]["reasoning_details"] = delta.reasoning_details
+
+                        # Check if Kimi native tool call section is complete
+                        if kimi_section_started and "<|tool_calls_section_end|>" in content_buffer:
+                            # Extract tool calls from buffered content
+                            kimi_tools = self._extract_kimi_native_tool_calls(content_buffer)
+                            if kimi_tools:
+                                from cortex.utils.tool_call_validation import validate_tool_call_data
+
+                                logger.info(
+                                    f"Parsed {len(kimi_tools)} tool calls from Kimi native format "
+                                    f"in streaming mode for model {model}"
+                                )
+                                result["message"]["tool_calls"] = [
+                                    validate_tool_call_data(tc, index=i)
+                                    for i, tc in enumerate(kimi_tools)
+                                ]
+                                # Clear content since it was tool syntax
+                                result["message"]["content"] = ""
+                            # Reset buffer
+                            content_buffer = ""
+                            kimi_section_started = False
+
                         yield result
         except Exception as e:
             raise ProviderError(f"OpenRouter streaming error: {e}") from e
@@ -204,8 +261,101 @@ class OpenRouterProvider(ModelProvider):
             "claude-3.5",
             "claude-3.7",
             "mimo",
+            "kimi",
         ]
         return any(indicator in model_lower for indicator in thinking_indicators)
+
+    def _extract_kimi_native_tool_calls(self, content: str) -> Optional[List[Dict[str, Any]]]:
+        """
+        Extract tool calls from Kimi's native token format.
+
+        Kimi K2/K2.5 models use a special token-based format for tool calls that
+        OpenRouter may not always properly transpile to OpenAI's tool_calls format.
+
+        Native Kimi format:
+        <|tool_calls_section_begin|>
+        <|tool_call_begin|>functions.func_name:0<|tool_call_argument_begin|>{"arg": "value"}
+        <|tool_call_end|>
+        <|tool_calls_section_end|>
+
+        Args:
+            content: The raw content from the model response
+
+        Returns:
+            List of tool call dicts in OpenAI-compatible format, or None if no native format found
+        """
+        if not content or "<|tool_calls_section_begin|>" not in content:
+            return None
+
+        tool_calls = []
+
+        # Pattern to match the entire tool calls section
+        section_pattern = r"<\|tool_calls_section_begin\|>(.*?)<\|tool_calls_section_end\|>"
+        sections = re.findall(section_pattern, content, re.DOTALL)
+
+        if not sections:
+            return None
+
+        # Pattern to match individual tool calls within the section
+        # Format: <|tool_call_begin|>functions.name:idx<|tool_call_argument_begin|>{args}<|tool_call_end|>
+        call_pattern = (
+            r"<\|tool_call_begin\|>\s*"
+            r"(?P<tool_id>[\w\.]+:\d+)\s*"
+            r"<\|tool_call_argument_begin\|>\s*"
+            r"(?P<args>\{.*?\})\s*"
+            r"<\|tool_call_end\|>"
+        )
+
+        for section in sections:
+            for match in re.finditer(call_pattern, section, re.DOTALL):
+                tool_id = match.group("tool_id")
+                args_str = match.group("args")
+
+                # Parse function name from ID (functions.func_name:0)
+                func_name = ""
+                if "." in tool_id and ":" in tool_id:
+                    try:
+                        func_name = tool_id.split(".")[1].split(":")[0]
+                    except IndexError:
+                        logger.warning(f"Could not parse function name from tool_id: {tool_id}")
+                        continue
+
+                tool_calls.append({
+                    "id": tool_id,
+                    "type": "function",
+                    "function": {
+                        "name": func_name,
+                        "arguments": args_str.strip(),
+                    },
+                })
+
+        if tool_calls:
+            logger.debug(f"Extracted {len(tool_calls)} tool calls from Kimi native format")
+
+        return tool_calls if tool_calls else None
+
+    def _clean_kimi_tool_content(self, content: str) -> str:
+        """
+        Remove Kimi native tool call syntax from content.
+
+        Args:
+            content: Raw content containing tool call syntax
+
+        Returns:
+            Cleaned content with tool syntax removed
+        """
+        if not content:
+            return ""
+
+        # Remove the entire tool calls section
+        cleaned = re.sub(
+            r"<\|tool_calls_section_begin\|>.*?<\|tool_calls_section_end\|>",
+            "",
+            content,
+            flags=re.DOTALL,
+        )
+
+        return cleaned.strip()
 
     def _should_enable_reasoning(self, model: str) -> bool:
         """

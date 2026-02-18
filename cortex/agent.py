@@ -1201,17 +1201,17 @@ class Cortex:
                             )
 
                             if has_tool_syntax:
-                                self._output_warning(
-                                    "Model attempted to use tools in reasoning but didn't properly format tool calls. "
-                                    "This may be a provider issue or model incompatibility."
+                                # Model tried to use tools but failed - log quietly, don't warn user
+                                logger.debug(
+                                    "Model attempted tool use in reasoning but no valid tool_calls parsed"
                                 )
                             else:
-                                # Normal reasoning-only response (thinking was already displayed)
+                                # Normal reasoning-only response - thinking already displayed
                                 logger.debug("Reasoning-only response received, exiting cleanly")
                             return
                         else:
-                            # Truly empty response - this shouldn't happen
-                            self._output_warning("Model returned empty response. Exiting.")
+                            # Truly empty response - this shouldn't happen but handle gracefully
+                            logger.debug("Empty model response received, exiting")
                             return
 
                 except KeyboardInterrupt:
@@ -1605,17 +1605,17 @@ class Cortex:
                             )
 
                             if has_tool_syntax:
-                                self._output_warning(
-                                    "Model attempted to use tools in reasoning but didn't properly format tool calls. "
-                                    "This may be a provider issue or model incompatibility."
+                                # Model tried to use tools but failed - log quietly, don't warn user
+                                logger.debug(
+                                    "Model attempted tool use in reasoning but no valid tool_calls parsed"
                                 )
                             else:
-                                # Normal reasoning-only response (thinking was already displayed)
+                                # Normal reasoning-only response - thinking already displayed
                                 logger.debug("Reasoning-only response received, exiting cleanly")
                             return
                         else:
-                            # Truly empty response - this shouldn't happen
-                            self._output_warning("Model returned empty response. Exiting.")
+                            # Truly empty response - this shouldn't happen but handle gracefully
+                            logger.debug("Empty model response received, exiting")
                             return
 
                 except KeyboardInterrupt:

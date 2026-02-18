@@ -191,7 +191,8 @@ class TestDisplayStreamingResponse:
         with patch('cortex.core.streaming.console'):
             result = display_streaming_response(empty_stream)
             
-            assert result == {"role": "assistant"}
+            # Now always includes empty content to prevent API errors
+            assert result == {"role": "assistant", "content": ""}
             # Should not crash
     
     def test_display_streaming_response_custom_title(self):
@@ -214,7 +215,9 @@ class TestDisplayStreamingResponse:
         with patch('cortex.core.streaming.console') as mock_console:
             result = display_streaming_response(iter(stream_chunks))
             
-            assert "content" not in result
+            # Now always includes empty content to prevent API errors
+            assert "content" in result
+            assert result["content"] == ""
             assert "tool_calls" in result
             # console.print should not be called since there's no content
             # (Actually current implementation prints only if content exists)
