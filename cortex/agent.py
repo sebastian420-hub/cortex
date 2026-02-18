@@ -620,6 +620,17 @@ class Cortex:
                             *self.conversation.history[-5:],  # Last 5 messages
                         ]
 
+                        # Also truncate content of remaining tool results to prevent overflow
+                        max_tool_content_length = 8000  # ~2000 tokens per tool result
+                        for msg in self.conversation.history:
+                            if msg.get("role") == "tool":
+                                content = msg.get("content", "")
+                                if isinstance(content, str) and len(content) > max_tool_content_length:
+                                    msg["content"] = (
+                                        content[:max_tool_content_length]
+                                        + f"\n\n[... Content truncated from {len(content)} chars to prevent context overflow ...]"
+                                    )
+
                         new_count = len(self.conversation.history)
                         new_tokens = self.conversation.get_token_count()
 

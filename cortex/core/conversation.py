@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Maximum content length for tool results to prevent context overflow
+MAX_TOOL_RESULT_LENGTH = 8000  # ~2000 tokens, applied before adding to history
+
 
 class ConversationManager:
     """Manages conversation history and context"""
@@ -143,13 +146,30 @@ class ConversationManager:
         if "success" not in result:
             result["success"] = "error" not in result
 
+        # Convert result to JSON string
+        result_json = json.dumps(sanitize_object(result), ensure_ascii=False)
+
+        # Proactive truncation: limit tool result size before adding to history
+        original_length = len(result_json)
+        if original_length > MAX_TOOL_RESULT_LENGTH:
+            # Truncate the result content
+            truncated_result = result.copy()
+            truncated_result["data"] = {"truncated": True, "original_size": original_length}
+            truncated_result["truncation_reason"] = (
+                f"Tool result truncated from {original_length} to {MAX_TOOL_RESULT_LENGTH} chars "
+                "to prevent context overflow"
+            )
+            result_json = json.dumps(sanitize_object(truncated_result), ensure_ascii=False)
+            logger.warning(
+                f"Proactively truncated tool result: {original_length} -> {len(result_json)} chars "
+                f"(~{original_length // 4} -> ~{len(result_json) // 4} tokens)"
+            )
+
         self.history.append(
             {
                 "role": "tool",
                 "tool_call_id": tool_call_id,
-                "content": json.dumps(
-                    sanitize_object(result), ensure_ascii=False
-                ),  # Keep JSON but ensure format
+                "content": result_json,  # Keep JSON but ensure format
             }
         )
         self._optimize()

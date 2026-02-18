@@ -7,10 +7,10 @@ from typing import Dict, Any, List
 logger = logging.getLogger(__name__)
 
 # Maximum characters for different result types
-MAX_FILE_LIST_LENGTH = 50000  # ~12,500 tokens (4 chars/token)
-MAX_SEARCH_RESULTS_LENGTH = 100000  # ~25,000 tokens
-MAX_SINGLE_FILE_LENGTH = 200000  # ~50,000 tokens
-MAX_GENERIC_RESULT_LENGTH = 150000  # ~37,500 tokens
+MAX_FILE_LIST_LENGTH = 30000  # ~7,500 tokens (4 chars/token)
+MAX_SEARCH_RESULTS_LENGTH = 50000  # ~12,500 tokens - reduced to prevent overflow
+MAX_SINGLE_FILE_LENGTH = 150000  # ~37,500 tokens
+MAX_GENERIC_RESULT_LENGTH = 100000  # ~25,000 tokens - reduced to prevent overflow
 
 # Truncation messages
 TRUNCATION_MESSAGE = "\n\n[... Content truncated to prevent context overflow. {} items removed ...]"
@@ -154,7 +154,7 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
         if isinstance(extracted, list) and len(extracted) > 0:
             # Calculate size
             extracted_json = json.dumps(extracted, ensure_ascii=False)
-            max_structures = 150  # Limit to 150 structures
+            max_structures = 50  # Limit to 50 structures - reduced to prevent overflow
 
             if len(extracted_json) > MAX_SEARCH_RESULTS_LENGTH or len(extracted) > max_structures:
                 original_count = len(extracted)
