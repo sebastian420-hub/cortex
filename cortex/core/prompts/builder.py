@@ -64,25 +64,28 @@ class ToolFormatter:
             # File operations - most commonly needed
             "read_file",
             "write_file",
+            "edit",
             "edit_file",
             # Search operations
+            "grep",
             "grep_search",
+            "glob",
             "glob_files",
-            "find_files",
+            "list_files",
             # Execution
             "bash",
-            "run_command",
+            "execute_command",
             # Planning
             "create_plan",
             "execute_plan",
             "monitor_plan",
-            "update_plan",
+            "todo_write",
             # Web
             "web_search",
             "web_fetch",
-            # Memory
-            "memory_store",
-            "memory_recall",
+            # AST
+            "ast_search",
+            "ast_extract",
         ]
 
         def get_priority(tool: Dict[str, Any]) -> int:
@@ -101,9 +104,15 @@ class ToolFormatter:
         sections.append("You have access to the following tools. Use them to accomplish tasks.\n")
 
         for tool in tools:
-            name = tool.get("name", "unknown")
-            description = tool.get("description", "No description")
-            parameters = tool.get("parameters", {})
+            # Handle both function schema and direct schema
+            if "function" in tool:
+                tool_data = tool["function"]
+            else:
+                tool_data = tool
+
+            name = tool_data.get("name", "unknown")
+            description = tool_data.get("description", "No description")
+            parameters = tool_data.get("parameters", {})
 
             sections.append(f"## {name}\n")
             sections.append(f"{description}\n")
@@ -115,7 +124,7 @@ class ToolFormatter:
                 sections.append(params_info)
 
             # Generate example
-            example = self._generate_example(tool)
+            example = self._generate_example(tool_data)
             sections.append(f"\n**Example:**\n```json\n{example}\n```\n")
 
         return "\n".join(sections)
@@ -126,13 +135,18 @@ class ToolFormatter:
         lines.append("Available tools (use function calling):\n")
 
         for tool in tools:
-            name = tool.get("name", "unknown")
-            description = tool.get("description", "")
+            if "function" in tool:
+                tool_data = tool["function"]
+            else:
+                tool_data = tool
+
+            name = tool_data.get("name", "unknown")
+            description = tool_data.get("description", "")
             # Truncate long descriptions
             if len(description) > 100:
                 description = description[:97] + "..."
 
-            params = tool.get("parameters", {})
+            params = tool_data.get("parameters", {})
             required = params.get("required", [])
             param_str = ", ".join(required[:3])  # Show first 3 required params
             if len(required) > 3:
@@ -157,9 +171,14 @@ When you want to use a tool:
         )
 
         for tool in tools:
-            name = tool.get("name", "unknown")
-            description = tool.get("description", "")
-            params = tool.get("parameters", {})
+            if "function" in tool:
+                tool_data = tool["function"]
+            else:
+                tool_data = tool
+
+            name = tool_data.get("name", "unknown")
+            description = tool_data.get("description", "")
+            params = tool_data.get("parameters", {})
             required = params.get("required", [])
             properties = params.get("properties", {})
 
@@ -179,7 +198,7 @@ When you want to use a tool:
                     )
 
             # Show example
-            example = self._generate_example(tool)
+            example = self._generate_example(tool_data)
             sections.append(f"EXAMPLE:\n{name}({example})")
             sections.append("")
 
@@ -202,14 +221,17 @@ When you want to use a tool:
 
         return "\n".join(lines)
 
-    def _generate_example(self, tool: Dict[str, Any]) -> str:
+    def _generate_example(self, tool_data: Dict[str, Any]) -> str:
         """Generate an example call for a tool."""
-        params = tool.get("parameters", {})
+        params = tool_data.get("parameters", {})
         properties = params.get("properties", {})
         required = params.get("required", [])
 
         example = {}
-        for name in required[:3]:  # Show up to 3 required params
+        # If no required, try to use first few properties
+        names_to_use = required[:3] if required else list(properties.keys())[:2]
+
+        for name in names_to_use:
             if name in properties:
                 param_type = properties[name].get("type", "string")
                 if param_type == "string":
@@ -277,18 +299,22 @@ class PromptBuilder:
         enable_memory: bool = False,
         state_context: Optional[str] = None,
         project_context: Optional[str] = None,
+        memory_bank_context: Optional[str] = None,
         custom_instructions: Optional[str] = None,
+        permission_mode: str = "NORMAL",
     ) -> str:
         """
         Build complete system prompt adapted to model.
 
         Args:
             tools: List of available tool definitions
-            enable_planning: Include planning system guidance
-            enable_memory: Include memory system guidance
+            enable_planning: Include full planning engine guidance
+            enable_memory: Include layered memory guidance
             state_context: Current state context to inject
             project_context: Project-specific context (from AGENT.md etc.)
+            memory_bank_context: Memory bank summary
             custom_instructions: Additional custom instructions
+            permission_mode: Permission mode string
 
         Returns:
             Complete system prompt string
@@ -296,7 +322,7 @@ class PromptBuilder:
         sections = []
 
         # 1. Core identity and instructions
-        sections.append(self._build_core_section())
+        sections.append(self._build_core_section(permission_mode))
 
         # 2. Output schema (for models that support JSON mode)
         if self.profile.supports_json_mode:
@@ -304,32 +330,34 @@ class PromptBuilder:
             if schema_section:
                 sections.append(schema_section)
 
-        # 3. Tool documentation (adapted to model)
+        # 3. Mental Model & Capabilities (The "Phase" approach)
+        sections.append(self._build_mental_model_section())
+
+        # 4. Tool documentation (adapted to model)
         if tools:
             tool_section = self.tool_formatter.format_tools(tools)
             sections.append(tool_section)
             # Add tool usage guide
             sections.append(self._build_tool_guide())
 
-        # 4. Planning guidance (if enabled)
-        if enable_planning:
-            sections.append(self._build_planning_section())
+        # 5. Planning & Task Management
+        # Scaling: uses todo_write for simple, create_plan for complex
+        sections.append(self._build_planning_section(enable_planning))
 
-        # 5. Memory guidance (if enabled)
-        if enable_memory:
-            sections.append(self._build_memory_section())
+        # 6. Memory & State context
+        if enable_memory or memory_bank_context:
+            sections.append(self._build_memory_section(memory_bank_context))
 
-        # 6. State context (if available)
         if state_context:
-            sections.append(f"## Current State\n\n{state_context}")
+            sections.append(f"# Current State\n\n{state_context}")
 
         # 7. Project context (if available)
         if project_context:
-            sections.append(f"## Project Context\n\n{project_context}")
+            sections.append(f"# Project Context\n\n{project_context}")
 
         # 8. Custom instructions (if provided)
         if custom_instructions:
-            sections.append(f"## Additional Instructions\n\n{custom_instructions}")
+            sections.append(f"# Additional Instructions\n\n{custom_instructions}")
 
         # 9. Model-specific adaptations
         adaptation = self._build_model_adaptation()
@@ -338,25 +366,37 @@ class PromptBuilder:
 
         return "\n\n---\n\n".join(sections)
 
-    def _build_core_section(self) -> str:
+    def _build_core_section(self, permission_mode: str) -> str:
         """Build core identity and behavior section."""
+        mode_instruction = {
+            "NORMAL": "Ask for user approval before making changes.",
+            "AUTO_APPROVE": "You can make changes without asking. Be careful!",
+            "PLAN": "You are in PLAN MODE - read-only. Do not write files or execute commands. Only analyze and create plans.",
+        }.get(permission_mode.upper(), "Follow safety protocols.")
+
         if self.profile.prompt_style == PromptStyle.EXPLICIT:
-            return """# CORTEX AI ASSISTANT
+            return f"""# CORTEX AI ASSISTANT
 
 You are Cortex, an AI assistant that helps with software development tasks.
+Project root: {self.project_dir}
+
+Permission Mode: {permission_mode.upper()}
+{mode_instruction}
 
 IMPORTANT RULES:
 1. Use the tools provided to accomplish tasks
 2. Read files before editing them
 3. Be precise and follow instructions exactly
-4. If unsure, ask for clarification
-
-Your job is to help the user with their coding tasks efficiently."""
+4. If unsure, ask for clarification"""
 
         elif self.profile.prompt_style == PromptStyle.CONCISE:
-            return """# Cortex AI Assistant
+            return f"""# Cortex AI Assistant
 
 You are Cortex, an AI coding assistant with access to file and system tools.
+Working in: {self.project_dir}
+
+Permission Mode: {permission_mode.upper()}
+{mode_instruction}
 
 Key behaviors:
 - Use tools to read, write, and edit files
@@ -365,9 +405,13 @@ Key behaviors:
 - Ask if requirements are unclear"""
 
         else:  # DETAILED
-            core_prompt = """# Cortex AI Assistant
+            core_prompt = f"""# Cortex AI Assistant
 
 You are Cortex, a highly capable AI assistant specialized in software development and coding tasks. You have access to a comprehensive set of tools for file operations, code search, command execution, and more.
+Project directory: {self.project_dir}
+
+Permission Mode: {permission_mode.upper()}
+{mode_instruction}
 
 ## Core Principles
 
@@ -400,26 +444,46 @@ For events after the cutoff, use reasoning based on prior patterns. When uncerta
 
             return core_prompt
 
+    def _build_mental_model_section(self) -> str:
+        """Build mental model for codebase understanding section."""
+        if self.profile.prompt_style == PromptStyle.EXPLICIT:
+            return """# HOW TO EXPLORE CODE
+
+1. Use `glob` to find all files
+2. Use `grep` to find where classes or functions are
+3. Read ONLY the files you need to change
+4. Do not guess file paths"""
+
+        return """# Mental Model for Codebase Understanding
+
+When exploring a new codebase, build understanding systematically:
+
+## Phase 1: Structure Discovery
+Use `glob(pattern="**/*.py")` (or similar) to map all source files. Identify entry points, core packages, and test locations.
+
+## Phase 2: Architecture Understanding
+Use `grep` to find top-level class and function definitions. Build a mental map of how data flows from entry points to utilities.
+
+## Phase 3: Targeted Deep Dives
+Only read files when you have a specific reason. Track what you've read to avoid re-reading. Use `files_with_matches` mode in grep for breadth first."""
+
     def _build_tool_guide(self) -> str:
         """Build tool usage guide section."""
         if self.profile.prompt_style == PromptStyle.EXPLICIT:
             return """# TOOL USAGE GUIDE
 
-## Which Tool to Use
-
 | Need to... | Use this tool |
 |------------|---------------|
 | Read a file | `read_file` |
-| Edit a file | `edit_file` (read first!) |
+| Edit a file | `edit` (read first!) |
 | Create new file | `write_file` |
-| Find files | `glob_files` |
-| Search code | `grep_search` |
-| Run command | `bash` |
+| Find files | `glob` |
+| Search code | `grep` |
+| Run command | `execute_command` |
 
 ## IMPORTANT
 - ALWAYS read a file before editing it
-- Use search tools to find code, don't guess paths
-- Check tool results before continuing"""
+- Use search tools to find code, don't guess paths"""
 
         elif self.profile.prompt_style == PromptStyle.CONCISE:
             return """# Tool Quick Reference
@@ -427,10 +491,10 @@ For events after the cutoff, use reasoning based on prior patterns. When uncerta
 | Task | Tool | Notes |
 |------|------|-------|
 | Read file | `read_file` | Always before editing |
-| Edit file | `edit_file` | Requires unique match |
-| Search | `grep_search` | Regex supported |
-| Find files | `glob_files` | Use patterns |
-| Commands | `bash` | System operations |
+| Edit file | `edit` | Requires unique match |
+| Search | `grep` | Regex supported |
+| Find files | `glob` | Use patterns |
+| Commands | `execute_command` | System operations |
 
 Tips: Read before edit. Search before assuming paths."""
 
@@ -442,40 +506,26 @@ Tips: Read before edit. Search before assuming paths."""
 | Task | Tool | When to Use |
 |------|------|-------------|
 | Read a file | `read_file` | Always before editing; to understand code |
-| Edit a file | `edit_file` | Make targeted changes to existing files |
+| Edit a file | `edit` | Make targeted changes to existing files |
 | Create file | `write_file` | Create new files only |
-| Search code | `grep_search` | Find patterns, functions, classes |
-| Find files | `glob_files` | Locate files by name patterns |
-| Run command | `bash` | Execute system commands, tests |
-| Create plan | `create_plan` | For complex multi-step tasks |
-| Execute plan | `execute_plan` | Run through plan steps |
-| Find functions/classes | `ast_search` | Structural code search by definition |
-| Extract code structure | `ast_extract` | Get functions/classes with metadata |
-| Analyze code quality | `ast_analyze` | Complexity metrics, issues, dependencies |
+| Search code | `grep` | Find patterns, functions, classes |
+| Find files | `glob` | Locate files by name patterns |
+| Run command | `execute_command` | Execute system commands, tests |
+| Create plan | `create_plan` | For complex multi-step tasks (4+ steps) |
+| Find symbols | `ast_search` | Structural code search by definition |
+| Extract code | `ast_extract` | Get functions/classes with metadata |
 
 ## Decision Tree
 
 ```
 Need to understand code?
 ├── Know the file? → read_file
-├── Know the pattern? → grep_search
-├── Know the extension? → glob_files
-└── Need function/class definitions? → ast_search or ast_extract
+├── Know the pattern? → grep
+└── Need definitions? → ast_search or ast_extract
 
 Need to modify code?
-├── Small change? → edit_file
-├── New file? → write_file
+├── Small change? → edit
 └── Multiple files? → create_plan first
-
-Need to run something?
-├── Tests? → bash command
-├── Build? → bash command
-└── Other? → bash command
-
-Need code analysis?
-├── Find code structure? → ast_search (search_type="function" or "class")
-├── Get full definitions? → ast_extract (with docstrings, decorators)
-└── Analyze complexity? → ast_analyze
 ```
 
 ## grep vs ast_search
@@ -483,31 +533,39 @@ Need code analysis?
 - **ast_search**: Function/class/import definitions by structure
 
 ## Common Mistakes to Avoid
-
 - **DON'T** edit a file you haven't read
 - **DON'T** guess file paths - use search
-- **DON'T** make large changes without understanding context
-- **DO** verify changes after edits
-- **DO** handle errors gracefully"""
+- **DO** verify changes after edits"""
 
-    def _build_planning_section(self) -> str:
-        """Build planning system guidance section."""
+    def _build_planning_section(self, enable_planning: bool) -> str:
+        """Build planning system guidance section, scaling based on capability."""
+        if not enable_planning:
+            # Fallback to simple todo_write guidance
+            return """# Task Management (todo_write)
+
+For multi-step tasks (3+ steps), use `todo_write` to track progress:
+- Track status: pending → in_progress → completed
+- Only ONE task can be in_progress at a time
+- Mark tasks completed IMMEDIATELY after finishing
+
+Example:
+```python
+todo_write(todos=[
+    {"content": "Read auth files", "status": "completed", "activeForm": "Reading auth files"},
+    {"content": "Implement feature", "status": "in_progress", "activeForm": "Implementing feature"}
+])
+```"""
+
+        # Full planning engine enabled
         if self.profile.prompt_style == PromptStyle.EXPLICIT:
             return """# PLANNING TOOLS
 
-For complex tasks with 4+ steps, use planning tools:
-
+For complex tasks, use planning tools:
 1. `create_plan` - Make a plan
-   - goal: What to achieve
-   - constraints: Any limitations
-
 2. `execute_plan` - Run the plan
-   - plan_id: From create_plan
-
 3. `monitor_plan` - Check progress
-   - plan_id: The plan to check
 
-USE PLANNING when task is complex. SKIP for simple tasks."""
+USE PLANNING when task is complex (4+ steps). SKIP for simple tasks."""
 
         elif self.profile.prompt_style == PromptStyle.CONCISE:
             return """# Planning Tools
@@ -522,7 +580,7 @@ Skip planning for simple, single-step tasks."""
         else:  # DETAILED
             return """# Planning System
 
-You have access to planning tools for managing complex, multi-step tasks.
+You have access to planning tools for managing complex, multi-step tasks systematically.
 
 ## When to Use Planning
 
@@ -530,82 +588,31 @@ You have access to planning tools for managing complex, multi-step tasks.
 - Task involves 4+ sequential steps
 - Multiple files need coordinated changes
 - Task has dependencies between steps
-- You need to track progress
 
-**SKIP planning when:**
-- Task is simple (1-3 steps)
-- Single file change
-- Quick lookup or read operation
+**Planning Tools:**
+- `create_plan`: Create a structured plan with goals and constraints.
+- `execute_plan`: Execute steps one by one.
+- `monitor_plan`: Check progress and status.
+- `update_plan`: Modify plan if approach needs adjustment.
 
-## Planning Tools
+**Note on todo_write:** Use `todo_write` for simple tracking of 2-3 steps. For everything else, use `create_plan`."""
 
-### create_plan
-Create a structured plan for achieving a goal.
-```
-create_plan(
-    goal="Description of what to achieve",
-    constraints=["Must not break tests", "Use existing patterns"],
-    assumptions=["Python 3.10+"]
-)
-```
-
-### execute_plan
-Execute a plan step by step.
-```
-execute_plan(
-    plan_id="plan_xxx",
-    max_steps=10,
-    stop_on_failure=True
-)
-```
-
-### monitor_plan
-Check plan progress at any time.
-```
-monitor_plan(plan_id="plan_xxx")
-```
-
-### update_plan
-Modify a plan if needed.
-```
-update_plan(
-    plan_id="plan_xxx",
-    add_steps=[...],
-    remove_step_ids=[...]
-)
-```"""
-
-    def _build_memory_section(self) -> str:
+    def _build_memory_section(self, memory_bank_context: Optional[str]) -> str:
         """Build memory system guidance section."""
+        section = "# Memory System\n\n"
+        if memory_bank_context:
+            section += f"## Session Memory\n\n{memory_bank_context}\n\n"
+
         if self.profile.prompt_style in (PromptStyle.EXPLICIT, PromptStyle.CONCISE):
-            return """# Memory System
-
-The system tracks:
-- Files you've read
-- Patterns that worked
-- Decisions made
-
-This context is provided automatically to help you."""
-
+            section += "The system tracks files read and decisions made automatically."
         else:  # DETAILED
-            return """# Memory System
+            section += """You have a layered memory system:
+- **Working Memory**: Current files, recently identified symbols.
+- **Session Memory**: Successful patterns, failed approaches, key decisions.
 
-You have a layered memory system that tracks context across the conversation:
+Use this to avoid repeating mistakes and reuse proven patterns."""
 
-## Working Memory
-- Current task and sub-goals
-- Recently accessed files
-- Active hypotheses and insights
-
-## Session Memory
-- Failed approaches (to avoid repeating)
-- Successful patterns (to reuse)
-- Key decisions made
-
-This context is automatically provided. Use it to:
-- Avoid repeating failed approaches
-- Reuse patterns that worked
-- Stay focused on the current goal"""
+        return section
 
     def _build_output_schema_section(self) -> str:
         """Add JSON schema enforcement for models that support it."""
@@ -635,18 +642,10 @@ ALL responses MUST be valid JSON matching this schema:
 }
 ```
 
-**Mode semantics**:
-- `plan`: Multiple steps needed; return commands + edits without executing yet; ask for approval
-- `run_command`: Execute shell command immediately (only if safety checks pass)
-- `edit_file`: Modify a single file (propose change, await approval unless auto-approved)
-- `answer`: Return only natural language answer in the "answer" field
-- `reasoning`: Thinking-heavy response; return chain-of-thought in "reasoning"
-
 **Security Constraints**:
-- NEVER run destructive commands without explicit approval (rm -rf, > /dev/null, network changes)
-- ALWAYS validate file paths; reject attempts to write outside allowed directories
-- ALWAYS explain your reasoning in < 150 words
-- Always output valid JSON; never output raw shell or code without the schema wrapper
+- NEVER run destructive commands without explicit approval.
+- ALWAYS validate file paths.
+- Always output valid JSON.
 """
 
     def _build_model_adaptation(self) -> str:

@@ -85,6 +85,10 @@ class EnhancedCortex(Cortex):
             enable_planning: Enable planning system
             enable_layered_memory: Enable layered memory system
         """
+        # Planning and memory configuration (set before super().__init__ so _get_system_prompt works)
+        self.enable_planning = enable_planning
+        self.enable_layered_memory = enable_layered_memory
+
         # Initialize base Cortex
         super().__init__(
             model=model,
@@ -95,10 +99,6 @@ class EnhancedCortex(Cortex):
             output_format=output_format,
             on_max_iterations_reached=on_max_iterations_reached,
         )
-
-        # Planning and memory configuration
-        self.enable_planning = enable_planning
-        self.enable_layered_memory = enable_layered_memory
 
         # Replace base memory bank with enhanced one if enabled
         if enable_layered_memory:
@@ -123,217 +123,13 @@ class EnhancedCortex(Cortex):
         self.plans_executed = 0
         self.plans_completed = 0
 
-        # Update system prompt with enhanced guidance
-        self._update_system_prompt()
+        # Initial system prompt update (now handled by super().__init__ calling our overridden _get_system_prompt)
+        # But we force one update here to ensure all state is captured
+        self.conversation.history[0]["content"] = self._get_system_prompt()
 
     def load_project_context(self) -> str:
         """Public method to load project context for backward compatibility."""
         return self._load_project_context()
-
-    def _update_system_prompt(self) -> None:
-        """Update system prompt with planning and memory guidance, adapted to model capabilities."""
-        # Get base system prompt
-        base_prompt = super()._get_system_prompt()
-
-        # Get model profile for adaptive guidance
-        profile = get_model_profile(self.model)
-        _adapter_info = get_adapter_info(self.model)
-
-        logger.debug(
-            f"EnhancedCortex using model profile: {profile.name}, style: {profile.prompt_style.value}"
-        )
-
-        # Generate guidance based on model capability
-        enhanced_guidance = self._get_planning_guidance(profile.prompt_style)
-
-        # Apply model-specific adaptations
-        enhanced_prompt = base_prompt + enhanced_guidance
-        enhanced_prompt = adapt_prompt_for_model(enhanced_prompt, self.model)
-
-        # Update conversation manager's system prompt
-        self.conversation.history[0]["content"] = enhanced_prompt
-
-    def _get_planning_guidance(self, style: PromptStyle) -> str:
-        """Get planning guidance appropriate for model capability level."""
-
-        if style == PromptStyle.EXPLICIT:
-            # Shorter, more explicit guidance for smaller models
-            return """
-
-# PLANNING TOOLS
-
-You have planning tools for complex tasks.
-
-## Available Tools
-
-1. `create_plan(goal, constraints, assumptions)` - Create a plan
-2. `execute_plan(plan_id)` - Run the plan
-3. `monitor_plan(plan_id)` - Check progress
-4. `update_plan(plan_id, action, step_data)` - Modify plan
-
-## When to Use Planning
-
-USE planning when:
-- Task has 4+ steps
-- Multiple files need changes
-- Task is complex
-
-SKIP planning when:
-- Simple single-file change
-- Quick lookup or read
-- Less than 3 tool calls needed
-
-## Memory
-
-The system tracks:
-- Files you've read
-- What worked and what failed
-- Patterns discovered
-
-Use this to avoid repeating mistakes.
-"""
-
-        elif style == PromptStyle.CONCISE:
-            # Medium-length guidance
-            return """
-
-# ENHANCED AGENT: PLANNING & MEMORY
-
-## Planning Tools
-
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `create_plan` | Create structured plan | `create_plan(goal="...", constraints=[...])` |
-| `execute_plan` | Run plan steps | `execute_plan(plan_id="plan_xxx")` |
-| `monitor_plan` | Check status | `monitor_plan(plan_id="plan_xxx")` |
-| `update_plan` | Modify plan | `update_plan(plan_id="...", action="add_step")` |
-
-## When to Plan
-
-**Use planning for:**
-- Tasks with 4+ sequential steps
-- Multi-file coordinated changes
-- Complex debugging or refactoring
-
-**Skip planning for:**
-- Single file changes
-- Quick lookups
-- Simple fixes (< 3 tool calls)
-
-## Memory System
-
-Working Memory: Current files, patterns, decisions
-Session Memory: What worked, what failed, insights
-
-**Tips:**
-- Avoid re-reading files already examined
-- Reuse patterns that worked
-- Learn from failures
-
-## Key Principles
-
-1. Plan before complex work
-2. Communicate your approach
-3. Execute systematically
-4. Adapt when needed
-"""
-
-        else:  # DETAILED - full guidance for capable models
-            return """
-
-# ENHANCED AGENT: PLANNING TOOLS & MEMORY
-
-You have access to **planning tools** that help you tackle complex, multi-step tasks systematically.
-
----
-
-## PLANNING TOOLS REFERENCE
-
-### 1. `create_plan` - Create a structured plan
-```
-create_plan(
-    goal="Clear description of what to achieve",
-    constraints=["Must not break existing tests", "Use existing patterns"],
-    assumptions=["Python 3.10+", "pytest for testing"]
-)
-```
-**Returns:** `plan_id`, `step_count`, `plan_summary`
-
-### 2. `execute_plan` - Execute a plan's steps
-```
-execute_plan(plan_id="plan_xxx", max_steps=10, stop_on_failure=True)
-```
-**Returns:** `success`, `progress`, `step_results`
-
-### 3. `monitor_plan` - Check plan status
-```
-monitor_plan(plan_id="plan_xxx", detail_level="summary")
-```
-**Returns:** `status`, `progress`, `steps`
-
-### 4. `update_plan` - Modify an existing plan
-```
-update_plan(plan_id="plan_xxx", action="add_step", step_data={...})
-```
-
----
-
-## WHEN TO USE PLANNING
-
-### USE Planning When:
-- Task involves **4+ sequential steps**
-- **Multiple files** need coordinated changes
-- Task requires **analysis before action**
-- You might need to **backtrack or retry**
-- User asks for something **complex**
-
-### SKIP Planning When:
-- **Single file** change
-- **< 3 tool calls** needed
-- **Clear, specific** request
-- **Quick lookup**
-
----
-
-## PLANNING WORKFLOW
-
-1. **Assess Complexity** - Is this multi-step? Multiple files?
-2. **Create Plan** - `create_plan(goal=..., constraints=[...])`
-3. **Communicate** - Show the plan to user
-4. **Execute** - `execute_plan(plan_id=...)`
-5. **Verify** - `monitor_plan(plan_id=...)` and report results
-
----
-
-## MEMORY SYSTEM
-
-### Working Memory (Current Context)
-- Files you've read this session
-- Patterns you've identified
-- Decisions you've made
-
-### Session Memory (Learnings)
-- What approaches worked
-- What failed and why
-- Insights about the codebase
-
-**Use memory to:**
-- Avoid re-reading files you've already examined
-- Remember patterns when making similar changes
-- Learn from failures to improve next attempts
-
----
-
-## KEY PRINCIPLES
-
-1. **Plan before complex work** - Create a plan for tasks with 4+ steps
-2. **Communicate the plan** - Show users what you intend to do
-3. **Execute systematically** - Follow the plan, track progress
-4. **Adapt when needed** - If something fails, update the plan
-5. **Learn continuously** - Record insights for future tasks
-
-**Remember:** Planning tools make you MORE effective. A good plan prevents wasted effort.
-"""
 
     def _load_skill(self, skill_name: str) -> Dict[str, Any]:
         """Load a skill by name (for planning engine)."""

@@ -1,4 +1,4 @@
-﻿"""Main Cortex class"""
+"""Main Cortex class"""
 
 import asyncio
 import json
@@ -43,6 +43,7 @@ from .core.security import SecurityError
 # New modular components
 from .core.agent_init import AgentInitializer
 from .core.agent_prompts import PromptGenerator
+from .core.prompts.builder import PromptBuilder
 from .core.agent_permissions import PermissionManager
 from .core.agent_tools import ToolExecutor
 from .core.agent_messaging import MessageProcessor
@@ -149,13 +150,14 @@ class Cortex:
 
         # Initialize new modular components
         self.prompt_generator = PromptGenerator(self)
+        self.prompt_builder = PromptBuilder(self.model, project_dir=self.project_dir)
         self.permission_manager = PermissionManager(self)
         self.tool_executor = ToolExecutor(self)
         self.message_processor = MessageProcessor(self)
 
-        # Update conversation system prompt now that PromptGenerator is ready
+        # Update conversation system prompt
         self.project_context = self.prompt_generator.load_project_context()
-        system_prompt = self.prompt_generator.generate()
+        system_prompt = self._get_system_prompt()
         self.conversation.system_prompt = system_prompt
         self.conversation._on_truncation = self._on_context_truncation
 
@@ -350,6 +352,9 @@ class Cortex:
             # Update model and provider
             self.model = new_model
             self.provider = new_provider
+            
+            # Update prompt builder for new model
+            self.prompt_builder = PromptBuilder(self.model, project_dir=self.project_dir)
 
             # Update conversation manager's model reference for token counting
             self.conversation.update_model(new_model)
@@ -450,8 +455,24 @@ class Cortex:
         return self.prompt_generator.load_project_context()
 
     def _get_system_prompt(self) -> str:
-        """Generate comprehensive system prompt (delegates to PromptGenerator)"""
-        return self.prompt_generator.generate()
+        """Generate comprehensive system prompt using PromptBuilder"""
+        # Get dynamic context
+        state_context = self.state_manager.get_llm_context() if hasattr(self, "state_manager") else None
+        memory_bank_context = self.memory_bank.get_summary() if hasattr(self, "memory_bank") else None
+        
+        # Get all tool schemas (includes base + orchestration tools)
+        tool_schemas = get_registry().get_all_schemas()
+        
+        # Build using PromptBuilder
+        return self.prompt_builder.build_system_prompt(
+            tools=tool_schemas,
+            enable_planning=getattr(self, "enable_planning", False),
+            enable_memory=getattr(self, "enable_layered_memory", False),
+            state_context=state_context,
+            project_context=self.project_context,
+            memory_bank_context=memory_bank_context,
+            permission_mode=self.permission_mode
+        )
 
     def _dispatch_session_start(self) -> None:
         """Dispatch session start event to hooks."""
