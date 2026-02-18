@@ -1,4 +1,4 @@
-﻿"""Command-line interface for Cortex"""
+"""Command-line interface for Cortex"""
 
 import sys
 import os
@@ -23,7 +23,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .agent import Cortex
-from .agent_enhanced import EnhancedCortex
 from .models import PermissionMode
 from .config import AgentConfig
 from .core.providers import ProviderFactory, ProviderError
@@ -396,28 +395,22 @@ Examples:
     elif args.no_hooks:
         hook_manager.disable()
 
-    # Create agent
-    if args.enhanced:
-        console.print("[cyan]Using enhanced agent with planning and layered memory[/cyan]")
-        agent = EnhancedCortex(
-            model=config.model,
-            project_dir=project_dir,
-            permission_mode=permission_mode,
-            config=config,
-            hook_manager=hook_manager,
-            output_format=output_format,
-            enable_planning=True,
-            enable_layered_memory=True,
-        )
-    else:
-        agent = Cortex(
-            model=config.model,
-            project_dir=project_dir,
-            permission_mode=permission_mode,
-            config=config,
-            hook_manager=hook_manager,
-            output_format=output_format,
-        )
+    # Create unified agent
+    is_enhanced = args.enhanced or (args.config and config.enable_planning)
+    
+    if is_enhanced:
+        console.print("[cyan]Using enhanced features: planning and layered memory[/cyan]")
+        
+    agent = Cortex(
+        model=config.model,
+        project_dir=project_dir,
+        permission_mode=permission_mode,
+        config=config,
+        hook_manager=hook_manager,
+        output_format=output_format,
+        enable_planning=is_enhanced,
+        enable_layered_memory=is_enhanced,
+    )
 
     # Load session if requested
     if args.load_session:
@@ -469,23 +462,9 @@ Examples:
 
         # Run in async mode if requested
         if args.use_async:
-            if hasattr(agent, "process_with_planning_async"):
-                asyncio.run(
-                    agent.process_with_planning_async(args.prompt, use_streaming=args.streaming)
-                )
-            elif hasattr(agent, "_process_message_async"):
-                asyncio.run(agent._process_message_async(args.prompt, use_streaming=args.streaming))
-            else:
-                console.print(
-                    "[yellow]Warning: Async mode not available. Using sync mode.[/yellow]"
-                )
-                agent._process_message(args.prompt, use_streaming=args.streaming)
+            asyncio.run(agent._process_message_async(args.prompt, use_streaming=args.streaming))
         else:
-            # Use enhanced processing if available
-            if hasattr(agent, "process_with_planning"):
-                agent.process_with_planning(args.prompt, use_streaming=args.streaming)
-            else:
-                agent._process_message(args.prompt, use_streaming=args.streaming)
+            agent._process_message(args.prompt, use_streaming=args.streaming)
 
         # Save session if requested
         if args.save_session:
@@ -598,28 +577,12 @@ def run_interactive(
             # Process with agent
             if use_async:
                 # Async mode
-                if hasattr(agent, "process_with_planning_async"):
-                    asyncio.run(
-                        agent.process_with_planning_async(user_input, use_streaming=use_streaming)
-                    )
-                elif hasattr(agent, "_process_message_async"):
-                    asyncio.run(
-                        agent._process_message_async(user_input, use_streaming=use_streaming)
-                    )
-                else:
-                    console.print(
-                        "[yellow]Warning: Async mode not available. Using sync mode.[/yellow]"
-                    )
-                    if hasattr(agent, "process_with_planning"):
-                        agent.process_with_planning(user_input, use_streaming=use_streaming)
-                    else:
-                        agent._process_message(user_input, use_streaming=use_streaming)
+                asyncio.run(
+                    agent._process_message_async(user_input, use_streaming=use_streaming)
+                )
             else:
-                # Sync mode - Use enhanced processing if available
-                if hasattr(agent, "process_with_planning"):
-                    agent.process_with_planning(user_input, use_streaming=use_streaming)
-                else:
-                    agent._process_message(user_input, use_streaming=use_streaming)
+                # Sync mode
+                agent._process_message(user_input, use_streaming=use_streaming)
 
         except KeyboardInterrupt:
             # Handle Ctrl+C gracefully

@@ -1,7 +1,7 @@
 """
 Delegation-enabled Cortex agent with model-aware planning.
 
-This module extends EnhancedCortex to add model delegation capabilities
+This module extends the unified Cortex agent to add model delegation capabilities
 to the planning system. It enables automatic delegation to specialist
 models based on step requirements and validation rules.
 """
@@ -9,7 +9,7 @@ models based on step requirements and validation rules.
 import logging
 from typing import Optional, Dict, Any, Callable
 
-from .agent_enhanced import EnhancedCortex
+from .agent import Cortex
 from .models import PermissionMode
 from .config import AgentConfig
 from .output import OutputFormat
@@ -17,16 +17,16 @@ from .hooks import HookManager
 from .core.planning_enhanced import convert_plan_to_modelaware
 from .core.delegation_planning_engine import DelegationPlanningEngine
 from .core.prompts.delegation_guidance import get_delegation_guidance, get_quick_reference
-from .core.model_capabilities import PromptStyle
+from .core.model_capabilities import get_model_profile, PromptStyle
 
 logger = logging.getLogger(__name__)
 
 
-class PlanningDelegationCortex(EnhancedCortex):
+class PlanningDelegationCortex(Cortex):
     """
     Enhanced Cortex agent with model delegation planning.
 
-    Extends EnhancedCortex to:
+    Extends Cortex to:
     1. Use DelegationPlanningEngine instead of PlanningEngine
     2. Add delegation guidance to system prompts
     3. Provide model-aware plan creation helpers
@@ -49,25 +49,12 @@ class PlanningDelegationCortex(EnhancedCortex):
     ):
         """
         Initialize delegation-enabled Cortex agent.
-
-        Args:
-            model: Model name to use (coordinator model)
-            project_dir: Project directory to work in
-            permission_mode: Permission mode (NORMAL, AUTO_APPROVE, PLAN)
-            config: Agent configuration
-            hook_manager: Hook manager for event handling
-            output_format: Output format (TEXT, JSON, etc.)
-            on_max_iterations_reached: Callback for max iterations
-            enable_planning: Enable planning system
-            enable_layered_memory: Enable layered memory system
-            max_delegations: Maximum allowed delegations per request
-            current_model: The model name representing this coordinator
         """
         # Store delegation settings
         self.max_delegations = max_delegations
         self.current_model = current_model
 
-        # Initialize parent (EnhancedCortex) with planning disabled
+        # Initialize parent (Cortex) with planning disabled
         # We'll create our own delegation planning engine
         super().__init__(
             model=model,
@@ -100,59 +87,31 @@ class PlanningDelegationCortex(EnhancedCortex):
         # Re-enable planning flag for our agent
         self.enable_planning = enable_planning
 
-        # Update system prompt with delegation guidance
-        self._update_system_prompt()
+        # Force a system prompt update with delegation guidance
+        self.conversation.history[0]["content"] = self._get_system_prompt()
 
         logger.info(f"PlanningDelegationCortex initialized for model: {current_model}")
-        logger.info(f"Maximum delegations: {max_delegations}")
 
-    def _update_system_prompt(self) -> None:
+    def _get_system_prompt(self) -> str:
         """
-        Update system prompt with delegation guidance.
-
-        Overrides parent to add model delegation framework guidance
-        while keeping all existing enhanced guidance.
+        Generate system prompt including delegation guidance.
         """
-        # Get base enhanced prompt from parent
+        # Get base system prompt from parent (uses PromptBuilder)
         base_prompt = super()._get_system_prompt()
 
         # Get model profile for adaptive guidance
-        from .core.model_capabilities import get_model_profile, get_adapter_info
-        from .core.prompts import adapt_prompt_for_model
-
         profile = get_model_profile(self.model)
-        _adapter_info = get_adapter_info(self.model)
-
-        logger.debug(
-            f"PlanningDelegationCortex using model profile: {profile.name}, style: {profile.prompt_style.value}"
-        )
-
-        # Get enhanced planning guidance (from parent)
-        enhanced_guidance = self._get_planning_guidance(profile.prompt_style)
-
+        
         # Get delegation guidance based on remaining quota
         delegation_guidance = self._get_delegation_guidance(profile.prompt_style)
 
-        # Combine all guidance
-        full_prompt = base_prompt + enhanced_guidance + delegation_guidance
-
-        # Apply model-specific adaptations
-        full_prompt = adapt_prompt_for_model(full_prompt, self.model)
-
-        # Update conversation manager's system prompt
-        self.conversation.history[0]["content"] = full_prompt
-
-        logger.debug("System prompt updated with delegation guidance")
+        # Combine and adapt
+        from .core.prompts import adapt_prompt_for_model
+        return adapt_prompt_for_model(base_prompt + delegation_guidance, self.model)
 
     def _get_delegation_guidance(self, style: PromptStyle) -> str:
         """
         Get delegation guidance appropriate for model capability level.
-
-        Args:
-            style: Prompt style based on model capability
-
-        Returns:
-            Delegation guidance string
         """
         # Get remaining delegations from engine if available
         remaining_delegations = self.max_delegations
@@ -160,28 +119,25 @@ class PlanningDelegationCortex(EnhancedCortex):
             remaining_delegations = self.planning_engine.delegation_tracker.get_remaining()
 
         if style == PromptStyle.EXPLICIT:
-            # Short, explicit guidance for smaller models
             return f"""
 
 # MODEL DELEGATION (SIMPLIFIED)
 
 You can delegate tasks to specialist models:
 
-1. **Security** → dolphin-24b (REQUIRED for security tasks)
-2. **Complex** → deepseek-reasoner (recommended)
-3. **Code Review** → gpt-5.1-codex-mini
-4. **Implementation** → grok-code-fast-1
+1. **Security** -> dolphin-24b (REQUIRED for security tasks)
+2. **Complex** -> deepseek-reasoner (recommended)
+3. **Code Review** -> gpt-5.1-codex-mini
+4. **Implementation** -> grok-code-fast-1
 
 **Delegations Remaining:** {remaining_delegations}/{self.max_delegations}
 
 **IMPORTANT RULES:**
 - Security tasks MUST use dolphin-24b
 - Don't delegate simple tasks
-- Track your delegation count
 """
 
         elif style == PromptStyle.CONCISE:
-            # Medium-length guidance
             return f"""
 
 # MODEL DELEGATION FRAMEWORK
@@ -201,45 +157,31 @@ You coordinate a team of specialist models. Delegate strategically.
 **Remaining:** {remaining_delegations}/{self.max_delegations}
 
 ## KEY RULES
-1. **MANDATORY**: Security tasks → dolphin-24b
-2. **RECOMMENDED**: Complex tasks → deepseek-reasoner
-3. **OPTIONAL**: Code reviews → gpt-5.1-codex-mini
-4. **PROHIBITED**: Don't delegate simple tasks
+1. **MANDATORY**: Security tasks -> dolphin-24b
+2. **RECOMMENDED**: Complex tasks -> deepseek-reasoner
+3. **PROHIBITED**: Don't delegate simple tasks
 """
 
-        else:  # DETAILED - full guidance for capable models
+        else:  # DETAILED
             # Get full delegation guidance
             full_guidance = get_delegation_guidance(remaining_delegations)
-
-            # Add quick reference at the end
+            # Add quick reference
             full_guidance += "\n\n" + get_quick_reference()
-
-            return full_guidance
+            return f"\n\n{full_guidance}"
 
     def get_delegation_stats(self) -> Dict[str, Any]:
-        """
-        Get delegation statistics.
-
-        Returns:
-            Dictionary with delegation statistics and execution stats
-        """
+        """Get delegation statistics."""
         if not self.enable_planning or not self.planning_engine:
             return {"delegation_enabled": False, "message": "Planning not enabled"}
 
-        # Get stats from delegation planning engine
         stats = self.planning_engine.get_execution_stats()
-
-        # Add agent-level info
-        stats.update(
-            {
-                "agent_model": self.model,
-                "coordinator_model": self.current_model,
-                "max_delegations": self.max_delegations,
-                "delegation_enabled": True,
-                "planning_enabled": self.enable_planning,
-            }
-        )
-
+        stats.update({
+            "agent_model": self.model,
+            "coordinator_model": self.current_model,
+            "max_delegations": self.max_delegations,
+            "delegation_enabled": True,
+            "planning_enabled": self.enable_planning,
+        })
         return stats
 
     def create_model_aware_plan(
@@ -250,24 +192,8 @@ You coordinate a team of specialist models. Delegate strategically.
         assumptions: Optional[list] = None,
         skill_hints: Optional[list] = None,
     ) -> Dict[str, Any]:
-        """
-        Create a plan and convert it to model-aware format.
-
-        This is a convenience method that creates a plan and automatically
-        converts it to use ModelAwarePlanStep for all steps.
-
-        Args:
-            goal: The goal to achieve
-            context: Additional context (optional)
-            constraints: List of constraints (optional)
-            assumptions: List of assumptions (optional)
-            skill_hints: Suggested skills to apply (optional)
-
-        Returns:
-            Plan creation result with delegation metadata
-        """
-        # Create plan using parent method
-        result = self.tool_executor(
+        """Create a plan and convert it to model-aware format."""
+        result = self.execute_tool(
             "create_plan",
             {
                 "goal": goal,
@@ -278,24 +204,18 @@ You coordinate a team of specialist models. Delegate strategically.
             },
         )
 
-        # Convert plan to model-aware format
         if result.get("success") and self.enable_planning and self.planning_engine:
             plan_id = result.get("plan_id")
             if plan_id:
                 plan = self.planning_engine.get_plan(plan_id)
                 if plan:
-                    # Convert to model-aware
                     converted_plan = convert_plan_to_modelaware(plan)
-                    # Replace in engine
                     self.planning_engine.plans[plan_id] = converted_plan
-
-                    # Add delegation metadata to result
                     result["delegation_metadata"] = {
                         "model_aware": True,
                         "step_count": len(converted_plan.steps),
                         "max_delegations": self.max_delegations,
                     }
-
         return result
 
     def add_model_aware_step(
@@ -310,26 +230,7 @@ You coordinate a team of specialist models. Delegate strategically.
         review_model: Optional[str] = None,
         **step_kwargs,
     ) -> Dict[str, Any]:
-        """
-        Add a model-aware step to a plan.
-
-        This is a convenience method for adding steps with delegation metadata.
-
-        Args:
-            plan_id: ID of the plan to update
-            description: Step description
-            required_model: Model that must execute this step
-            model_assignment_reason: Reason for model assignment
-            risk_level: Risk level (low, medium, high, critical)
-            security_related: Whether step involves security
-            review_required: Whether step requires review
-            review_model: Model to perform review
-            **step_kwargs: Additional step parameters
-
-        Returns:
-            Update plan result
-        """
-        # Build step data with delegation fields
+        """Add a model-aware step to a plan."""
         step_data = {
             "description": description,
             "required_model": required_model,
@@ -340,12 +241,9 @@ You coordinate a team of specialist models. Delegate strategically.
             "review_model": review_model,
             **step_kwargs,
         }
-
-        # Remove None values
         step_data = {k: v for k, v in step_data.items() if v is not None}
 
-        # Use update_plan tool
-        return self.tool_executor(
+        return self.execute_tool(
             "update_plan",
             {
                 "plan_id": plan_id,
@@ -355,27 +253,14 @@ You coordinate a team of specialist models. Delegate strategically.
         )
 
     def get_delegation_summary(self) -> str:
-        """
-        Get human-readable delegation summary.
-
-        Returns:
-            String summary of delegation activity
-        """
+        """Get human-readable delegation summary."""
         if not self.enable_planning or not self.planning_engine:
             return "Delegation planning not enabled"
-
         return self.planning_engine.get_delegation_summary()
 
     def reset_delegation_stats(self) -> Dict[str, Any]:
-        """
-        Reset delegation statistics.
-
-        Returns:
-            Result of reset operation
-        """
+        """Reset delegation statistics."""
         if not self.enable_planning or not self.planning_engine:
             return {"success": False, "error": "Planning not enabled"}
-
         self.planning_engine.reset_execution_stats()
-
         return {"success": True, "message": "Delegation statistics reset"}
