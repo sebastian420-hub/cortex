@@ -1,4 +1,4 @@
-"""Main Cortex class"""
+"""Main Cortex class - Unified Agent Orchestrator"""
 
 import asyncio
 import json
@@ -6,7 +6,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Callable
+from typing import Optional, Dict, Any, List, Callable, Union
 from datetime import datetime
 
 from rich.markdown import Markdown
@@ -21,6 +21,7 @@ from .config import AgentConfig
 from .core.parallel import ParallelToolExecutor, ToolCall
 from .core.streaming import stream_model_response, display_streaming_response
 from .core.providers import ProviderFactory, ProviderError
+from .core.planning import PlanningEngine, Plan
 
 # Import routing system (optional, gracefully handle if not available)
 try:
@@ -47,7 +48,7 @@ from .core.prompts.builder import PromptBuilder
 from .core.agent_permissions import PermissionManager
 from .core.agent_tools import ToolExecutor
 from .core.agent_messaging import MessageProcessor
-from .core.memory_layers import AgentFocus
+from .core.memory_layers import AgentFocus, EnhancedMemoryBank
 from .tools import create_tool_instance, get_registry
 from .ui.console import console
 from .ui.consolidated_display import get_consolidated_display, OperationStatus
@@ -76,7 +77,10 @@ from .utils.result_truncation import truncate_tool_result
 
 
 class Cortex:
-    """Main Cortex class - handles conversation loop and tool execution"""
+    """
+    Main Cortex class - handles conversation loop, tool execution, 
+    planning, and layered memory.
+    """
 
     def __init__(
         self,
@@ -87,8 +91,23 @@ class Cortex:
         hook_manager: Optional[HookManager] = None,
         output_format: OutputFormat = OutputFormat.TEXT,
         on_max_iterations_reached: Optional[Callable[[int, int], Optional[int]]] = None,
+        enable_planning: bool = True,
+        enable_layered_memory: bool = True,
     ):
-        """Initialize Cortex agent with all components."""
+        """
+        Initialize Cortex agent with all components.
+        
+        Args:
+            model: LLM model to use
+            project_dir: Project directory path
+            permission_mode: Permission mode (NORMAL, AUTO_APPROVE, PLAN)
+            config: Agent configuration
+            hook_manager: Hook manager for event handling
+            output_format: Output format (TEXT, JSON, etc.)
+            on_max_iterations_reached: Callback for max iterations
+            enable_planning: Whether to enable the planning engine
+            enable_layered_memory: Whether to use enhanced layered memory
+        """
         # Basic setup
         self.model = model
         self.project_dir = Path(project_dir).resolve()
@@ -97,6 +116,10 @@ class Cortex:
         self.session_start = datetime.now()
         self.hook_manager = hook_manager or HookManager()
         self.output_format = output_format
+        
+        # Enhanced features configuration
+        self.enable_planning = enable_planning
+        self.enable_layered_memory = enable_layered_memory
 
         # Use AgentInitializer to handle complex initialization
         initializer = AgentInitializer(
@@ -106,6 +129,13 @@ class Cortex:
             config=self.config,
             hook_manager=self.hook_manager,
             output_format=output_format,
+            enable_planning=enable_planning,
+            enable_layered_memory=enable_layered_memory,
+            planning_callbacks={
+                "skill_loader": self._load_skill,
+                "tool_executor": self._execute_tool_for_planning,
+                "reflection_callback": self._on_plan_reflection,
+            }
         )
 
         # Copy initialized components from initializer
@@ -126,6 +156,7 @@ class Cortex:
         self._routing_enabled = initializer.is_routing_enabled()
         self.tool_registry = initializer.tool_registry
         self.formatter = initializer.formatter
+        self.planning_engine = initializer.planning_engine
 
         # Orchestration system
         self._orchestration_enabled = initializer.orchestration_enabled
@@ -139,8 +170,8 @@ class Cortex:
         max_workers = parallel_config.get("max_workers", 0)
         if max_workers == 0 or max_workers == "auto":
             import os
-
             max_workers = min(4, os.cpu_count() or 2)
+            
         self.parallel_executor = ParallelToolExecutor(
             execute_fn=self.execute_tool,
             max_workers=max_workers,
@@ -155,10 +186,22 @@ class Cortex:
         self.tool_executor = ToolExecutor(self)
         self.message_processor = MessageProcessor(self)
 
-        # Update conversation system prompt
+        # Enhanced metrics
+        self.plans_generated = 0
+        self.plans_executed = 0
+        self.plans_completed = 0
+
+        # Initial context loading
         self.project_context = self.prompt_generator.load_project_context()
+        
+        # Initialize conversation system prompt correctly from the start
         system_prompt = self._get_system_prompt()
         self.conversation.system_prompt = system_prompt
+        if not self.conversation.history:
+            self.conversation.add_system_message(system_prompt)
+        else:
+            self.conversation.history[0]["content"] = system_prompt
+            
         self.conversation._on_truncation = self._on_context_truncation
 
         # Track tools used in session (for metrics)
@@ -177,10 +220,8 @@ class Cortex:
 
         # Set default callback if configured
         if on_max_iterations_reached is None and self.config.max_iterations_continue_default:
-
             def default_callback(current: int, max_iter: int) -> Optional[int]:
                 return self.config.max_iterations_continue_amount
-
             self._on_max_iterations_reached = default_callback
         else:
             self._on_max_iterations_reached = on_max_iterations_reached
@@ -195,9 +236,6 @@ class Cortex:
                 f"[yellow]Context truncated:[/yellow] Removed {messages_removed} old messages "
                 f"({remaining} remaining)"
             )
-
-    # Note: _init_orchestration() and _get_orchestration_prompt() have been
-    # moved to AgentInitializer and PromptGenerator respectively
 
     def _handle_delegation_action(self, result: Dict[str, Any]) -> bool:
         """
@@ -312,7 +350,7 @@ class Cortex:
         }
 
     def switch_model(
-        self, new_model: str, provider_override: Optional[str] = None, silent: bool = False
+        self, new_model: str, provider_override: Optional[str] = None, silent: bool = False, reason: Optional[str] = None
     ) -> None:
         """
         Switch to a different model while maintaining conversation history.
@@ -324,10 +362,8 @@ class Cortex:
         Args:
             new_model: New model name to use
             provider_override: Optional provider override
-            silent: If True, suppress the UI output (useful for orchestrated switches)
-
-        Raises:
-            ProviderError: If provider initialization fails or API key is missing
+            silent: If True, suppress the UI output
+            reason: Optional reason for the switch
         """
         # Skip if same model
         if new_model == self.model:
@@ -362,13 +398,14 @@ class Cortex:
             # Notify user of model switch (unless silent mode)
             if not silent:
                 new_provider_name = ProviderFactory.get_provider_name(new_model)
+                reason_str = f" [dim]({reason})[/dim]" if reason else ""
                 if old_provider_name != new_provider_name:
                     console.print(
                         f"[cyan]Switched model:[/cyan] {old_model} ({old_provider_name}) -> "
-                        f"{new_model} ({new_provider_name})"
+                        f"{new_model} ({new_provider_name}){reason_str}"
                     )
                 else:
-                    console.print(f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}")
+                    console.print(f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}{reason_str}")
 
         except ProviderError as e:
             # Keep old model on error
@@ -454,6 +491,10 @@ class Cortex:
         """Load AGENT.md or README.md for project context (delegates to PromptGenerator)"""
         return self.prompt_generator.load_project_context()
 
+    def load_project_context(self) -> str:
+        """Public method to load project context for backward compatibility."""
+        return self._load_project_context()
+
     def _get_system_prompt(self) -> str:
         """Generate comprehensive system prompt using PromptBuilder"""
         # Get dynamic context
@@ -466,8 +507,8 @@ class Cortex:
         # Build using PromptBuilder
         return self.prompt_builder.build_system_prompt(
             tools=tool_schemas,
-            enable_planning=getattr(self, "enable_planning", False),
-            enable_memory=getattr(self, "enable_layered_memory", False),
+            enable_planning=self.enable_planning,
+            enable_memory=self.enable_layered_memory,
             state_context=state_context,
             project_context=self.project_context,
             memory_bank_context=memory_bank_context,
@@ -547,16 +588,6 @@ class Cortex:
     ) -> int:
         """
         Estimate token count for API call for rate limiting.
-
-        Uses simple approximation: ~4 characters per token for English text.
-        For code, this may underestimate, but it's conservative for rate limiting.
-
-        Args:
-            messages: List of message dictionaries
-            tools: List of tool definitions
-
-        Returns:
-            Estimated token count
         """
         # Count characters in messages
         char_count = 0
@@ -591,27 +622,19 @@ class Cortex:
 
         for attempt in range(max_retries):
             try:
-                # Pre-flight validation: Check message structure to prevent API errors
+                # Pre-flight validation
                 validation = self._validate_messages_for_api(messages)
                 if not validation["valid"]:
-                    critical_issues = [
-                        i for i in validation["issues"] if i["severity"] == "critical"
-                    ]
+                    critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
                     if critical_issues:
-                        # Try to repair critical issues automatically
                         messages = self._repair_messages_for_api(messages, critical_issues)
-                        logger.warning(
-                            f"Repaired {len(critical_issues)} critical message validation issues before API call"
-                        )
+                        logger.warning(f"Repaired {len(critical_issues)} critical issues before API call")
 
-                # Apply rate limiting if enabled
+                # Apply rate limiting
                 if self.rate_limiter:
-                    # Estimate tokens for rate limiting
                     token_count = self._estimate_api_call_tokens(messages, tools)
                     if not self.rate_limiter.acquire(token_count=token_count, blocking=True):
-                        logger.warning(
-                            "Rate limiter blocked API call (should not happen with blocking=True)"
-                        )
+                        logger.warning("Rate limiter blocked API call")
 
                 # Normalize model name for provider
                 normalized_model = self.provider.normalize_model_name(self.model)
@@ -619,72 +642,37 @@ class Cortex:
 
             except ProviderError as e:
                 error_str = str(e).lower()
-                # Detect context overflow errors
-                if (
-                    "context length" in error_str
-                    or "maximum context" in error_str
-                    or "too many tokens" in error_str
-                    or "tokens (" in error_str
-                ):
-                    logger.warning(
-                        f"Context overflow detected on attempt {attempt + 1}/{max_retries}: {e}"
-                    )
+                if any(x in error_str for x in ["context length", "maximum context", "too many tokens", "tokens ("]):
+                    logger.warning(f"Context overflow detected on attempt {attempt + 1}/{max_retries}")
 
                     if attempt < max_retries - 1:
-                        # Trigger aggressive conversation truncation
-                        old_count = len(self.conversation.history)
-                        current_tokens = self.conversation.get_token_count()
-
-                        # Aggressively truncate by keeping only system + last 5 messages
+                        # Aggressive truncation
                         self.conversation.history = [
                             self.conversation.history[0],  # System prompt
                             *self.conversation.history[-5:],  # Last 5 messages
                         ]
 
-                        # Also truncate content of remaining tool results to prevent overflow
-                        max_tool_content_length = 8000  # ~2000 tokens per tool result
+                        # Truncate remaining tool results
+                        max_tool_content_length = 8000
                         for msg in self.conversation.history:
                             if msg.get("role") == "tool":
                                 content = msg.get("content", "")
                                 if isinstance(content, str) and len(content) > max_tool_content_length:
-                                    msg["content"] = (
-                                        content[:max_tool_content_length]
-                                        + f"\n\n[... Content truncated from {len(content)} chars to prevent context overflow ...]"
-                                    )
-
-                        new_count = len(self.conversation.history)
-                        new_tokens = self.conversation.get_token_count()
-
-                        logger.warning(
-                            f"Auto-recovery from context overflow: truncated conversation "
-                            f"{old_count} -> {new_count} messages (~{current_tokens} -> ~{new_tokens} tokens). "
-                            f"Retrying..."
-                        )
+                                    msg["content"] = content[:max_tool_content_length] + "... [truncated]"
 
                         if self._is_text_output():
-                            console.print(
-                                "[yellow]Context overflow - automatically reduced conversation history. "
-                                "Retrying...[/yellow]"
-                            )
+                            console.print("[yellow]Context overflow - aggressively reduced conversation history.[/yellow]")
 
-                        # Update messages for retry
                         messages = self.conversation.get_history()
                         continue
                     else:
-                        # Last attempt failed
-                        raise ModelError(
-                            f"Context overflow persists after aggressive truncation. "
-                            f"Please start a new conversation or reduce the scope of your request. "
-                            f"Original error: {e}"
-                        ) from e
+                        raise ModelError(f"Context overflow persists after truncation: {e}") from e
                 else:
-                    # Other provider error - raise immediately
                     raise ModelError(f"Provider error: {e}") from e
 
             except Exception as e:
                 raise ModelError(f"Failed to call model: {e}") from e
 
-        # Should not reach here
         raise ModelError("Unexpected error in model call retry logic")
 
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -722,11 +710,10 @@ class Cortex:
                 }
             )
         elif pre_result.action == HookAction.MODIFY and pre_result.modified_data:
-            # Use modified arguments from hook
             tool_name = pre_result.modified_data.get("tool_name", tool_name)
             arguments = pre_result.modified_data.get("arguments", arguments)
 
-        # Permission check (delegates to PermissionManager)
+        # Permission check
         if not self.permission_manager.check(tool_name, arguments):
             return create_permission_denial(
                 reason="Operation not permitted",
@@ -743,7 +730,7 @@ class Cortex:
         success = False
 
         try:
-            # Create tool instance (pass self for task tool which needs parent_agent)
+            # Create tool instance
             tool = create_tool_instance(
                 tool_name,
                 self.project_dir,
@@ -779,12 +766,10 @@ class Cortex:
         )
         post_result = self.hook_manager.dispatch(post_event)
 
-        # Allow hooks to modify the result
         if post_result.action == HookAction.MODIFY and post_result.modified_data:
             if "result" in post_result.modified_data:
                 result = post_result.modified_data["result"]
 
-        # Add duration to result for display
         if isinstance(result, dict):
             result["duration_ms"] = duration_ms
 
@@ -795,7 +780,6 @@ class Cortex:
         if not tool_calls:
             return "Processing"
 
-        # Count operations by type
         operation_counts = {}
         for tool_call in tool_calls:
             tool_name = tool_call.name.lower()
@@ -810,20 +794,14 @@ class Cortex:
             else:
                 operation_counts["other"] = operation_counts.get("other", 0) + 1
 
-        # Create descriptive message
         if len(operation_counts) == 1:
             op_type = list(operation_counts.keys())[0]
             count = list(operation_counts.values())[0]
-            if op_type == "read":
-                return f"Reading {count} file{'s' if count > 1 else ''}"
-            elif op_type == "write":
-                return f"Writing {count} file{'s' if count > 1 else ''}"
-            elif op_type == "search":
-                return f"Searching for {count} pattern{'s' if count > 1 else ''}"
-            elif op_type == "execute":
-                return f"Executing {count} command{'s' if count > 1 else ''}"
-            else:
-                return f"Processing {count} operation{'s' if count > 1 else ''}"
+            if op_type == "read": return f"Reading {count} file{'s' if count > 1 else ''}"
+            elif op_type == "write": return f"Writing {count} file{'s' if count > 1 else ''}"
+            elif op_type == "search": return f"Searching for {count} pattern{'s' if count > 1 else ''}"
+            elif op_type == "execute": return f"Executing {count} command{'s' if count > 1 else ''}"
+            else: return f"Processing {count} operation{'s' if count > 1 else ''}"
         else:
             total = sum(operation_counts.values())
             return f"Processing {total} operations"
@@ -834,15 +812,11 @@ class Cortex:
 
     def _validate_tool_result(self, tool_name: str, result: Dict[str, Any]) -> bool:
         """Validate tool result has expected structure"""
-        # Must have success field
         if "success" not in result:
             return False
-
-        # If error, must have error field or error_type
         if not result["success"]:
             if "error" not in result and "error_type" not in result:
                 return False
-
         return True
 
     def request_shutdown(self) -> None:
@@ -850,29 +824,17 @@ class Cortex:
         self._shutdown_requested = True
 
     def _cleanup(self) -> None:
-        """
-        Cleanup resources on shutdown.
-        Saves session state if dirty and dispatches session end event.
-        """
+        """Cleanup resources on shutdown."""
         try:
-            # Dispatch session end event
             self._dispatch_session_end()
-
-            # Shutdown parallel executor
             if self.parallel_executor:
                 self.parallel_executor.shutdown()
-
-            # Note: Session saving is handled by CLI layer if needed
-            # This cleanup focuses on internal state
-
         except Exception as e:
-            # Log with traceback for debugging, but don't raise
             logger.warning(f"Error during cleanup: {e}", exc_info=True)
 
     def _process_message(self, user_message: str, use_streaming: bool = False):
-        """Process a user message through the agent loop with hook support."""
+        """Unified message processing loop supporting planning and memory."""
 
-        # Check for shutdown request
         if self._shutdown_requested:
             return
 
@@ -882,120 +844,74 @@ class Cortex:
         )
         prompt_result = self.hook_manager.dispatch(prompt_event)
 
-        # Handle hook actions
         if prompt_result.action == HookAction.ABORT:
             self._output_error(prompt_result.message or "Blocked by hook", "prompt_blocked")
             return
         elif prompt_result.action == HookAction.MODIFY and prompt_result.modified_data:
-            # Use modified prompt from hook
             user_message = prompt_result.modified_data.get("prompt", user_message)
+
+        # Set goals if using state management
+        if hasattr(self, "state_manager"):
+            self.state_manager.set_primary_goal(user_message)
+            self.state_manager.set_focus(AgentFocus.EXPLORING)
 
         # Add user message
         self.conversation.add_user_message(user_message)
         self._session_dirty = True
 
-        # ========== ROUTING INTEGRATION ==========
-        # Route request to optimal model if routing is enabled
+        # Routing integration
         if self._routing_enabled and self.router:
             try:
                 routing_decision = self.route_request(user_message)
-
                 if routing_decision and routing_decision.model_name != self.model:
-                    # Display routing decision
-                    console.print("\n[cyan]Routing Decision[/cyan]")
-                    console.print(f"   Model: [bold]{routing_decision.model_name}[/bold]")
-                    console.print(f"   Reason: {routing_decision.reasoning.primary_reason}")
-                    if routing_decision.task_analysis:
-                        task_type = routing_decision.task_analysis.task_type.value
-                        complexity = routing_decision.task_analysis.complexity.score
-                        console.print(f"   Task: {task_type} (complexity: {complexity}/10)")
-                    if routing_decision.estimated_cost_usd is not None:
-                        console.print(f"   Est. Cost: ${routing_decision.estimated_cost_usd:.4f}")
-                    console.print()
-
-                    # Switch to routed model
-                    self.switch_model(
-                        routing_decision.model_name,
-                        reason=f"Routed: {routing_decision.reasoning.primary_reason}",
-                    )
+                    self.switch_model(routing_decision.model_name, reason=routing_decision.reasoning.primary_reason)
             except Exception as e:
-                logger.warning(f"Routing failed, continuing with current model: {e}")
-        # ========== END ROUTING ==========
+                logger.warning(f"Routing failed: {e}")
 
-        # Initialize delegation tracker for this request (model orchestration)
+        # Delegation tracking
         if self._orchestration_enabled and self._orchestration:
             self._delegation_tracker = self._orchestration.start_request(self.model)
 
-        # Set processing flag
         self._is_processing = True
-        # Set agent focus to EXECUTING mode
-        self.state_manager.set_focus(AgentFocus.EXECUTING)
-
-        # Agent loop - use while True with explicit break for dynamic iteration extension
+        
+        # Agent loop
         max_iterations = self.config.max_iterations
         iteration = 0
 
         try:
             while True:
                 iteration += 1
-                # Track iteration in state manager
                 self.state_manager.increment_iteration()
 
-                # Check for shutdown request
                 if self._shutdown_requested:
                     self._output_warning("Shutdown requested. Cleaning up...")
                     self._cleanup()
-                    self._is_processing = False
                     return
 
-                # Check if we've exceeded max iterations (before processing)
                 if iteration > max_iterations:
-                    # Check if callback is set
                     if self._on_max_iterations_reached:
                         additional = self._on_max_iterations_reached(iteration, max_iterations)
                         if additional is not None and additional > 0:
-                            # Extend max_iterations and continue
                             max_iterations += additional
-                            console.print(
-                                f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})"
-                            )
-                            continue  # Continue the loop with extended limit
-                        else:
-                            # Callback returned 0 or None - stop
-                            self._output_warning("Reached maximum iterations")
-                            self._is_processing = False
-                            return
-                    else:
-                        # No callback - default behavior (stop)
-                        self._output_warning("Reached maximum iterations")
-                        self._is_processing = False
-                        return
+                            continue
+                    self._output_warning("Reached maximum iterations")
+                    return
 
                 self.loop_guard.increment_iteration()
                 console.print(f"[dim]{'-' * 60}[/dim]")
 
                 try:
-                    # Get conversation history
+                    # Refresh system prompt with latest state/memory
+                    self.conversation.system_prompt = self._get_system_prompt()
                     messages = self.conversation.get_history()
-
-                    # Show thinking indicator
-                    # Get tools from registry (includes delegation tools)
                     tools = get_registry().get_all_schemas()
 
                     with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
-                        if (
-                            use_streaming
-                            and stream_model_response
-                            and self.provider.supports_streaming()
-                        ):
-                            # Streaming mode
+                        if use_streaming and stream_model_response and self.provider.supports_streaming():
                             normalized_model = self.provider.normalize_model_name(self.model)
-                            stream = stream_model_response(
-                                self.provider, normalized_model, messages, tools
-                            )
+                            stream = stream_model_response(self.provider, normalized_model, messages, tools)
                             response_message = display_streaming_response(stream)
                         else:
-                            # Non-streaming mode
                             response = self._call_model(messages, tools)
                             response_message = response["message"]
 
@@ -1006,887 +922,159 @@ class Cortex:
                         reasoning_content=response_message.get("reasoning_content"),
                     )
 
-                    # Create automatic checkpoint if needed
-                    session_id = f"session_{self.session_start.strftime('%Y%m%d_%H%M%S')}"
-                    if self.checkpoint_manager.should_checkpoint(
-                        session_id, len(self.conversation.get_history())
-                    ):
-                        health_report = self.health_monitor.analyze_health(
-                            self.conversation.get_history()
-                        )
-                        self.checkpoint_manager.create_checkpoint(
-                            session_id,
-                            self.conversation.get_history(),
-                            health_score=health_report.overall_score,
-                        )
-
-                    # Display thinking/reasoning if enabled and present
+                    # Handle thinking/reasoning
                     reasoning_content = response_message.get("reasoning_content")
                     if reasoning_content and self._is_text_output():
                         from .ui.display import display_thinking
-
                         display_thinking(reasoning_content, expanded=self.show_thinking)
 
-                    # Display MiMo reasoning details (OpenRouter format)
-                    reasoning_details = response_message.get("reasoning_details")
-                    if reasoning_details and self._is_text_output():
-                        from .ui.display import display_reasoning_details
-
-                        display_reasoning_details(reasoning_details, expanded=self.show_thinking)
-
-                    # Check if using tools
+                    # Process Tool Calls
                     if response_message.get("tool_calls"):
-                        # Don't display content here if tools are present - wait for final response
-                        # Create ToolCall objects for batch execution
                         tool_calls_to_run = []
                         for i, tool_call_data in enumerate(response_message["tool_calls"]):
-                            # Parse arguments from JSON string to dict
                             try:
-                                parsed_arguments = json.loads(
-                                    tool_call_data["function"]["arguments"]
-                                )
-                            except (json.JSONDecodeError, KeyError, TypeError):
-                                # Fallback to empty dict if parsing fails
+                                parsed_arguments = json.loads(tool_call_data["function"]["arguments"])
+                            except:
                                 parsed_arguments = {}
 
-                            # Ensure ID is always a string (defensive, in case provider validation missed something)
                             raw_id = tool_call_data.get("id", f"call_{iteration}_{i}")
-                            tool_call_id = (
-                                str(raw_id) if raw_id is not None else f"call_{iteration}_{i}"
-                            )
-
                             tool_calls_to_run.append(
                                 ToolCall(
-                                    id=tool_call_id,
+                                    id=str(raw_id) if raw_id is not None else f"call_{iteration}_{i}",
                                     name=tool_call_data["function"]["name"],
                                     arguments=parsed_arguments,
                                     index=i,
                                 )
                             )
 
-                        # Execute tools in batch with consolidated display
+                        # Batch execute
                         consolidated_display = get_consolidated_display()
                         agent_description = self._get_agent_description(tool_calls_to_run)
-
-                        # Update context stats for footer display
-                        context_stats = self.conversation.get_truncation_stats()
-                        consolidated_display.update_context_stats(context_stats)
-
-                        with consolidated_display.track_operations(
-                            tool_calls_to_run, agent_description
-                        ):
+                        
+                        with consolidated_display.track_operations(tool_calls_to_run, agent_description):
                             batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
 
-                            # Update operation status as tools complete
-                            for tool_result in batch_result.results:
-                                operation_id = f"op_{tool_result.index}_{tool_result.name}"
-                                status = (
-                                    OperationStatus.COMPLETED
-                                    if tool_result.success
-                                    else OperationStatus.FAILED
-                                )
-                                result_text = (
-                                    tool_result.result.get("content", "")
-                                    if tool_result.success
-                                    else tool_result.result.get("error", "")
-                                )
-
-                                consolidated_display.update_operation_status(
-                                    operation_id,
-                                    status,
-                                    result=result_text,
-                                    error=tool_result.error,
-                                )
-
                         # Process results
                         for tool_result in batch_result.results:
-                            # Check for shutdown request before each tool
-                            if self._shutdown_requested:
-                                self._output_warning(
-                                    "Shutdown requested. Stopping tool execution..."
-                                )
-                                self._cleanup()
-                                return
-
+                            if self._shutdown_requested: return
+                            
                             tool_name = tool_result.name
-                            arguments = next(
-                                (
-                                    tc.arguments
-                                    for tc in tool_calls_to_run
-                                    if tc.id == tool_result.id
-                                ),
-                                {},
-                            )
                             result = tool_result.result
+                            arguments = next((tc.arguments for tc in tool_calls_to_run if tc.id == tool_result.id), {})
 
-                            # Output tool result (for JSON modes)
                             self._output_tool_result(tool_name, result)
-
-                            # Track tool execution in state manager
+                            
+                            # Update state and memory
                             self.state_manager.record_tool_execution(tool_name, arguments, result)
+                            if self.enable_layered_memory and isinstance(self.memory_bank, EnhancedMemoryBank):
+                                self.memory_bank.extract_learnings_from_tool_results([result])
 
-                            # Check for delegation actions (model orchestration)
+                            # Delegation
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
                                 if self._handle_delegation_action(result):
-                                    # Model was switched - add result and continue with new model
                                     result = truncate_tool_result(tool_name, result)
                                     self.conversation.add_tool_result(tool_result.id, result)
-                                    # Don't return - let the loop continue with the new model
                                     continue
 
-                            # Validate result
-                            if not self._validate_tool_result(tool_name, result):
-                                self._output_warning(f"Invalid tool result format from {tool_name}")
-                                result = create_error_response(
-                                    "Tool returned invalid result format",
-                                    ErrorType.EXECUTION,
-                                    {"tool_name": tool_name},
-                                )
-
-                            # Truncate large results to prevent context overflow
+                            # Truncate and add to conversation
                             result = truncate_tool_result(tool_name, result)
-
-                            # Add result to conversation
                             self.conversation.add_tool_result(tool_result.id, result)
 
-                            # Parse arguments for loop guards
-                            parsed_arguments = arguments
-                            if isinstance(arguments, str):
-                                try:
-                                    parsed_arguments = json.loads(arguments)
-                                except json.JSONDecodeError:
-                                    parsed_arguments = {}
-
-                            # Check loop guards
+                            # Loop guard checks
                             if not self._is_tool_result_success(result):
-                                self.loop_guard.record_error(result)
                                 if self.loop_guard.check_repeated_error(result):
-                                    recovery_action = self.loop_guard.get_recovery_action(
-                                        result, tool_name, parsed_arguments
-                                    )
-                                    if recovery_action:
-                                        from .core.recovery_strategies import RecoveryStrategy
-
-                                        if recovery_action.strategy != RecoveryStrategy.ESCALATE:
-                                            self._output_warning(
-                                                f"Recovery triggered: {recovery_action.message}"
-                                            )
-                                            if recovery_action.suggested_prompt:
-                                                self.conversation.add_user_message(
-                                                    f"[Recovery Guidance] {recovery_action.suggested_prompt}"
-                                                )
-                                            continue
-                                    self._output_error(
-                                        "Repeated error detected. Stopping to prevent infinite loop.",
-                                        "loop_guard",
-                                    )
+                                    recovery_action = self.loop_guard.get_recovery_action(result, tool_name, arguments)
+                                    if recovery_action and recovery_action.strategy != "ESCALATE":
+                                        if recovery_action.suggested_prompt:
+                                            self.conversation.add_user_message(f"[Recovery Guidance] {recovery_action.suggested_prompt}")
+                                        continue
                                     return
 
-                            self.loop_guard.record_tool_call(tool_name, parsed_arguments)
-                            self.loop_guard.record_operation(tool_name, parsed_arguments)
-
-                            if self.loop_guard.check_stuck_state():
-                                self._output_error(
-                                    "Agent appears stuck. Stopping to prevent infinite loop.",
-                                    "loop_guard",
-                                )
-                                return
-
-                            if self.loop_guard.check_repeated_tool_call(
-                                tool_name, parsed_arguments
-                            ):
-                                self._output_error(
-                                    "Same tool called repeatedly. Stopping to prevent infinite loop.",
-                                    "loop_guard",
-                                )
-                                return
-
                     else:
-                        # No more tools - final response
+                        # Final response
                         final_text = response_message.get("content", "")
-                        reasoning = response_message.get("reasoning_content", "")
-
                         if final_text:
                             self._output_response({"content": final_text}, is_final=True)
+                            if self.enable_layered_memory:
+                                self._extract_insights_from_response(final_text)
                             return
-                        elif reasoning:
-                            # Model had reasoning but no content - check if it's confused about tools
-                            tool_syntax_patterns = [
-                                "<tool_call>",
-                                "</tool_call>",
-                                "function_call",
-                                "tool_use",
-                            ]
-                            has_tool_syntax = any(
-                                pattern in reasoning.lower() for pattern in tool_syntax_patterns
-                            )
-
-                            if has_tool_syntax:
-                                # Model tried to use tools but failed - log quietly, don't warn user
-                                logger.debug(
-                                    "Model attempted tool use in reasoning but no valid tool_calls parsed"
-                                )
-                            else:
-                                # Normal reasoning-only response - thinking already displayed
-                                logger.debug("Reasoning-only response received, exiting cleanly")
-                            return
-                        else:
-                            # Truly empty response - this shouldn't happen but handle gracefully
-                            logger.debug("Empty model response received, exiting")
-                            return
-
-                except KeyboardInterrupt:
-                    # User interrupted the current operation
-                    self._output_warning("Interrupted by user")
-                    return
-                except (ModelError, ProviderError) as e:
-                    import traceback
-
-                    error_msg = str(e)
-                    error_context = {"traceback": traceback.format_exc()}
-
-                    # Check for specific error types and provide recovery hints
-                    if "Invalid assistant message" in error_msg:
-                        # This is the specific error we're trying to prevent
-                        error_msg += (
-                            "\n\n[Recovery Hint] This error indicates corrupted conversation history. "
-                            "Try clearing the session with '/clear' or starting a new session."
-                        )
-                        error_context["recovery_suggestion"] = "clear_session"
-                    elif "rate limit" in error_msg.lower():
-                        error_msg += (
-                            "\n\n[Recovery Hint] Rate limit exceeded. Wait a moment and try again."
-                        )
-                        error_context["recovery_suggestion"] = "wait_and_retry"
-                    elif "authentication" in error_msg.lower() or "api key" in error_msg.lower():
-                        error_msg += "\n\n[Recovery Hint] Check your API key configuration."
-                        error_context["recovery_suggestion"] = "check_api_key"
-
-                    self._output_error(error_msg, "model_error", error_context)
-                    return
-                except Exception as e:
-                    import traceback
-
-                    self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
-                    return
-        finally:
-            self._is_processing = False
-            # Reset agent focus to EXPLORING when done
-            self.state_manager.set_focus(AgentFocus.EXPLORING)
-
-    async def _process_message_async(self, user_message: str, use_streaming: bool = False) -> None:
-        """Process a user message asynchronously through the agent loop with hook support.
-
-        This is the async version of _process_message. It provides non-blocking execution
-        while maintaining all the same functionality including:
-        - Hook support
-        - Routing integration
-        - Tool execution (parallel and async-compatible)
-        - Loop guards
-        - Error handling
-        - Rate limiting
-
-        Args:
-            user_message: The user's message to process
-            use_streaming: Whether to use streaming responses
-        """
-        # Check for shutdown request
-        if self._shutdown_requested:
-            return
-
-        # Dispatch UserPromptSubmit hook
-        prompt_event = UserPromptSubmitEvent(
-            prompt=user_message, conversation_length=len(self.conversation.get_history())
-        )
-        prompt_result = self.hook_manager.dispatch(prompt_event)
-
-        # Handle hook actions
-        if prompt_result.action == HookAction.ABORT:
-            self._output_error(prompt_result.message or "Blocked by hook", "prompt_blocked")
-            return
-        elif prompt_result.action == HookAction.MODIFY and prompt_result.modified_data:
-            # Use modified prompt from hook
-            user_message = prompt_result.modified_data.get("prompt", user_message)
-
-        # Add user message
-        self.conversation.add_user_message(user_message)
-        self._session_dirty = True
-
-        # ========== ROUTING INTEGRATION ==========
-        # Route request to optimal model if routing is enabled
-        if self._routing_enabled and self.router:
-            try:
-                routing_decision = self.route_request(user_message)
-
-                if routing_decision and routing_decision.model_name != self.model:
-                    # Display routing decision
-                    console.print("\n[cyan]Routing Decision[/cyan]")
-                    console.print(f"   Model: [bold]{routing_decision.model_name}[/bold]")
-                    console.print(f"   Reason: {routing_decision.reasoning.primary_reason}")
-                    if routing_decision.task_analysis:
-                        task_type = routing_decision.task_analysis.task_type.value
-                        complexity = routing_decision.task_analysis.complexity.score
-                        console.print(f"   Task: {task_type} (complexity: {complexity}/10)")
-                    if routing_decision.estimated_cost_usd is not None:
-                        console.print(f"   Est. Cost: ${routing_decision.estimated_cost_usd:.4f}")
-                    console.print()
-
-                    # Switch to routed model
-                    self.switch_model(
-                        routing_decision.model_name,
-                        reason=f"Routed: {routing_decision.reasoning.primary_reason}",
-                    )
-            except Exception as e:
-                logger.warning(f"Routing failed, continuing with current model: {e}")
-        # ========== END ROUTING ==========
-
-        # Initialize delegation tracker for this request (model orchestration)
-        if self._orchestration_enabled and self._orchestration:
-            self._delegation_tracker = self._orchestration.start_request(self.model)
-
-        # Set processing flag
-        self._is_processing = True
-        # Set agent focus to EXECUTING mode
-        self.state_manager.set_focus(AgentFocus.EXECUTING)
-
-        # Agent loop - use while True with explicit break for dynamic iteration extension
-        max_iterations = self.config.max_iterations
-        iteration = 0
-
-        try:
-            while True:
-                iteration += 1
-                # Track iteration in state manager
-                self.state_manager.increment_iteration()
-
-                # Check for shutdown request
-                if self._shutdown_requested:
-                    self._output_warning("Shutdown requested. Cleaning up...")
-                    await asyncio.to_thread(self._cleanup)
-                    self._is_processing = False
-                    return
-
-                # Check if we've exceeded max iterations (before processing)
-                if iteration > max_iterations:
-                    # Check if callback is set
-                    if self._on_max_iterations_reached:
-                        additional = await asyncio.to_thread(
-                            self._on_max_iterations_reached, iteration, max_iterations
-                        )
-                        if additional is not None and additional > 0:
-                            # Extend max_iterations and continue
-                            max_iterations += additional
-                            console.print(
-                                f"[cyan]Extended iterations:[/cyan] +{additional} more (total: {max_iterations})"
-                            )
-                            continue  # Continue the loop with extended limit
-                        else:
-                            # Callback returned 0 or None - stop
-                            self._output_warning("Reached maximum iterations")
-                            self._is_processing = False
-                            return
-                    else:
-                        # No callback - default behavior (stop)
-                        self._output_warning("Reached maximum iterations")
-                        self._is_processing = False
                         return
 
-                self.loop_guard.increment_iteration()
-                console.print(f"[dim]{'-' * 60}[/dim]")
-
-                try:
-                    # Get conversation history
-                    messages = self.conversation.get_history()
-
-                    # Get tools from registry (includes delegation tools)
-                    tools = await asyncio.to_thread(get_registry().get_all_schemas)
-
-                    # Show thinking indicator
-                    with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
-                        if (
-                            use_streaming
-                            and stream_model_response
-                            and self.provider.supports_streaming()
-                        ):
-                            # Streaming mode - async
-                            normalized_model = self.provider.normalize_model_name(self.model)
-                            stream = await asyncio.to_thread(
-                                stream_model_response,
-                                self.provider,
-                                normalized_model,
-                                messages,
-                                tools,
-                            )
-                            response_message = await asyncio.to_thread(
-                                display_streaming_response, stream
-                            )
-                        else:
-                            # Non-streaming mode - call async model if available
-                            response = await self._call_model_async(messages, tools)
-                            response_message = response["message"]
-
-                    # Add assistant response
-                    self.conversation.add_assistant_message(
-                        content=response_message.get("content", ""),
-                        tool_calls=response_message.get("tool_calls"),
-                        reasoning_content=response_message.get("reasoning_content"),
-                    )
-
-                    # Create automatic checkpoint if needed
-                    session_id = f"session_{self.session_start.strftime('%Y%m%d_%H%M%S')}"
-                    if self.checkpoint_manager.should_checkpoint(
-                        session_id, len(self.conversation.get_history())
-                    ):
-                        health_report = await asyncio.to_thread(
-                            self.health_monitor.analyze_health, self.conversation.get_history()
-                        )
-                        await asyncio.to_thread(
-                            self.checkpoint_manager.create_checkpoint,
-                            session_id,
-                            self.conversation.get_history(),
-                            health_score=health_report.overall_score,
-                        )
-
-                    # Display thinking/reasoning if enabled and present
-                    reasoning_content = response_message.get("reasoning_content")
-                    if reasoning_content and self._is_text_output():
-                        from .ui.display import display_thinking
-
-                        await asyncio.to_thread(
-                            display_thinking, reasoning_content, expanded=self.show_thinking
-                        )
-
-                    # Display MiMo reasoning details (OpenRouter format)
-                    reasoning_details = response_message.get("reasoning_details")
-                    if reasoning_details and self._is_text_output():
-                        from .ui.display import display_reasoning_details
-
-                        await asyncio.to_thread(
-                            display_reasoning_details,
-                            reasoning_details,
-                            expanded=self.show_thinking,
-                        )
-
-                    # Check if using tools
-                    if response_message.get("tool_calls"):
-                        # Create ToolCall objects for batch execution
-                        tool_calls_to_run = []
-                        for i, tool_call_data in enumerate(response_message["tool_calls"]):
-                            # Parse arguments from JSON string to dict
-                            try:
-                                parsed_arguments = json.loads(
-                                    tool_call_data["function"]["arguments"]
-                                )
-                            except (json.JSONDecodeError, KeyError, TypeError):
-                                # Fallback to empty dict if parsing fails
-                                parsed_arguments = {}
-
-                            # Ensure ID is always a string (defensive, in case provider validation missed something)
-                            raw_id = tool_call_data.get("id", f"call_{iteration}_{i}")
-                            tool_call_id = (
-                                str(raw_id) if raw_id is not None else f"call_{iteration}_{i}"
-                            )
-
-                            tool_calls_to_run.append(
-                                ToolCall(
-                                    id=tool_call_id,
-                                    name=tool_call_data["function"]["name"],
-                                    arguments=parsed_arguments,
-                                    index=i,
-                                )
-                            )
-
-                        # Execute tools in batch (async-compatible)
-                        batch_result = await self._execute_tools_async(tool_calls_to_run)
-
-                        # Process results
-                        for tool_result in batch_result.results:
-                            # Check for shutdown request before each tool
-                            if self._shutdown_requested:
-                                self._output_warning(
-                                    "Shutdown requested. Stopping tool execution..."
-                                )
-                                await asyncio.to_thread(self._cleanup)
-                                return
-
-                            tool_name = tool_result.name
-                            arguments = next(
-                                (
-                                    tc.arguments
-                                    for tc in tool_calls_to_run
-                                    if tc.id == tool_result.id
-                                ),
-                                {},
-                            )
-                            result = tool_result.result
-
-                            # Output tool result (for JSON modes)
-                            self._output_tool_result(tool_name, result)
-
-                            # Track tool execution in state manager
-                            self.state_manager.record_tool_execution(tool_name, arguments, result)
-
-                            # Check for delegation actions (model orchestration)
-                            if tool_name in ("delegate_to_model", "return_to_coordinator"):
-                                if await asyncio.to_thread(self._handle_delegation_action, result):
-                                    # Model was switched - add result and continue with new model
-                                    result = truncate_tool_result(tool_name, result)
-                                    self.conversation.add_tool_result(tool_result.id, result)
-                                    # Don't return - let the loop continue with the new model
-                                    continue
-
-                            # Validate result
-                            if not await asyncio.to_thread(
-                                self._validate_tool_result, tool_name, result
-                            ):
-                                self._output_warning(f"Invalid tool result format from {tool_name}")
-                                result = await asyncio.to_thread(
-                                    create_error_response,
-                                    "Tool returned invalid result format",
-                                    ErrorType.EXECUTION,
-                                    {"tool_name": tool_name},
-                                )
-
-                            # Truncate large results to prevent context overflow
-                            result = truncate_tool_result(tool_name, result)
-
-                            # Add result to conversation
-                            self.conversation.add_tool_result(tool_result.id, result)
-
-                            # Parse arguments for loop guards
-                            parsed_arguments = arguments
-                            if isinstance(arguments, str):
-                                try:
-                                    parsed_arguments = json.loads(arguments)
-                                except json.JSONDecodeError:
-                                    parsed_arguments = {}
-
-                            # Check loop guards
-                            if not self._is_tool_result_success(result):
-                                self.loop_guard.record_error(result)
-                                if self.loop_guard.check_repeated_error(result):
-                                    recovery_action = self.loop_guard.get_recovery_action(
-                                        result, tool_name, parsed_arguments
-                                    )
-                                    if recovery_action:
-                                        from .core.recovery_strategies import RecoveryStrategy
-
-                                        if recovery_action.strategy != RecoveryStrategy.ESCALATE:
-                                            self._output_warning(
-                                                f"Recovery triggered: {recovery_action.message}"
-                                            )
-                                            if recovery_action.suggested_prompt:
-                                                self.conversation.add_user_message(
-                                                    f"[Recovery Guidance] {recovery_action.suggested_prompt}"
-                                                )
-                                            continue
-                                    self._output_error(
-                                        "Repeated error detected. Stopping to prevent infinite loop.",
-                                        "loop_guard",
-                                    )
-                                    return
-
-                            self.loop_guard.record_tool_call(tool_name, parsed_arguments)
-                            self.loop_guard.record_operation(tool_name, parsed_arguments)
-
-                            if self.loop_guard.check_stuck_state():
-                                self._output_error(
-                                    "Agent appears stuck. Stopping to prevent infinite loop.",
-                                    "loop_guard",
-                                )
-                                return
-
-                            if self.loop_guard.check_repeated_tool_call(
-                                tool_name, parsed_arguments
-                            ):
-                                self._output_error(
-                                    "Same tool called repeatedly. Stopping to prevent infinite loop.",
-                                    "loop_guard",
-                                )
-                                return
-
-                    else:
-                        # No more tools - final response
-                        final_text = response_message.get("content", "")
-                        reasoning = response_message.get("reasoning_content", "")
-
-                        if final_text:
-                            self._output_response({"content": final_text}, is_final=True)
-                            return
-                        elif reasoning:
-                            # Model had reasoning but no content - check if it's confused about tools
-                            tool_syntax_patterns = [
-                                "<tool_call>",
-                                "</tool_call>",
-                                "function_call",
-                                "tool_use",
-                            ]
-                            has_tool_syntax = any(
-                                pattern in reasoning.lower() for pattern in tool_syntax_patterns
-                            )
-
-                            if has_tool_syntax:
-                                # Model tried to use tools but failed - log quietly, don't warn user
-                                logger.debug(
-                                    "Model attempted tool use in reasoning but no valid tool_calls parsed"
-                                )
-                            else:
-                                # Normal reasoning-only response - thinking already displayed
-                                logger.debug("Reasoning-only response received, exiting cleanly")
-                            return
-                        else:
-                            # Truly empty response - this shouldn't happen but handle gracefully
-                            logger.debug("Empty model response received, exiting")
-                            return
-
-                except KeyboardInterrupt:
-                    # User interrupted the current operation
-                    self._output_warning("Interrupted by user")
-                    return
-                except (ModelError, ProviderError) as e:
-                    import traceback
-
-                    error_msg = str(e)
-                    error_context = {"traceback": traceback.format_exc()}
-
-                    # Check for specific error types and provide recovery hints
-                    if "Invalid assistant message" in error_msg:
-                        # This is the specific error we're trying to prevent
-                        error_msg += (
-                            "\n\n[Recovery Hint] This error indicates corrupted conversation history. "
-                            "Try clearing the session with '/clear' or starting a new session."
-                        )
-                        error_context["recovery_suggestion"] = "clear_session"
-                    elif "rate limit" in error_msg.lower():
-                        error_msg += (
-                            "\n\n[Recovery Hint] Rate limit exceeded. Wait a moment and try again."
-                        )
-                        error_context["recovery_suggestion"] = "wait_and_retry"
-                    elif "authentication" in error_msg.lower() or "api key" in error_msg.lower():
-                        error_msg += "\n\n[Recovery Hint] Check your API key configuration."
-                        error_context["recovery_suggestion"] = "check_api_key"
-
-                    self._output_error(error_msg, "model_error", error_context)
-                    return
                 except Exception as e:
                     import traceback
-
                     self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
                     return
         finally:
             self._is_processing = False
-            # Reset agent focus to EXPLORING when done
             self.state_manager.set_focus(AgentFocus.EXPLORING)
 
-    async def _call_model_async(
-        self, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
-        """Call model asynchronously via provider with retry logic.
+    # Async version of the loop
+    async def _process_message_async(self, user_message: str, use_streaming: bool = False) -> None:
+        """Async version of message processing."""
+        await asyncio.to_thread(self._process_message, user_message, use_streaming)
 
-        This async version uses asyncio.to_thread for CPU-bound operations
-        and maintains the same retry logic as the sync version.
-        """
+    def _extract_insights_from_response(self, response: str) -> None:
+        """Extract insights from final response text for layered memory."""
+        if not self.enable_layered_memory:
+            return
+        insight_indicators = ["insight:", "learned that", "key finding:", "discovered that"]
+        for line in response.split("\n"):
+            for indicator in insight_indicators:
+                if indicator in line.lower():
+                    idx = line.lower().find(indicator)
+                    insight_text = line[idx + len(indicator) :].strip()
+                    if len(insight_text) > 10:
+                        self.state_manager.record_insight(insight_text)
+                        break
+
+    def generate_and_execute_plan(self, goal: str) -> Dict[str, Any]:
+        """Generate and execute a structured plan."""
+        if not self.enable_planning or not self.planning_engine:
+            return {"success": False, "error": "Planning not enabled"}
         try:
-            # Apply rate limiting if enabled (async version)
-            if self.rate_limiter:
-                # Estimate tokens for rate limiting
-                token_count = self._estimate_api_call_tokens(messages, tools)
-                if not self.rate_limiter.acquire(token_count=token_count, blocking=True):
-                    logger.warning(
-                        "Rate limiter blocked API call (should not happen with blocking=True)"
-                    )
-
-            # Normalize model name for provider
-            normalized_model = self.provider.normalize_model_name(self.model)
-
-            # Call provider asynchronously
-            # Most provider calls are I/O-bound, so we can use to_thread
-            return await asyncio.to_thread(
-                self.provider.chat,
-                model=normalized_model,
-                messages=messages,
-                tools=tools,
-            )
+            plan = self.planning_engine.create_plan(goal)
+            self.plans_generated += 1
+            self.state_manager.set_active_plan(plan)
+            self.state_manager.set_focus(AgentFocus.EXECUTING)
+            execution_result = self.planning_engine.execute_plan(plan)
+            self.plans_executed += 1
+            if execution_result.get("success", False):
+                self.plans_completed += 1
+            return execution_result
         except Exception as e:
-            logger.error(f"Error in async model call: {e}")
-            raise
+            logger.error(f"Plan execution failed: {e}")
+            return {"success": False, "error": str(e)}
 
-    async def _execute_tools_async(self, tool_calls_to_run: List[ToolCall]) -> Any:
-        """Execute tools asynchronously.
+    def _load_skill(self, skill_name: str) -> Dict[str, Any]:
+        return {}
 
-        This method maintains compatibility with the sync version while
-        allowing async execution of tools where possible.
-        """
-        # Check if we should run tools in parallel
-        execution_mode = self.parallel_executor._get_execution_mode(tool_calls_to_run)
+    def _execute_tool_for_planning(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        return self.execute_tool(tool_name, arguments)
 
-        if execution_mode.value == "parallel":
-            # For parallel execution, we use the existing parallel executor
-            # which is already optimized for concurrent execution
-            return await asyncio.to_thread(
-                self.parallel_executor.execute_batch,
-                tool_calls_to_run,
-            )
-        else:
-            # For serialized execution, also use to_thread
-            return await asyncio.to_thread(
-                self.parallel_executor.execute_batch,
-                tool_calls_to_run,
-            )
+    def _on_plan_reflection(self, plan: Plan, reflection: str) -> None:
+        if self.enable_layered_memory:
+            self.state_manager.record_insight(f"Plan reflection: {reflection}")
 
     def get_conversation_history(self) -> List[Dict[str, Any]]:
-        """Get current conversation history"""
         return self.conversation.get_history()
 
     def clear_conversation(self) -> None:
-        """Clear conversation history"""
         self.conversation.clear(keep_system=True)
-        # Update system prompt
         self.conversation.history[0]["content"] = self._get_system_prompt()
 
     def _validate_messages_for_api(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """
-        Validate messages for API compliance to prevent "Invalid assistant message" errors.
-
-        Returns:
-            Dict with validation results and issues found.
-        """
         issues = []
-
         for i, msg in enumerate(messages):
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            tool_calls = msg.get("tool_calls")
+            if msg.get("role") == "assistant" and not msg.get("content") and not msg.get("tool_calls"):
+                issues.append({"index": i, "type": "invalid_assistant_message", "severity": "critical"})
+        return {"valid": len(issues) == 0, "issues": issues}
 
-            # Validate assistant messages - must have content or tool_calls
-            if role == "assistant":
-                if not content and not tool_calls:
-                    issues.append(
-                        {
-                            "index": i,
-                            "type": "invalid_assistant_message",
-                            "message": f"Assistant message at index {i} has no content or tool_calls",
-                            "severity": "critical",  # Will cause API errors
-                        }
-                    )
-
-            # Validate tool messages - content must be string
-            elif role == "tool":
-                if not isinstance(msg.get("content", ""), str):
-                    issues.append(
-                        {
-                            "index": i,
-                            "type": "invalid_tool_result",
-                            "message": f"Tool result at index {i} has non-string content",
-                            "severity": "warning",
-                        }
-                    )
-
-        return {
-            "valid": len(issues) == 0,
-            "issues": issues,
-            "message_count": len(messages),
-            "severity_levels": {
-                "critical": len([i for i in issues if i["severity"] == "critical"]),
-                "warning": len([i for i in issues if i["severity"] == "warning"]),
-            },
-        }
-
-    def _repair_messages_for_api(
-        self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Attempt to automatically repair critical message validation issues.
-
-        Args:
-            messages: Original message list
-            issues: List of validation issues (only critical ones should be passed)
-
-        Returns:
-            Repaired message list
-        """
-        repaired_messages = messages.copy()
-
+    def _repair_messages_for_api(self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        repaired = messages.copy()
         for issue in issues:
-            if issue["type"] == "invalid_assistant_message":
-                idx = issue["index"]
-                msg = repaired_messages[idx]
-
-                # Try to fix by converting reasoning_content to content
-                if msg.get("reasoning_content"):
-                    content = f"[Reasoning: {msg['reasoning_content'][:200]}{'...' if len(msg['reasoning_content']) > 200 else ''}]"
-                    repaired_messages[idx]["content"] = content
-                    logger.debug(
-                        f"Repaired assistant message at index {idx} by converting reasoning to content"
-                    )
-                else:
-                    # Fallback: add minimal content
-                    repaired_messages[idx]["content"] = "[Repaired empty assistant response]"
-                    logger.debug(
-                        f"Repaired assistant message at index {idx} by adding minimal content"
-                    )
-
-        return repaired_messages
-
-    def validate_session_health(self) -> Dict[str, Any]:
-        """
-        Validate the current session health and provide recovery recommendations.
-
-        Returns:
-            Dict with session health status and recommendations.
-        """
-        # Use conversation manager's validation
-        history_validation = self.conversation.validate_history()
-
-        # Additional checks
-        issues = history_validation["issues"].copy()
-        recommendations = []
-
-        # Check for excessive message count
-        if history_validation["message_count"] > 100:
-            issues.append(
-                {
-                    "type": "high_message_count",
-                    "message": f"Session has {history_validation['message_count']} messages, which may impact performance",
-                    "severity": "warning",
-                }
-            )
-            recommendations.append("Consider clearing old messages or starting a new session")
-
-        # Check for repeated errors in recent history
-        recent_messages = self.conversation.get_history()[-20:]  # Last 20 messages
-        error_count = 0
-        for msg in recent_messages:
-            if msg.get("role") == "tool":
-                try:
-                    result = json.loads(msg.get("content", "{}"))
-                    if not result.get("success", True):
-                        error_count += 1
-                except json.JSONDecodeError as e:
-                    logger.debug(f"Failed to parse tool result JSON: {e}")
-                    pass
-
-        if error_count > 5:
-            issues.append(
-                {
-                    "type": "frequent_errors",
-                    "message": f"{error_count} errors in recent messages, indicating potential issues",
-                    "severity": "warning",
-                }
-            )
-            recommendations.append("Review recent tool executions for patterns")
-
-        # Generate recovery recommendations based on issues
-        if history_validation["severity_levels"]["critical"] > 0:
-            recommendations.insert(
-                0, "CRITICAL: Session has corrupted messages. Use '/clear' to start fresh"
-            )
-        elif history_validation["severity_levels"]["warning"] > 0:
-            recommendations.insert(0, "Session has warnings. Monitor for issues")
-
-        return {
-            "healthy": len([i for i in issues if i["severity"] == "critical"]) == 0,
-            "issues": issues,
-            "recommendations": recommendations,
-            "validation": history_validation,
-        }
+            idx = issue["index"]
+            if repaired[idx].get("reasoning_content"):
+                repaired[idx]["content"] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
+            else:
+                repaired[idx]["content"] = "[Repaired empty response]"
+        return repaired

@@ -3,7 +3,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from datetime import datetime
 
 from ..config import AgentConfig
@@ -24,7 +24,8 @@ from .summarization import (
     SummarizationStrategy,
 )
 from .memory import create_memory_bank, MemoryBank
-from .memory_layers import StateManager
+from .memory_layers import StateManager, EnhancedMemoryBank
+from .planning import PlanningEngine
 from .orchestration import (
     OrchestrationManager,
     DelegationContext,
@@ -64,6 +65,7 @@ class AgentInitializer:
     - Configure rate limiters
     - Initialize caching system
     - Set up orchestration system
+    - Configure planning and layered memory systems
     """
 
     def __init__(
@@ -75,6 +77,9 @@ class AgentInitializer:
         hook_manager: HookManager,
         output_format: OutputFormat,
         project_context: str = None,
+        enable_planning: bool = False,
+        enable_layered_memory: bool = False,
+        planning_callbacks: Optional[Dict[str, Callable]] = None,
     ):
         """
         Initialize all agent components.
@@ -87,6 +92,9 @@ class AgentInitializer:
             hook_manager: Hook manager for event handling
             output_format: Output format (TEXT, JSON, etc.)
             project_context: Pre-loaded project context (optional)
+            enable_planning: Whether to enable the planning engine
+            enable_layered_memory: Whether to use enhanced layered memory
+            planning_callbacks: Optional callbacks for the planning engine
         """
         self.model = model
         self.project_dir = project_dir
@@ -95,6 +103,9 @@ class AgentInitializer:
         self.hook_manager = hook_manager
         self.output_format = output_format
         self.project_context = project_context
+        self.enable_planning = enable_planning
+        self.enable_layered_memory = enable_layered_memory
+        self.planning_callbacks = planning_callbacks or {}
 
         # Initialize history directory
         self.history_dir = Path.home() / ".cortex" / "sessions"
@@ -115,6 +126,9 @@ class AgentInitializer:
         self.router = self._init_routing()
         self.tool_registry = get_registry()
         self.formatter = create_formatter(output_format, console=console)
+        
+        # Initialize planning engine
+        self.planning_engine = self._init_planning_engine()
 
         # Initialize orchestration system
         self.orchestration = None
@@ -129,11 +143,25 @@ class AgentInitializer:
 
     def _init_memory_bank(self) -> MemoryBank:
         """Initialize memory bank for tracking decisions and facts"""
+        if self.enable_layered_memory:
+            return EnhancedMemoryBank(max_items=100)
         return create_memory_bank(max_items=50)
 
     def _init_state_manager(self) -> StateManager:
         """Initialize state manager for task tracking"""
         return StateManager(project_dir=self.project_dir)
+
+    def _init_planning_engine(self) -> Optional[PlanningEngine]:
+        """Initialize planning engine if enabled"""
+        if not self.enable_planning:
+            return None
+            
+        return PlanningEngine(
+            project_dir=self.project_dir,
+            skill_loader=self.planning_callbacks.get("skill_loader"),
+            tool_executor=self.planning_callbacks.get("tool_executor"),
+            reflection_callback=self.planning_callbacks.get("reflection_callback"),
+        )
 
     def _init_conversation(self) -> ConversationManager:
         """
