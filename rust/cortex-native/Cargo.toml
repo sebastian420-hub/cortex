@@ -1,0 +1,61 @@
+[package]
+name = "cortex-native"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust extensions for Cortex AI coding assistant"
+license = "MIT"
+
+[lib]
+name = "cortex_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+# Python bindings
+pyo3 = { version = "0.22", features = ["extension-module"] }
+
+# Search engine (ripgrep core)
+grep-regex = "0.1"
+grep-searcher = "0.1"
+grep-matcher = "0.1"
+ignore = "0.4"
+regex = "1"
+
+# AST parsing
+tree-sitter = "0.24"
+streaming-iterator = "0.1"
+tree-sitter-python = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-java = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-rust = "0.23"
+tree-sitter-c = "0.23"
+tree-sitter-cpp = "0.23"
+
+# Token counting
+tiktoken-rs = "0.6"
+
+# Parallelism
+rayon = "1.10"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Performance
+parking_lot = "0.12"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tempfile = "3"
+
+[[bench]]
+name = "benchmarks"
+harness = false
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]

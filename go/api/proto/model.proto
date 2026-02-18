@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package cortex.model.v1;
+
+option go_package = "github.com/cortex/cortex-services/api/proto/modelpb";
+
+// ModelService provides model health monitoring, preloading,
+// and connection management for Ollama and other LLM backends.
+service ModelService {
+  // Check health of all model backends.
+  rpc GetHealth(HealthRequest) returns (HealthResponse);
+
+  // List available models.
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse);
+
+  // Preload a model into memory for faster first inference.
+  rpc PreloadModel(PreloadRequest) returns (PreloadResponse);
+
+  // Get status of a specific model.
+  rpc GetModelStatus(ModelStatusRequest) returns (ModelStatusResponse);
+
+  // Stream model status updates.
+  rpc WatchStatus(WatchStatusRequest) returns (stream StatusEvent);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool ollama_available = 1;
+  string ollama_version = 2;
+  int32 models_loaded = 3;
+  int64 memory_used_bytes = 4;
+  int64 memory_total_bytes = 5;
+  repeated string gpu_devices = 6;
+  int64 uptime_seconds = 7;
+}
+
+message ListModelsRequest {
+  bool include_details = 1;
+}
+
+message ModelInfo {
+  string name = 1;
+  string model_family = 2;
+  int64 parameter_count = 3;
+  int64 size_bytes = 4;
+  string quantization = 5;
+  int32 context_length = 6;
+  bool is_loaded = 7;
+  int64 last_used = 8;
+}
+
+message ListModelsResponse {
+  repeated ModelInfo models = 1;
+}
+
+message PreloadRequest {
+  string model_name = 1;
+  bool keep_alive = 2;    // Keep model in memory
+  int32 timeout_seconds = 3;
+}
+
+message PreloadResponse {
+  bool success = 1;
+  double load_time_ms = 2;
+  int64 memory_used_bytes = 3;
+  string error = 4;
+}
+
+message ModelStatusRequest {
+  string model_name = 1;
+}
+
+message ModelStatusResponse {
+  string model_name = 1;
+  string status = 2;  // "loaded", "loading", "unloaded", "error"
+  int64 memory_used_bytes = 3;
+  int64 last_used = 4;
+  int32 inference_count = 5;
+  double avg_latency_ms = 6;
+}
+
+message WatchStatusRequest {
+  repeated string model_names = 1;  // Empty = watch all
+  int32 interval_seconds = 2;       // Update interval (default: 10)
+}
+
+message StatusEvent {
+  string model_name = 1;
+  string event_type = 2;  // "loaded", "unloaded", "error", "inference"
+  string details = 3;
+  int64 timestamp = 4;
+}

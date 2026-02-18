@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package cortex.cache.v1;
+
+option go_package = "github.com/cortex/cortex-services/api/proto/cachepb";
+
+// CacheService provides high-performance file caching with LRU eviction,
+// TTL support, and mtime-based invalidation.
+service CacheService {
+  // Get a cached file entry by path.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Set/update a cache entry.
+  rpc Set(SetRequest) returns (SetResponse);
+
+  // Invalidate (remove) a cache entry.
+  rpc Invalidate(InvalidateRequest) returns (InvalidateResponse);
+
+  // Get multiple entries in a single call.
+  rpc BatchGet(BatchGetRequest) returns (BatchGetResponse);
+
+  // Set multiple entries in a single call.
+  rpc BatchSet(BatchSetRequest) returns (BatchSetResponse);
+
+  // Get cache statistics.
+  rpc GetStats(StatsRequest) returns (StatsResponse);
+
+  // Pre-cache files matching patterns.
+  rpc PreCache(PreCacheRequest) returns (PreCacheResponse);
+
+  // Clear all cache entries.
+  rpc Clear(ClearRequest) returns (ClearResponse);
+
+  // Stream invalidation events for cache coherence.
+  rpc WatchInvalidations(WatchRequest) returns (stream InvalidationEvent);
+}
+
+// A cached file entry.
+message CacheEntry {
+  string path = 1;
+  bytes content = 2;
+  int64 mtime = 3;
+  int64 size = 4;
+  string content_hash = 5;
+  int64 accessed_at = 6;
+  int32 hit_count = 7;
+}
+
+message GetRequest {
+  string path = 1;
+  bool validate_mtime = 2;  // Check if file has been modified
+}
+
+message GetResponse {
+  bool found = 1;
+  CacheEntry entry = 2;
+  bool stale = 3;  // True if mtime changed since caching
+}
+
+message SetRequest {
+  string path = 1;
+  bytes content = 2;
+  int64 mtime = 3;
+  int64 size = 4;
+  int32 ttl_seconds = 5;  // 0 = use default TTL
+}
+
+message SetResponse {
+  bool success = 1;
+  bool evicted = 2;  // True if another entry was evicted to make room
+  string error = 3;
+}
+
+message InvalidateRequest {
+  string path = 1;
+}
+
+message InvalidateResponse {
+  bool found = 1;
+}
+
+message BatchGetRequest {
+  repeated string paths = 1;
+  bool validate_mtime = 2;
+}
+
+message BatchGetResponse {
+  map<string, CacheEntry> entries = 1;
+  repeated string misses = 2;
+}
+
+message BatchSetRequest {
+  repeated SetRequest entries = 1;
+}
+
+message BatchSetResponse {
+  int32 success_count = 1;
+  int32 error_count = 2;
+  repeated string errors = 3;
+}
+
+message StatsRequest {}
+
+message StatsResponse {
+  int64 total_entries = 1;
+  int64 total_size_bytes = 2;
+  int64 max_entries = 3;
+  int64 max_size_bytes = 4;
+  int64 hits = 5;
+  int64 misses = 6;
+  int64 evictions = 7;
+  double hit_rate = 8;
+  int64 uptime_seconds = 9;
+}
+
+message PreCacheRequest {
+  repeated string patterns = 1;  // Glob patterns (e.g., "*.py")
+  string directory = 2;          // Root directory
+  int32 max_files = 3;           // Max files to cache
+}
+
+message PreCacheResponse {
+  int32 cached = 1;
+  int32 skipped = 2;
+  int32 errors = 3;
+  repeated string files = 4;
+}
+
+message ClearRequest {}
+
+message ClearResponse {
+  int32 cleared = 1;
+}
+
+message WatchRequest {
+  repeated string path_prefixes = 1;  // Watch paths starting with these
+}
+
+message InvalidationEvent {
+  string path = 1;
+  string reason = 2;  // "modified", "deleted", "evicted", "manual"
+  int64 timestamp = 3;
+}
