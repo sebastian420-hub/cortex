@@ -100,43 +100,120 @@ class GrepTool(Tool):
             context_before = context
             context_after = context
 
-        # Try ripgrep first, fall back to Python
-        if self._has_ripgrep():
-            result = self._search_with_ripgrep(
-                pattern,
-                full_path,
-                glob,
-                file_type,
-                output_mode,
-                case_insensitive,
-                context_before,
-                context_after,
-                multiline,
-                head_limit,
-                offset,
-                show_line_numbers,
-            )
-        else:
-            result = self._search_with_python(
-                pattern,
-                full_path,
-                glob,
-                file_type,
-                output_mode,
-                case_insensitive,
-                multiline,
-                head_limit,
-                offset,
-                show_line_numbers,
-                context_before,
-                context_after,
-            )
+        # Try native Rust search first, then ripgrep, then Python fallback
+        result = None
+
+        # Phase 2: Rust native search via feature flag
+        rust_failed = False
+        try:
+            from ..core.feature_flags import FeatureFlag, FeatureManager
+
+            fm = FeatureManager.get_instance()
+            if fm.is_enabled(FeatureFlag.RUST_SEARCH):
+                result = self._search_with_rust(
+                    pattern, full_path, glob, file_type, output_mode,
+                    case_insensitive, context_before, context_after,
+                    multiline, head_limit, offset,
+                )
+                if result and not result.get("success"):
+                    rust_failed = True
+                    if self.console:
+                        self.console.print("[dim]Rust search failed, falling back...[/dim]")
+                    result = None # Reset result to trigger fallback
+        except (ImportError, Exception):
+            pass
+
+        if result is None:
+            if self._has_ripgrep():
+                result = self._search_with_ripgrep(
+                    pattern,
+                    full_path,
+                    glob,
+                    file_type,
+                    output_mode,
+                    case_insensitive,
+                    context_before,
+                    context_after,
+                    multiline,
+                    head_limit,
+                    offset,
+                    show_line_numbers,
+                )
+            else:
+                result = self._search_with_python(
+                    pattern,
+                    full_path,
+                    glob,
+                    file_type,
+                    output_mode,
+                    case_insensitive,
+                    multiline,
+                    head_limit,
+                    offset,
+                    show_line_numbers,
+                    context_before,
+                    context_after,
+                )
 
         # Display results
         if result.get("success") and self.console:
             self._display_results(result, output_mode)
 
         return result
+
+    def _search_with_rust(
+        self, pattern, path, glob_filter, file_type, output_mode,
+        case_insensitive, context_before, context_after, multiline,
+        head_limit, offset,
+    ) -> Optional[Dict[str, Any]]:
+        """Search using native Rust extension (cortex_native)."""
+        try:
+            from ..native import native_search, NATIVE_AVAILABLE
+
+            if not NATIVE_AVAILABLE or native_search is None:
+                return None
+
+            result = native_search(
+                pattern=pattern,
+                path=str(path),
+                glob_filter=glob_filter,
+                file_type=file_type,
+                case_insensitive=case_insensitive,
+                multiline=multiline,
+                context_before=context_before,
+                context_after=context_after,
+                output_mode=output_mode,
+                head_limit=head_limit,
+                offset=offset,
+            )
+
+            # Convert native SearchResult to standard tool result format
+            if output_mode == "files_with_matches":
+                content = "\n".join(m.path for m in result.matches)
+            elif output_mode == "content":
+                lines = []
+                for m in result.matches:
+                    prefix = f"{m.path}:{m.line_number}:" if m.line_number else f"{m.path}:"
+                    lines.append(f"{prefix}{m.content or ''}")
+                content = "\n".join(lines)
+            elif output_mode == "count":
+                lines = [f"{m.path}:{m.count}" for m in result.matches]
+                content = "\n".join(lines)
+            else:
+                content = str(result)
+
+            return create_success_response(
+                content,
+                {
+                    "total_matches": result.total_matches,
+                    "files_searched": result.files_searched,
+                    "files_matched": result.files_matched,
+                    "duration_ms": result.duration_ms,
+                    "engine": "rust_native",
+                },
+            )
+        except Exception as e:
+            return {"success": False, "error": "Rust search failed", "details": str(e)}
 
     def _has_ripgrep(self) -> bool:
         """Check if ripgrep is available on this system."""
@@ -216,7 +293,7 @@ class GrepTool(Tool):
 
             if not output.strip():
                 return create_success_response(
-                    {"results": [], "match_count": 0, "message": "No matches found"}
+                    {"results": [], "match_count": 0, "message": "[ripgrep] No matches found"}
                 )
 
             # Parse output
@@ -382,7 +459,7 @@ class GrepTool(Tool):
 
         if not results:
             return create_success_response(
-                {"results": [], "match_count": 0, "message": "No matches found"}
+                {"results": [], "match_count": 0, "message": "[python] No matches found"}
             )
 
         return create_success_response(
@@ -507,7 +584,9 @@ class GrepTool(Tool):
 
     def _display_results(self, result: Dict[str, Any], output_mode: str) -> None:
         """Display search results in console."""
-        results = result.get("results", [])
+        # Handle both wrapped (data key) and unwrapped result formats
+        data = result.get("data", result)
+        results = data.get("results", [])
 
         if not results:
             self.console.print("[dim]No matches found[/dim]")
