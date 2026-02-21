@@ -18,6 +18,7 @@ class TestTaskAnalysis:
             TaskAnalysis,
             TaskComplexity,
         )
+
         assert TaskAnalysisEngine is not None
         assert TaskType is not None
 
@@ -60,7 +61,9 @@ class TestTaskAnalysis:
         from cortex.core.routing.task_analysis import TaskAnalysisEngine, TaskType
 
         engine = TaskAnalysisEngine()
-        result = engine.analyze("Analyze the authentication system for security vulnerabilities and potential exploits")  # noqa: E501
+        result = engine.analyze(
+            "Analyze the authentication system for security vulnerabilities and potential exploits"
+        )  # noqa: E501
 
         assert result is not None
         assert result.task_type == TaskType.SECURITY
@@ -107,6 +110,7 @@ class TestCostTracking:
             ModelPricing,
             get_cost_tracker,
         )
+
         assert CostTracker is not None
         assert CostEstimate is not None
         assert ModelPricing is not None
@@ -152,6 +156,7 @@ class TestProviderFactory:
             ProviderType,
             ProviderConfig,
         )
+
         assert EnhancedProviderFactory is not None
         assert ProviderType is not None
 
@@ -187,6 +192,7 @@ class TestTransparency:
             DecisionSource,
             DisplayFormat,
         )
+
         assert TransparencyLayer is not None
         assert RoutingDecision is not None
         assert DecisionSource is not None
@@ -218,6 +224,7 @@ class TestRoutingOrchestrator:
             RoutingConfig,
             RoutingContext,
         )
+
         assert RoutingOrchestrator is not None
         assert RoutingConfig is not None
         assert RoutingContext is not None

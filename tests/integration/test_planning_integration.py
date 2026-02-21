@@ -12,6 +12,7 @@ from cortex.core.planning import PlanningEngine, Plan, PlanStep, PlanStepType, P
 
 logger = logging.getLogger(__name__)
 
+
 def create_skill_loader_adapter(tmp_path):
     """Create a skill loader adapter for the planning engine."""
     tool = SkillLoaderTool(project_dir=tmp_path, permission_mode="normal", console=None)
@@ -25,16 +26,20 @@ def create_skill_loader_adapter(tmp_path):
 
     return load_skill
 
+
 @pytest.fixture
 def skill_loader_fixture(tmp_path):
     return create_skill_loader_adapter(tmp_path)
+
 
 @pytest.fixture
 def mock_tool_executor_fixture():
     def mock_tool_executor(tool_name, arguments):
         logger.info(f"  [Mock Tool] {tool_name}({arguments})")
         return {"success": True, "output": f"Mock result for {tool_name}"}
+
     return mock_tool_executor
+
 
 @pytest.fixture
 def planning_engine_fixture(tmp_path, skill_loader_fixture, mock_tool_executor_fixture):
@@ -42,9 +47,10 @@ def planning_engine_fixture(tmp_path, skill_loader_fixture, mock_tool_executor_f
         project_dir=tmp_path,
         skill_loader=skill_loader_fixture,
         tool_executor=mock_tool_executor_fixture,
-        reflection_callback=lambda plan, desc: logger.info(f"  [Reflection] {desc}")
+        reflection_callback=lambda plan, desc: logger.info(f"  [Reflection] {desc}"),
     )
     return engine
+
 
 def test_planning_with_skill_loader(planning_engine_fixture, tmp_path):
     logger.info("=== Planning Engine with SkillLoader integration ===")
@@ -57,7 +63,7 @@ def test_planning_with_skill_loader(planning_engine_fixture, tmp_path):
         goal=goal,
         constraints=["Must not break existing tests"],
         assumptions=["Performance issue is reproducible"],
-        skill_hints=["debugging", "performance optimization"]
+        skill_hints=["debugging", "performance optimization"],
     )
 
     # Check that we have skill application steps
@@ -82,6 +88,7 @@ def test_planning_with_skill_loader(planning_engine_fixture, tmp_path):
     assert loaded_plan.id == plan.id
     assert len(loaded_plan.steps) == len(plan.steps)
 
+
 def test_skill_loader_direct(tmp_path):
     logger.info("=== Direct SkillLoaderTool test ===")
 
@@ -94,6 +101,7 @@ def test_skill_loader_direct(tmp_path):
     # For now, just check if it doesn't fail.
     # A more robust test would involve creating mock skill files.
 
+
 def test_plan_serialization():
     logger.info("=== Plan serialization test ===")
 
@@ -104,14 +112,14 @@ def test_plan_serialization():
         description="A test plan",
         success_criteria=["All tests pass", "Code is documented"],
         constraints=["Time limit: 1 hour"],
-        assumptions=["Tests exist"]
+        assumptions=["Tests exist"],
     )
 
     step1 = PlanStep(
         id="step1",
         description="Analyze requirements",
         step_type=PlanStepType.SUBTASK,
-        expected_outcome="Requirements document"
+        expected_outcome="Requirements document",
     )
 
     step2 = PlanStep(
@@ -119,7 +127,7 @@ def test_plan_serialization():
         description="Run tests",
         step_type=PlanStepType.TOOL_CALL,
         tool_name="run_tests",
-        tool_arguments={"pattern": "test_auth.py"}
+        tool_arguments={"pattern": "test_auth.py"},
     )
 
     step3 = PlanStep(
@@ -127,7 +135,7 @@ def test_plan_serialization():
         description="Apply debugging skill",
         step_type=PlanStepType.SKILL_APPLICATION,
         skill_name="debugging",
-        dependencies=["step1", "step2"]
+        dependencies=["step1", "step2"],
     )
 
     plan.add_step(step1)

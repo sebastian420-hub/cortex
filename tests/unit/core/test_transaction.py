@@ -13,7 +13,7 @@ from cortex.core.transaction import (
     FileBackup,
     Transaction,
     TransactionManager,
-    MEMORY_BACKUP_THRESHOLD
+    MEMORY_BACKUP_THRESHOLD,
 )
 
 
@@ -47,7 +47,7 @@ class TestFileBackup:
             backup_path=backup_path,
             operation="write",
             content="File content",
-            existed=True
+            existed=True,
         )
 
         assert backup.original_path == original_path
@@ -67,7 +67,7 @@ class TestFileBackup:
             backup_path=None,
             operation="edit",
             content="Original content",  # Backup content
-            existed=True
+            existed=True,
         )
 
         # Modify the file
@@ -92,7 +92,7 @@ class TestFileBackup:
             backup_path=backup_file,
             operation="edit",
             content=None,  # No in-memory content
-            existed=True
+            existed=True,
         )
 
         # Modify original
@@ -114,7 +114,7 @@ class TestFileBackup:
             backup_path=None,
             operation="write",
             content=None,
-            existed=False
+            existed=False,
         )
 
         # Create the file (simulating it was created)
@@ -136,11 +136,11 @@ class TestFileBackup:
             backup_path=None,
             operation="edit",
             content=None,  # No backup
-            existed=True
+            existed=True,
         )
 
         # Restore should fail
-        with patch('cortex.core.transaction.logger') as mock_logger:
+        with patch("cortex.core.transaction.logger") as mock_logger:
             result = backup.restore()
 
             assert result is False
@@ -155,11 +155,11 @@ class TestFileBackup:
             backup_path=Path("/nonexistent/backup.bak"),
             operation="edit",
             content=None,
-            existed=True
+            existed=True,
         )
 
         # File doesn't exist, but existed=True - should cause error
-        with patch('cortex.core.transaction.logger') as mock_logger:
+        with patch("cortex.core.transaction.logger") as mock_logger:
             result = backup.restore()
 
             assert result is False
@@ -175,7 +175,7 @@ class TestFileBackup:
             backup_path=backup_file,
             operation="edit",
             content=None,
-            existed=True
+            existed=True,
         )
 
         # Clean up backup file
@@ -190,7 +190,7 @@ class TestFileBackup:
             backup_path=Path("/nonexistent/backup.bak"),
             operation="edit",
             content=None,
-            existed=True
+            existed=True,
         )
 
         # Should not raise exception
@@ -203,9 +203,7 @@ class TestTransaction:
     def test_transaction_creation(self):
         """Test creating a Transaction."""
         transaction = Transaction(
-            id="tx_123",
-            state=TransactionState.ACTIVE,
-            metadata={"user": "test", "action": "edit"}
+            id="tx_123", state=TransactionState.ACTIVE, metadata={"user": "test", "action": "edit"}
         )
 
         assert transaction.id == "tx_123"
@@ -223,7 +221,7 @@ class TestTransaction:
             backup_path=None,
             operation="edit",
             content="test",
-            existed=True
+            existed=True,
         )
 
         transaction.add_backup(backup)
@@ -279,11 +277,7 @@ class TestTransactionManager:
     def test_initialization(self, temp_dir):
         """Test TransactionManager initialization."""
         backup_dir = temp_dir / "backups"
-        manager = TransactionManager(
-            backup_dir=backup_dir,
-            max_backups=5,
-            enabled=False
-        )
+        manager = TransactionManager(backup_dir=backup_dir, max_backups=5, enabled=False)
 
         assert manager.backup_dir == backup_dir
         assert manager.max_backups == 5
@@ -293,7 +287,7 @@ class TestTransactionManager:
 
     def test_initialization_default_backup_dir(self):
         """Test initialization with default backup directory."""
-        with patch('cortex.core.transaction.Path.home', return_value=Path("/home/user")):
+        with patch("cortex.core.transaction.Path.home", return_value=Path("/home/user")):
             manager = TransactionManager()
 
             expected = Path("/home/user/.cortex/backups")
@@ -520,6 +514,7 @@ class TestTransactionManager:
 
             history = transaction_manager.get_transaction_history()
             assert len(history) <= transaction_manager.max_backups
+
     def test_transaction_with_metadata(self, transaction_manager):
         """Test transaction with metadata."""
         metadata = {"user": "test", "action": "edit_file"}

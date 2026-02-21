@@ -1,4 +1,3 @@
-
 import subprocess
 import pytest
 from pathlib import Path
@@ -20,6 +19,7 @@ def git_repo(tmp_path):
 
 def test_git_show_tool(git_repo):
     from cortex.ui.console import console
+
     tool = create_tool_instance("git_show", git_repo, PermissionMode.NORMAL, console)
     result = tool.execute(ref="HEAD")
     assert result["success"]
@@ -28,6 +28,7 @@ def test_git_show_tool(git_repo):
 
 def test_git_checkout_tool(git_repo):
     from cortex.ui.console import console
+
     tool = create_tool_instance("git_checkout", git_repo, PermissionMode.AUTO_APPROVE, console)
 
     # Test creating a new branch
@@ -35,7 +36,9 @@ def test_git_checkout_tool(git_repo):
     assert result["success"]
 
     # Check if the branch was created
-    branches_result = subprocess.run(["git", "branch"], cwd=git_repo, capture_output=True, text=True, check=True)  # noqa: E501
+    branches_result = subprocess.run(
+        ["git", "branch"], cwd=git_repo, capture_output=True, text=True, check=True
+    )  # noqa: E501
     assert "new_feature" in branches_result.stdout
 
     # Test switching to the new branch
@@ -45,6 +48,7 @@ def test_git_checkout_tool(git_repo):
 
 def test_git_reset_tool(git_repo):
     from cortex.ui.console import console
+
     # Create and commit file2.txt
     (git_repo / "file2.txt").write_text("initial file2 content")
     subprocess.run(["git", "add", "file2.txt"], cwd=git_repo, check=True)
@@ -55,7 +59,9 @@ def test_git_reset_tool(git_repo):
     subprocess.run(["git", "add", "file2.txt"], cwd=git_repo, check=True)
 
     # Verify file2.txt is staged
-    status_before_reset = subprocess.run(["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True)  # noqa: E501
+    status_before_reset = subprocess.run(
+        ["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True
+    )  # noqa: E501
     assert "Changes to be committed" in status_before_reset.stdout
     assert "file2.txt" in status_before_reset.stdout
 
@@ -64,7 +70,9 @@ def test_git_reset_tool(git_repo):
     assert result["success"]
 
     # Check if the file is unstaged
-    status_after_reset = subprocess.run(["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True)  # noqa: E501
+    status_after_reset = subprocess.run(
+        ["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True
+    )  # noqa: E501
     assert "Changes not staged for commit" in status_after_reset.stdout
     assert "file2.txt" in status_after_reset.stdout
     assert "Changes to be committed" not in status_after_reset.stdout
@@ -81,6 +89,7 @@ def remote_repo(tmp_path):
 
 def test_git_fetch_tool(git_repo, remote_repo, tmp_path):
     from cortex.ui.console import console
+
     # Add a remote to the local repository
     subprocess.run(["git", "remote", "add", "origin", str(remote_repo)], cwd=git_repo, check=True)
     subprocess.run(["git", "push", "origin", "main"], cwd=git_repo, check=True)
@@ -101,6 +110,7 @@ def test_git_fetch_tool(git_repo, remote_repo, tmp_path):
 
 def test_git_pull_tool(git_repo, remote_repo, tmp_path):
     from cortex.ui.console import console
+
     # Add a remote to the local repository
     subprocess.run(["git", "remote", "add", "origin", str(remote_repo)], cwd=git_repo, check=True)
     subprocess.run(["git", "push", "origin", "main"], cwd=git_repo, check=True)

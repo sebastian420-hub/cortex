@@ -18,10 +18,9 @@ def mock_deepseek_provider():
     provider.chat.return_value = {
         "message": {"role": "assistant", "content": "Test response from DeepSeek"}
     }
-    provider.stream_chat.return_value = iter([
-        {"message": {"content": "Test"}},
-        {"message": {"content": " response"}}
-    ])
+    provider.stream_chat.return_value = iter(
+        [{"message": {"content": "Test"}}, {"message": {"content": " response"}}]
+    )
     provider.supports_streaming.return_value = True
     provider.normalize_model_name.return_value = "deepseek-chat"
     provider.validate_api_key.return_value = True
@@ -36,10 +35,9 @@ def mock_anthropic_provider():
     provider.chat.return_value = {
         "message": {"role": "assistant", "content": "Test response from Claude"}
     }
-    provider.stream_chat.return_value = iter([
-        {"message": {"content": "Test"}},
-        {"message": {"content": " response"}}
-    ])
+    provider.stream_chat.return_value = iter(
+        [{"message": {"content": "Test"}}, {"message": {"content": " response"}}]
+    )
     provider.supports_streaming.return_value = True
     provider.normalize_model_name.return_value = "claude-3-haiku-20240307"
     provider.validate_api_key.return_value = True

@@ -21,14 +21,15 @@ class TestChunkedEditTool:
     def teardown_method(self):
         """Clean up test environment."""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_create_chunked_edit_tool(self):
         """Test creating a ChunkedEditTool."""
         assert self.tool is not None
         assert self.tool.project_dir == Path(self.temp_dir)
-        assert hasattr(self.tool, 'chunker')
-        assert hasattr(self.tool, 'context_window')
+        assert hasattr(self.tool, "chunker")
+        assert hasattr(self.tool, "context_window")
 
     def test_read_file_chunked_small_file(self):
         """Test reading small file (should not chunk)."""
@@ -96,11 +97,7 @@ def func3():
         test_file = Path(self.temp_dir) / "small.txt"
         test_file.write_text("Hello World!")
 
-        result = self.tool.execute(
-            path="small.txt",
-            old_string="World",
-            new_string="Universe"
-        )
+        result = self.tool.execute(path="small.txt", old_string="World", new_string="Universe")
 
         assert result["success"] is True
         assert result["data"]["changes"] == 1
@@ -117,9 +114,7 @@ def func3():
         test_file.write_text(content)
 
         result = self.tool.execute(
-            path="large.txt",
-            old_string="TARGET_TEXT",
-            new_string="REPLACED_TEXT"
+            path="large.txt", old_string="TARGET_TEXT", new_string="REPLACED_TEXT"
         )
 
         assert result["success"] is True
@@ -159,7 +154,7 @@ def func3():
             path="large.txt",
             chunk_id=target_chunk_id,
             old_string="TARGET_TEXT",
-            new_string="REPLACED_TEXT"
+            new_string="REPLACED_TEXT",
         )
 
         assert result["success"] is True
@@ -174,11 +169,7 @@ def func3():
         test_file = Path(self.temp_dir) / "test.txt"
         test_file.write_text("Hello World!")
 
-        result = self.tool.execute(
-            path="test.txt",
-            old_string="NotFound",
-            new_string="Replacement"
-        )
+        result = self.tool.execute(path="test.txt", old_string="NotFound", new_string="Replacement")
 
         assert result["success"] is False
         assert "not found" in result["error"].lower()
@@ -186,9 +177,7 @@ def func3():
     def test_edit_file_not_found(self):
         """Test edit with non-existent file."""
         result = self.tool.execute(
-            path="nonexistent.txt",
-            old_string="text",
-            new_string="replacement"
+            path="nonexistent.txt", old_string="text", new_string="replacement"
         )
 
         assert result["success"] is False
@@ -200,11 +189,7 @@ def func3():
         test_file.write_text("original")
 
         # Make an edit
-        self.tool.execute(
-            path="test.txt",
-            old_string="original",
-            new_string="modified"
-        )
+        self.tool.execute(path="test.txt", old_string="original", new_string="modified")
 
         # Rollback
         result = self.tool.rollback_last_edit()
@@ -243,7 +228,7 @@ def func3():
             path="large.txt",
             chunk_id="nonexistent_chunk_id",
             old_string="text",
-            new_string="replacement"
+            new_string="replacement",
         )
 
         assert result["success"] is False
@@ -256,10 +241,7 @@ class TestEditOperation:
     def test_create_edit_operation(self):
         """Test creating an EditOperation."""
         op = EditOperation(
-            chunk_id="test_chunk",
-            operation_type="replace",
-            old_text="old",
-            new_text="new"
+            chunk_id="test_chunk", operation_type="replace", old_text="old", new_text="new"
         )
 
         assert op.chunk_id == "test_chunk"
@@ -281,6 +263,7 @@ class TestIntegration:
     def teardown_method(self):
         """Clean up test environment."""
         import shutil
+
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_full_workflow_large_python_file(self):
@@ -348,7 +331,7 @@ if __name__ == "__main__":
             path="module.py",
             chunk_id=target_chunk_id,
             old_string="print(result)",
-            new_string="print_debug(result)"
+            new_string="print_debug(result)",
         )
 
         assert edit_result["success"] is True
@@ -384,17 +367,13 @@ if __name__ == "__main__":
 
         # First edit
         result1 = self.tool.execute(
-            path="multi_edit.txt",
-            old_string="First",
-            new_string="Updated First"
+            path="multi_edit.txt", old_string="First", new_string="Updated First"
         )
         assert result1["success"] is True
 
         # Second edit
         result2 = self.tool.execute(
-            path="multi_edit.txt",
-            old_string="Second",
-            new_string="Updated Second"
+            path="multi_edit.txt", old_string="Second", new_string="Updated Second"
         )
         assert result2["success"] is True
 
@@ -411,16 +390,8 @@ if __name__ == "__main__":
         test_file.write_text("original content")
 
         # Make edits
-        self.tool.execute(
-            path="history.txt",
-            old_string="original",
-            new_string="first edit"
-        )
-        self.tool.execute(
-            path="history.txt",
-            old_string="content",
-            new_string="text"
-        )
+        self.tool.execute(path="history.txt", old_string="original", new_string="first edit")
+        self.tool.execute(path="history.txt", old_string="content", new_string="text")
 
         # Check history
         assert len(self.tool.operation_history) == 2

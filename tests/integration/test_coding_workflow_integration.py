@@ -31,11 +31,18 @@ def mock_tools():
     tools = MagicMock()
 
     mock_read_file_instance = MagicMock()
-    mock_read_file_instance.execute.return_value = {"success": True, "content": "def foo():\n    pass\n"}  # noqa: E501
+    mock_read_file_instance.execute.return_value = {
+        "success": True,
+        "content": "def foo():\n    pass\n",
+    }  # noqa: E501
     tools.read_file_tool_instance = mock_read_file_instance
 
     mock_edit_tool_instance = MagicMock()
-    mock_edit_tool_instance.execute.return_value = {"success": True, "message": "File edited.", "diff": "mock diff"}  # noqa: E501
+    mock_edit_tool_instance.execute.return_value = {
+        "success": True,
+        "message": "File edited.",
+        "diff": "mock diff",
+    }  # noqa: E501
     tools.edit_tool_instance = mock_edit_tool_instance
 
     mock_glob_tool_instance = MagicMock()
@@ -67,10 +74,8 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
     # First turn: Agent plans to read the file
     mock_llm_provider.chat.side_effect = [
         create_mock_response(
-            tool_calls=[
-                create_tool_call("read_file", {"path": str(target_file)})
-            ],
-            content="Okay, I will start by reading `bar.py` to understand its content."
+            tool_calls=[create_tool_call("read_file", {"path": str(target_file)})],
+            content="Okay, I will start by reading `bar.py` to understand its content.",
         ),
         # Second turn: After reading, agent plans to edit the file
         create_mock_response(
@@ -81,16 +86,16 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
                         "file_path": str(target_file),
                         "old_string": "def foo():\n    pass\n",
                         "new_string": "def foo_refactored():\n    # Refactored content\n    pass\n",
-                        "instruction": "Refactor function foo to foo_refactored and add a comment."
-                    }
+                        "instruction": "Refactor function foo to foo_refactored and add a comment.",
+                    },
                 )
             ],
-            content="I have analyzed the file and will now refactor the `foo` function."
+            content="I have analyzed the file and will now refactor the `foo` function.",
         ),
         # Third turn: After editing, agent provides a summary
         create_mock_response(
             content="The `foo` function in `bar.py` has been refactored to `foo_refactored`."
-        )
+        ),
     ]
 
     with patch("cortex.agent.ProviderFactory.get_provider", return_value=mock_llm_provider):
@@ -102,13 +107,17 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
                 "glob": mock_tools.glob_tool_instance,
                 "grep": mock_tools.grep_tool_instance,
                 "write_file": mock_tools.write_file_tool_instance,
-            }.get(tool_name) or MagicMock(execute=MagicMock(return_value={"success": False, "error": f"Mocked tool {tool_name} not found"}))  # noqa: E501
+            }.get(tool_name) or MagicMock(
+                execute=MagicMock(
+                    return_value={"success": False, "error": f"Mocked tool {tool_name} not found"}
+                )
+            )  # noqa: E501
 
             agent = Cortex(
                 model="mock-model",
                 project_dir=str(tmp_path),
                 permission_mode=PermissionMode.AUTO_APPROVE,
-                config=AgentConfig(max_iterations=5)
+                config=AgentConfig(max_iterations=5),
             )
 
             user_message = "Refactor function foo in bar.py to improve readability."
@@ -116,20 +125,26 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
 
             # Assertions
             history = agent.get_conversation_history()
-            assert len(history) >= 5 # System + User + Agent (read) + Tool (read) + Agent (edit) + Tool (edit) + Agent (summary)  # noqa: E501
+            assert (
+                len(history) >= 5
+            )  # System + User + Agent (read) + Tool (read) + Agent (edit) + Tool (edit) + Agent (summary)  # noqa: E501
 
             # Verify read_file.execute was called
-            mock_tools.read_file_tool_instance.execute.assert_called_once_with(path=str(target_file))  # noqa: E501
+            mock_tools.read_file_tool_instance.execute.assert_called_once_with(
+                path=str(target_file)
+            )  # noqa: E501
 
             # Verify edit.execute was called
             mock_tools.edit_tool_instance.execute.assert_called_once_with(
                 file_path=str(target_file),
                 old_string="def foo():\n    pass\n",
                 new_string="def foo_refactored():\n    # Refactored content\n    pass\n",
-                instruction="Refactor function foo to foo_refactored and add a comment."
+                instruction="Refactor function foo to foo_refactored and add a comment.",
             )
 
             # Verify the final agent message
             final_agent_message = history[-1]["content"]
-            assert "The `foo` function in `bar.py` has been refactored to `foo_refactored`." in final_agent_message  # noqa: E501
-
+            assert (
+                "The `foo` function in `bar.py` has been refactored to `foo_refactored`."
+                in final_agent_message
+            )  # noqa: E501

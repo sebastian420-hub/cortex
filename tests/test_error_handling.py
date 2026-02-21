@@ -4,8 +4,14 @@ import pytest
 from pathlib import Path
 from cortex.tools import create_tool_instance
 from cortex.models import PermissionMode
-from cortex.utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType  # noqa: E501
+from cortex.utils.errors import (
+    create_error_response,
+    create_success_response,
+    create_permission_denial,
+    ErrorType,
+)  # noqa: E501
 from cortex.ui.console import console
+
 
 def test_error_format_consistency():
     """Verify all tools return standardized error format"""
@@ -25,6 +31,7 @@ def test_error_format_consistency():
     assert error["error_type"] == ErrorType.EXECUTION
     assert error["error_context"]["context"] == "test"
 
+
 def test_error_context_completeness():
     """Verify errors include sufficient debugging context"""
     # Test that error context includes tool name, operation, and timestamp
@@ -35,8 +42,8 @@ def test_error_context_completeness():
             "tool_name": "read_file",
             "operation": "read_file",
             "path": "test.py",
-            "hint": "Check if file exists"
-        }
+            "hint": "Check if file exists",
+        },
     )
 
     # Check context completeness
@@ -45,6 +52,7 @@ def test_error_context_completeness():
     assert "operation" in context
     assert "path" in context
     assert "hint" in context
+
 
 def test_permission_denial_format():
     """Test permission denial response format"""
@@ -66,6 +74,7 @@ def test_permission_denial_format():
     assert denial["reason"] == "Plan mode restriction"
     assert denial["action"] == "write_file"
 
+
 def test_success_response_format():
     """Test success response format"""
     success = create_success_response({"content": "test", "lines": 10})
@@ -80,6 +89,7 @@ def test_success_response_format():
     # Check values
     assert success["data"]["content"] == "test"
     assert success["data"]["lines"] == 10
+
 
 def test_error_recovery_flows(tmp_path):
     """Test loop guard intervention on errors"""
@@ -105,16 +115,38 @@ def test_error_recovery_flows(tmp_path):
     assert recovery_action is not None
     assert recovery_action.strategy in [RecoveryStrategy.SUGGEST, RecoveryStrategy.ESCALATE]
 
+
 def test_all_tools_use_standardized_errors(tmp_path):
     """Test that all tools use create_error_response pattern"""
     # List of all tools that should use standardized error handling
     tools_to_test = [
-        "read_file", "write_file", "execute_command", "list_files",
-        "git_status", "git_diff", "git_commit", "git_log", "git_add",
-        "git_branch", "git_push", "git_remote", "git_show", "git_checkout",
-        "git_reset", "git_fetch", "git_pull", "edit", "glob", "grep",
-        "search_files", "web_fetch", "web_search", "run_tests",
-        "skill_loader", "todo_write", "ask_user_question"
+        "read_file",
+        "write_file",
+        "execute_command",
+        "list_files",
+        "git_status",
+        "git_diff",
+        "git_commit",
+        "git_log",
+        "git_add",
+        "git_branch",
+        "git_push",
+        "git_remote",
+        "git_show",
+        "git_checkout",
+        "git_reset",
+        "git_fetch",
+        "git_pull",
+        "edit",
+        "glob",
+        "grep",
+        "search_files",
+        "web_fetch",
+        "web_search",
+        "run_tests",
+        "skill_loader",
+        "todo_write",
+        "ask_user_question",
     ]
 
     # Test each tool can be instantiated and uses the base class methods
@@ -123,9 +155,9 @@ def test_all_tools_use_standardized_errors(tmp_path):
             tool = create_tool_instance(tool_name, tmp_path, PermissionMode.NORMAL, console)
 
             # Check that the tool has the base class error methods
-            assert hasattr(tool, '_create_error')
-            assert hasattr(tool, '_create_permission_denial')
-            assert hasattr(tool, '_create_success')
+            assert hasattr(tool, "_create_error")
+            assert hasattr(tool, "_create_permission_denial")
+            assert hasattr(tool, "_create_success")
 
             # Test that the methods work
             error = tool._create_error("Test error", "validation", context={"test": "data"})
@@ -147,6 +179,7 @@ def test_all_tools_use_standardized_errors(tmp_path):
             # This is expected for certain tools
             pass
 
+
 def test_error_type_constants():
     """Test that all error type constants are defined"""
     # Test all expected error types
@@ -158,6 +191,7 @@ def test_error_type_constants():
     assert ErrorType.NETWORK == "network"
     assert ErrorType.SECURITY == "security"
     assert ErrorType.PROVIDER == "provider"
+
 
 def test_error_handling_in_file_operations(tmp_path):
     """Test error handling in file operations"""
@@ -182,6 +216,7 @@ def test_error_handling_in_file_operations(tmp_path):
     assert "error" in result
     assert "error_context" in result
 
+
 def test_error_handling_in_git_operations(tmp_path):
     """Test error handling in git operations"""
     import subprocess
@@ -199,6 +234,7 @@ def test_error_handling_in_git_operations(tmp_path):
     assert "error" in result
     assert "error_context" in result
 
+
 def test_error_handling_in_command_execution(tmp_path):
     """Test error handling in command execution"""
     tool = create_tool_instance("execute_command", tmp_path, PermissionMode.AUTO_APPROVE, console)
@@ -212,6 +248,7 @@ def test_error_handling_in_command_execution(tmp_path):
     assert "error_context" in result
     assert "command" in result["error_context"]
 
+
 def test_error_handling_in_web_operations(tmp_path):
     """Test error handling in web operations"""
     tool = create_tool_instance("web_fetch", tmp_path, PermissionMode.NORMAL, console)
@@ -224,6 +261,7 @@ def test_error_handling_in_web_operations(tmp_path):
     assert "error" in result
     assert "error_context" in result
 
+
 def test_error_handling_in_search_operations(tmp_path):
     """Test error handling in search operations"""
     tool = create_tool_instance("search_files", tmp_path, PermissionMode.NORMAL, console)
@@ -235,30 +273,32 @@ def test_error_handling_in_search_operations(tmp_path):
     assert result["success"] is True
     assert result["data"]["match_count"] == 0
 
+
 def test_error_recovery_suggestions():
     """Test that error responses include recovery suggestions where applicable"""
     # Test error with recovery suggestion
     error = create_error_response(
         "File not found",
         ErrorType.NOT_FOUND,
-        {
-            "path": "test.py",
-            "suggestion": "Use list_files to find the correct path"
-        }
+        {"path": "test.py", "suggestion": "Use list_files to find the correct path"},
     )
 
     assert "error_context" in error
     assert "suggestion" in error["error_context"]
     assert error["error_context"]["suggestion"] == "Use list_files to find the correct path"
 
+
 def test_error_timestamp_inclusion():
     """Test that errors include timestamp for debugging"""
     # Create error with context to include timestamp
-    error = create_error_response("Test error", ErrorType.EXECUTION, {"timestamp": "2026-01-13T03:53:00"})  # noqa: E501
+    error = create_error_response(
+        "Test error", ErrorType.EXECUTION, {"timestamp": "2026-01-13T03:53:00"}
+    )  # noqa: E501
 
     # Check that context is included when provided
     assert "error_context" in error
     assert "timestamp" in error["error_context"]
+
 
 def test_error_format_validation():
     """Test that error format validation works correctly"""
@@ -272,13 +312,14 @@ def test_error_format_validation():
     # (This is more of a documentation test)
     manual_error = {
         "success": False,
-        "error": "Manual error"
+        "error": "Manual error",
         # Missing error_type, retryable, etc.
     }
 
     # This would be caught by validation in real usage
     assert "error_type" not in manual_error
     assert "retryable" not in manual_error
+
 
 def test_error_context_enrichment(tmp_path):
     """Test that tool base class enriches error context"""
@@ -299,6 +340,7 @@ def test_error_context_enrichment(tmp_path):
     assert "tool_name" in result["error_context"]
     assert "permission_mode" in result["error_context"]
 
+
 def test_error_handling_edge_cases():
     """Test error handling edge cases"""
     # Test empty error message
@@ -312,14 +354,12 @@ def test_error_handling_edge_cases():
 
     # Test error with complex context
     complex_context = {
-        "nested": {
-            "data": ["list", "of", "values"],
-            "more_data": {"key": "value"}
-        },
-        "simple": "value"
+        "nested": {"data": ["list", "of", "values"], "more_data": {"key": "value"}},
+        "simple": "value",
     }
     error = create_error_response("Test", ErrorType.VALIDATION, complex_context)
     assert error["error_context"] == complex_context
+
 
 def test_error_retryable_flag():
     """Test retryable flag in error responses"""
@@ -328,12 +368,15 @@ def test_error_retryable_flag():
     assert retryable_error["retryable"] is True
 
     # Test non-retryable error
-    non_retryable_error = create_error_response("Validation error", ErrorType.VALIDATION, retryable=False)  # noqa: E501
+    non_retryable_error = create_error_response(
+        "Validation error", ErrorType.VALIDATION, retryable=False
+    )  # noqa: E501
     assert non_retryable_error["retryable"] is False
 
     # Test default (should be False)
     default_error = create_error_response("Default error", ErrorType.EXECUTION)
     assert default_error["retryable"] is False
+
 
 def test_error_type_specific_behaviors():
     """Test that different error types have appropriate behaviors"""
@@ -352,6 +395,7 @@ def test_error_type_specific_behaviors():
     # Security errors should not be retryable
     security_error = create_error_response("Permission denied", ErrorType.SECURITY, retryable=False)
     assert security_error["retryable"] is False
+
 
 def test_error_handling_integration(tmp_path):
     """Test error handling integration across multiple tools"""
@@ -373,6 +417,7 @@ def test_error_handling_integration(tmp_path):
 
     assert success_result["success"] is True
     assert "content" in success_result["data"]
+
 
 def test_error_metrics_and_monitoring():
     """Test that error metrics can be extracted for monitoring"""
@@ -398,15 +443,14 @@ def test_error_metrics_and_monitoring():
     # Network and timeout errors should be retryable in this test
     assert retryable_count == 2
 
+
 def test_error_response_serialization():
     """Test that error responses can be serialized and deserialized"""
     import json
 
     # Create error response
     error = create_error_response(
-        "Test error",
-        ErrorType.EXECUTION,
-        {"context": "test", "nested": {"data": "value"}}
+        "Test error", ErrorType.EXECUTION, {"context": "test", "nested": {"data": "value"}}
     )
 
     # Serialize to JSON
@@ -421,6 +465,7 @@ def test_error_response_serialization():
     assert deserialized["error_type"] == ErrorType.EXECUTION
     assert deserialized["error_context"]["context"] == "test"
     assert deserialized["error_context"]["nested"]["data"] == "value"
+
 
 def test_error_handling_performance():
     """Test that error handling doesn't significantly impact performance"""
@@ -437,6 +482,7 @@ def test_error_handling_performance():
     # Should be very fast (less than 1 second for 1000 errors)
     duration = end_time - start_time
     assert duration < 1.0, f"Error creation took {duration} seconds, expected < 1.0"
+
 
 def test_error_context_consistency(tmp_path):
     """Test that error context is consistent across different tools"""
@@ -470,12 +516,19 @@ def test_error_context_consistency(tmp_path):
             # Some tools might not be available or have different error conditions
             continue
 
+
 def test_error_handling_documentation():
     """Test that error handling is well documented"""
     # This is more of a documentation test to ensure error types are documented
     error_types = [
-        "PERMISSION", "NOT_FOUND", "VALIDATION", "EXECUTION",
-        "TIMEOUT", "NETWORK", "SECURITY", "PROVIDER"
+        "PERMISSION",
+        "NOT_FOUND",
+        "VALIDATION",
+        "EXECUTION",
+        "TIMEOUT",
+        "NETWORK",
+        "SECURITY",
+        "PROVIDER",
     ]
 
     # Verify all error types are defined

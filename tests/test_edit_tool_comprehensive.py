@@ -35,13 +35,12 @@ def temp_edit_project():
     # File with multi-line content
     (temp_dir / "multiline.py").write_text(
         "def function():\n    '''Docstring\n    with multiple lines'''\n    pass\n",
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
     # File with special characters
     (temp_dir / "special.txt").write_text(
-        "Hello\tWorld\nWith\ttabs\nAnd unicode: café ñ 日本語\n",
-        encoding="utf-8"
+        "Hello\tWorld\nWith\ttabs\nAnd unicode: café ñ 日本語\n", encoding="utf-8"
     )
 
     # File with UTF-8 BOM
@@ -82,13 +81,13 @@ class TestEditToolMultiLine:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
             file_path="multiline.py",
             old_string="'''Docstring\n    with multiple lines'''",
-            new_string="'''Updated docstring\n    on multiple lines'''"
+            new_string="'''Updated docstring\n    on multiple lines'''",
         )
 
         assert result["success"] is True
@@ -104,13 +103,13 @@ class TestEditToolMultiLine:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
             file_path="multiline.py",
             old_string="def function():\n    '''Docstring\n    with multiple lines'''",
-            new_string="def new_function():\n    '''New docstring\n    with new lines'''"
+            new_string="def new_function():\n    '''New docstring\n    with new lines'''",
         )
 
         assert result["success"] is True
@@ -127,14 +126,14 @@ class TestEditToolMultiLine:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
             file_path="repeated_multiline.txt",
             old_string="Block",
             new_string="Section",
-            replace_all=True
+            replace_all=True,
         )
 
         assert result["success"] is True
@@ -154,14 +153,10 @@ class TestEditToolValidation:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="",
-            new_string="replacement"
-        )
+        result = tool.execute(file_path="unix_endings.txt", old_string="", new_string="replacement")
 
         assert result["success"] is False
         assert result["error_type"] == ErrorType.VALIDATION
@@ -172,13 +167,11 @@ class TestEditToolValidation:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Line 1"
         )
 
         assert result["success"] is False
@@ -190,14 +183,10 @@ class TestEditToolValidation:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="nonexistent.txt",
-            old_string="foo",
-            new_string="bar"
-        )
+        result = tool.execute(file_path="nonexistent.txt", old_string="foo", new_string="bar")
 
         assert result["success"] is False
         assert result["error_type"] == ErrorType.NOT_FOUND
@@ -210,14 +199,10 @@ class TestEditToolValidation:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="subdir",
-            old_string="foo",
-            new_string="bar"
-        )
+        result = tool.execute(file_path="subdir", old_string="foo", new_string="bar")
 
         assert result["success"] is False
         assert result["error_type"] == ErrorType.VALIDATION
@@ -228,13 +213,13 @@ class TestEditToolValidation:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
             file_path="unix_endings.txt",
             old_string="Nonexistent String XYZ",
-            new_string="replacement"
+            new_string="replacement",
         )
 
         assert result["success"] is False
@@ -248,14 +233,10 @@ class TestEditToolValidation:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="repeated.txt",
-            old_string="foo",
-            new_string="replaced"
-        )
+        result = tool.execute(file_path="repeated.txt", old_string="foo", new_string="replaced")
 
         assert result["success"] is False
         assert result["error_type"] == ErrorType.VALIDATION
@@ -275,15 +256,11 @@ class TestEditToolPermissions:
     def test_plan_mode_blocking(self, temp_edit_project, mock_console):
         """Test that PLAN mode blocks edits."""
         tool = EditTool(
-            project_dir=temp_edit_project,
-            permission_mode=PermissionMode.PLAN,
-            console=mock_console
+            project_dir=temp_edit_project, permission_mode=PermissionMode.PLAN, console=mock_console
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Modified Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
         )
 
         assert result["success"] is False
@@ -298,15 +275,13 @@ class TestEditToolPermissions:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.NORMAL,
-            console=mock_console
+            console=mock_console,
         )
 
         # Mock Confirm.ask to return True
-        with patch('cortex.tools.edit_tool.Confirm.ask', return_value=True):
+        with patch("cortex.tools.edit_tool.Confirm.ask", return_value=True):
             result = tool.execute(
-                file_path="unix_endings.txt",
-                old_string="Line 1",
-                new_string="Modified Line 1"
+                file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
             )
 
         assert result["success"] is True
@@ -317,15 +292,13 @@ class TestEditToolPermissions:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.NORMAL,
-            console=mock_console
+            console=mock_console,
         )
 
         # Mock Confirm.ask to return False
-        with patch('cortex.tools.edit_tool.Confirm.ask', return_value=False):
+        with patch("cortex.tools.edit_tool.Confirm.ask", return_value=False):
             result = tool.execute(
-                file_path="unix_endings.txt",
-                old_string="Line 1",
-                new_string="Modified Line 1"
+                file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
             )
 
         assert result["success"] is False
@@ -337,13 +310,11 @@ class TestEditToolPermissions:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Modified Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
         )
 
         assert result["success"] is True
@@ -366,14 +337,12 @@ class TestEditToolStringMatching:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # Try to replace with spaces when file has tabs
         result = tool.execute(
-            file_path="special.txt",
-            old_string="Hello    World",  # Spaces
-            new_string="Hello World"
+            file_path="special.txt", old_string="Hello    World", new_string="Hello World"  # Spaces
         )
 
         assert result["success"] is False
@@ -384,14 +353,14 @@ class TestEditToolStringMatching:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # Use literal \n string (not actual newline)
         result = tool.execute(
             file_path="unix_endings.txt",
             old_string="Line 1\\nLine 2",  # Literal backslash-n
-            new_string="replacement"
+            new_string="replacement",
         )
 
         assert result["success"] is False
@@ -403,14 +372,14 @@ class TestEditToolStringMatching:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # Use literal \t string (not actual tab)
         result = tool.execute(
             file_path="special.txt",
             old_string="Hello\\tWorld",  # Literal backslash-t
-            new_string="replacement"
+            new_string="replacement",
         )
 
         assert result["success"] is False
@@ -422,7 +391,7 @@ class TestEditToolStringMatching:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # First check what's actually in the file
@@ -431,7 +400,7 @@ class TestEditToolStringMatching:
         result = tool.execute(
             file_path="special.txt",
             old_string="And unicode: café ñ 日本語",
-            new_string="And unicode: coffee spanish Japanese"
+            new_string="And unicode: coffee spanish Japanese",
         )
 
         assert result["success"] is True, f"Edit failed: {result.get('error', 'Unknown error')}"
@@ -444,13 +413,11 @@ class TestEditToolStringMatching:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="line 1",  # lowercase
-            new_string="replacement"
+            file_path="unix_endings.txt", old_string="line 1", new_string="replacement"  # lowercase
         )
 
         assert result["success"] is False
@@ -470,14 +437,10 @@ class TestEditToolFileSystem:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="special.txt",
-            old_string="日本語",
-            new_string="Japanese"
-        )
+        result = tool.execute(file_path="special.txt", old_string="日本語", new_string="Japanese")
 
         assert result["success"] is True
         content = (temp_edit_project / "special.txt").read_text()
@@ -491,20 +454,16 @@ class TestEditToolFileSystem:
         addressed in a future improvement to EditTool.
         """
         # Create a simple UTF-8 file without BOM for this test
-        (temp_edit_project / "utf8_test.txt").write_text(
-            "Content to edit", encoding="utf-8"
-        )
+        (temp_edit_project / "utf8_test.txt").write_text("Content to edit", encoding="utf-8")
 
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="utf8_test.txt",
-            old_string="Content to edit",
-            new_string="Modified content"
+            file_path="utf8_test.txt", old_string="Content to edit", new_string="Modified content"
         )
 
         assert result["success"] is True
@@ -521,13 +480,11 @@ class TestEditToolFileSystem:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="subdir/file.txt",
-            old_string="Original",
-            new_string="Modified"
+            file_path="subdir/file.txt", old_string="Original", new_string="Modified"
         )
 
         assert result["success"] is True
@@ -537,13 +494,11 @@ class TestEditToolFileSystem:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="large.txt",
-            old_string="Line 500",
-            new_string="Modified Line 500"
+            file_path="large.txt", old_string="Line 500", new_string="Modified Line 500"
         )
 
         assert result["success"] is True
@@ -562,13 +517,11 @@ class TestEditToolUI:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Modified Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
         )
 
         assert result["success"] is True
@@ -580,14 +533,12 @@ class TestEditToolUI:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # Try to find non-existent string
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="nonexistent",
-            new_string="replacement"
+            file_path="unix_endings.txt", old_string="nonexistent", new_string="replacement"
         )
 
         assert result["success"] is False
@@ -598,13 +549,11 @@ class TestEditToolUI:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Modified Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
         )
 
         assert result["success"] is True
@@ -630,15 +579,13 @@ class TestEditToolIntegration:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # Mock the invalidate_file function
-        with patch('cortex.tools.edit_tool.invalidate_file') as mock_invalidate:
+        with patch("cortex.tools.edit_tool.invalidate_file") as mock_invalidate:
             result = tool.execute(
-                file_path="unix_endings.txt",
-                old_string="Line 1",
-                new_string="Modified Line 1"
+                file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
             )
 
             assert result["success"] is True
@@ -650,16 +597,14 @@ class TestEditToolIntegration:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # Mock the backup_file method
         tool.backup_file = MagicMock()
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Modified Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
         )
 
         assert result["success"] is True
@@ -671,13 +616,11 @@ class TestEditToolIntegration:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="Modified Line 1"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="Modified Line 1"
         )
 
         # Check success response structure
@@ -701,14 +644,10 @@ class TestEditToolEdgeCases:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1\n",
-            new_string=""
-        )
+        result = tool.execute(file_path="unix_endings.txt", old_string="Line 1\n", new_string="")
 
         assert result["success"] is True
         content = (temp_edit_project / "unix_endings.txt").read_text()
@@ -719,13 +658,11 @@ class TestEditToolEdgeCases:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 1",
-            new_string="First Line"
+            file_path="unix_endings.txt", old_string="Line 1", new_string="First Line"
         )
 
         assert result["success"] is True
@@ -737,13 +674,11 @@ class TestEditToolEdgeCases:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="unix_endings.txt",
-            old_string="Line 3\n",
-            new_string="Last Line\n"
+            file_path="unix_endings.txt", old_string="Line 3\n", new_string="Last Line\n"
         )
 
         assert result["success"] is True
@@ -759,14 +694,10 @@ class TestEditToolEdgeCases:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="long.txt",
-            old_string=long_string,
-            new_string="B" * 1000
-        )
+        result = tool.execute(file_path="long.txt", old_string=long_string, new_string="B" * 1000)
 
         assert result["success"] is True
 
@@ -777,14 +708,10 @@ class TestEditToolEdgeCases:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
-        result = tool.execute(
-            file_path="regex.txt",
-            old_string="$10.00",
-            new_string="$15.00"
-        )
+        result = tool.execute(file_path="regex.txt", old_string="$10.00", new_string="$15.00")
 
         assert result["success"] is True
         content = (temp_edit_project / "regex.txt").read_text()
@@ -797,15 +724,12 @@ class TestEditToolEdgeCases:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         # "aa" appears twice in "aaaa", so it should fail without replace_all
         result = tool.execute(
-            file_path="overlap.txt",
-            old_string="aa",
-            new_string="bb",
-            replace_all=False
+            file_path="overlap.txt", old_string="aa", new_string="bb", replace_all=False
         )
 
         # This should fail because "aa" is not unique
@@ -816,10 +740,7 @@ class TestEditToolEdgeCases:
 
         # Now test with replace_all=True
         result = tool.execute(
-            file_path="overlap.txt",
-            old_string="aa",
-            new_string="bb",
-            replace_all=True
+            file_path="overlap.txt", old_string="aa", new_string="bb", replace_all=True
         )
 
         assert result["success"] is True
@@ -845,14 +766,11 @@ class TestEditToolPerformance:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="many.txt",
-            old_string="word",
-            new_string="term",
-            replace_all=True
+            file_path="many.txt", old_string="word", new_string="term", replace_all=True
         )
 
         assert result["success"] is True
@@ -867,14 +785,11 @@ class TestEditToolPerformance:
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
-            console=mock_console
+            console=mock_console,
         )
 
         result = tool.execute(
-            file_path="big_diff.txt",
-            old_string="Line",
-            new_string="Row",
-            replace_all=True
+            file_path="big_diff.txt", old_string="Line", new_string="Row", replace_all=True
         )
 
         assert result["success"] is True

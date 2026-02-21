@@ -14,7 +14,7 @@ from cortex.core.summarization import (
     LLMSummarizer,
     HybridSummarizer,
     create_summarizer,
-    ConversationSummarizer
+    ConversationSummarizer,
 )
 
 
@@ -44,7 +44,7 @@ class TestSummaryChunk:
             commands_executed=["pip install black"],
             errors_encountered=["File not found: missing.py"],
             timestamp_start="2024-01-01T00:00:00",
-            timestamp_end="2024-01-01T00:05:00"
+            timestamp_end="2024-01-01T00:05:00",
         )
 
         assert chunk.original_message_count == 10
@@ -68,7 +68,7 @@ class TestSummaryChunk:
             files_modified=["module.py"],
             files_read=["module.py", "tests.py"],
             commands_executed=["pytest"],
-            errors_encountered=["Test failure"]
+            errors_encountered=["Test failure"],
         )
 
         message = chunk.to_message()
@@ -88,7 +88,7 @@ class TestSummaryChunk:
             original_message_count=3,
             original_token_count=300,
             summary_token_count=50,
-            summary_content="General conversation."
+            summary_content="General conversation.",
         )
 
         message = chunk.to_message()
@@ -125,7 +125,7 @@ class TestSummarizationConfig:
             max_summary_tokens=300,
             preserve_tool_results=False,
             preserve_errors=False,
-            min_messages_to_summarize=10
+            min_messages_to_summarize=10,
         )
 
         assert config.enabled is False
@@ -148,13 +148,22 @@ class TestSimpleSummarizer:
     def test_should_summarize(self, summarizer):
         """Test should_summarize method."""
         # Below threshold
-        assert summarizer.should_summarize([], current_tokens=400, max_tokens=1000, threshold=0.5) is False  # noqa: E501
+        assert (
+            summarizer.should_summarize([], current_tokens=400, max_tokens=1000, threshold=0.5)
+            is False
+        )  # noqa: E501
 
         # At threshold
-        assert summarizer.should_summarize([], current_tokens=500, max_tokens=1000, threshold=0.5) is False  # noqa: E501
+        assert (
+            summarizer.should_summarize([], current_tokens=500, max_tokens=1000, threshold=0.5)
+            is False
+        )  # noqa: E501
 
         # Above threshold
-        assert summarizer.should_summarize([], current_tokens=600, max_tokens=1000, threshold=0.5) is True  # noqa: E501
+        assert (
+            summarizer.should_summarize([], current_tokens=600, max_tokens=1000, threshold=0.5)
+            is True
+        )  # noqa: E501
 
         # Default threshold
         assert summarizer.should_summarize([], current_tokens=850, max_tokens=1000) is True
@@ -179,10 +188,10 @@ class TestSimpleSummarizer:
         """Test summarizing user messages."""
         messages = [
             {"role": "user", "content": "Add logging to the application"},
-            {"role": "user", "content": "Also add tests"}
+            {"role": "user", "content": "Also add tests"},
         ]
 
-        with patch('cortex.core.context.estimate_tokens', return_value=10):
+        with patch("cortex.core.context.estimate_tokens", return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
 
             assert chunk.original_message_count == 2
@@ -199,20 +208,20 @@ class TestSimpleSummarizer:
                     {
                         "function": {
                             "name": "read_file",
-                            "arguments": json.dumps({"path": "main.py"})
+                            "arguments": json.dumps({"path": "main.py"}),
                         }
                     },
                     {
                         "function": {
                             "name": "write_file",
-                            "arguments": json.dumps({"path": "main.py", "content": "..."})
+                            "arguments": json.dumps({"path": "main.py", "content": "..."}),
                         }
-                    }
-                ]
+                    },
+                ],
             }
         ]
 
-        with patch('cortex.core.context.estimate_tokens', return_value=10):
+        with patch("cortex.core.context.estimate_tokens", return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
 
             assert "main.py" in chunk.files_read
@@ -229,14 +238,14 @@ class TestSimpleSummarizer:
                     {
                         "function": {
                             "name": "execute_command",
-                            "arguments": json.dumps({"command": "pytest tests/"})
+                            "arguments": json.dumps({"command": "pytest tests/"}),
                         }
                     }
-                ]
+                ],
             }
         ]
 
-        with patch('cortex.core.context.estimate_tokens', return_value=10):
+        with patch("cortex.core.context.estimate_tokens", return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
 
             assert "pytest tests/" in chunk.commands_executed[0]
@@ -246,14 +255,11 @@ class TestSimpleSummarizer:
         messages = [
             {
                 "role": "tool",
-                "content": json.dumps({
-                    "success": False,
-                    "error": "File not found: missing.py"
-                })
+                "content": json.dumps({"success": False, "error": "File not found: missing.py"}),
             }
         ]
 
-        with patch('cortex.core.context.estimate_tokens', return_value=10):
+        with patch("cortex.core.context.estimate_tokens", return_value=10):
             chunk = summarizer.summarize(messages, max_summary_tokens=500)
 
             assert "File not found" in chunk.errors_encountered[0]
@@ -291,11 +297,11 @@ class TestLLMSummarizer:
         """Test successful LLM summarization."""
         messages = [
             {"role": "user", "content": "Add logging"},
-            {"role": "assistant", "content": "I'll help with that"}
+            {"role": "assistant", "content": "I'll help with that"},
         ]
 
-        with patch('cortex.core.context.estimate_tokens', return_value=50):
-            with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
+        with patch("cortex.core.context.estimate_tokens", return_value=50):
+            with patch("cortex.core.summarization.SimpleSummarizer") as mock_simple:
                 mock_simple_instance = Mock()
                 mock_simple_instance.summarize.return_value = SummaryChunk(
                     original_message_count=2,
@@ -306,7 +312,7 @@ class TestLLMSummarizer:
                     files_modified=[],
                     files_read=[],
                     commands_executed=[],
-                    errors_encountered=[]
+                    errors_encountered=[],
                 )
                 mock_simple.return_value = mock_simple_instance
 
@@ -325,8 +331,8 @@ class TestLLMSummarizer:
 
         messages = [{"role": "user", "content": "Test"}]
 
-        with patch('cortex.core.context.estimate_tokens', return_value=10):
-            with patch('cortex.core.summarization.SimpleSummarizer') as mock_simple:
+        with patch("cortex.core.context.estimate_tokens", return_value=10):
+            with patch("cortex.core.summarization.SimpleSummarizer") as mock_simple:
                 mock_simple_instance = Mock()
                 mock_simple_instance.summarize.return_value = SummaryChunk(
                     original_message_count=1,
@@ -337,7 +343,7 @@ class TestLLMSummarizer:
                     files_modified=[],
                     files_read=[],
                     commands_executed=[],
-                    errors_encountered=[]
+                    errors_encountered=[],
                 )
                 mock_simple.return_value = mock_simple_instance
 
@@ -350,8 +356,11 @@ class TestLLMSummarizer:
         """Test formatting messages for summary prompt."""
         messages = [
             {"role": "user", "content": "Short message"},
-            {"role": "assistant", "content": "This is a longer message that might get truncated if it exceeds certain length limits."},  # noqa: E501
-            {"role": "tool", "content": json.dumps({"success": True, "result": "data"})}
+            {
+                "role": "assistant",
+                "content": "This is a longer message that might get truncated if it exceeds certain length limits.",
+            },  # noqa: E501
+            {"role": "tool", "content": json.dumps({"success": True, "result": "data"})},
         ]
 
         formatted = llm_summarizer._format_messages_for_summary(messages, max_chars=1000)
@@ -364,7 +373,7 @@ class TestLLMSummarizer:
         """Test truncation of formatted messages."""
         messages = [
             {"role": "user", "content": "A" * 300},  # Very long message
-            {"role": "assistant", "content": "B"}
+            {"role": "assistant", "content": "B"},
         ]
 
         formatted = llm_summarizer._format_messages_for_summary(messages, max_chars=100)
@@ -381,9 +390,7 @@ class TestHybridSummarizer:
     def mock_provider(self):
         """Create a mock provider."""
         provider = Mock()
-        provider.chat.return_value = {
-            "message": {"content": "Enhanced LLM summary"}
-        }
+        provider.chat.return_value = {"message": {"content": "Enhanced LLM summary"}}
         return provider
 
     def test_hybrid_with_provider(self, mock_provider):
@@ -392,7 +399,7 @@ class TestHybridSummarizer:
 
         messages = [{"role": "user", "content": "Test"}] * 11  # More than 10 messages
 
-        with patch.object(summarizer.simple, 'summarize') as mock_simple_summarize:
+        with patch.object(summarizer.simple, "summarize") as mock_simple_summarize:
             simple_chunk = SummaryChunk(
                 original_message_count=11,
                 original_token_count=2200,
@@ -402,11 +409,11 @@ class TestHybridSummarizer:
                 files_modified=["file.py"],
                 files_read=["read.py"],
                 commands_executed=[],
-                errors_encountered=[]
+                errors_encountered=[],
             )
             mock_simple_summarize.return_value = simple_chunk
 
-            with patch.object(summarizer.llm, 'summarize') as mock_llm_summarize:
+            with patch.object(summarizer.llm, "summarize") as mock_llm_summarize:
                 llm_chunk = SummaryChunk(
                     original_message_count=11,
                     original_token_count=2200,
@@ -416,7 +423,7 @@ class TestHybridSummarizer:
                     files_modified=[],
                     files_read=[],
                     commands_executed=[],
-                    errors_encountered=[]
+                    errors_encountered=[],
                 )
                 mock_llm_summarize.return_value = llm_chunk
 
@@ -433,7 +440,7 @@ class TestHybridSummarizer:
 
         messages = [{"role": "user", "content": "Test"}]
 
-        with patch.object(summarizer.simple, 'summarize') as mock_simple_summarize:
+        with patch.object(summarizer.simple, "summarize") as mock_simple_summarize:
             simple_chunk = SummaryChunk(
                 original_message_count=1,
                 original_token_count=20,
@@ -443,7 +450,7 @@ class TestHybridSummarizer:
                 files_modified=[],
                 files_read=[],
                 commands_executed=[],
-                errors_encountered=[]
+                errors_encountered=[],
             )
             mock_simple_summarize.return_value = simple_chunk
 
@@ -458,7 +465,7 @@ class TestHybridSummarizer:
 
         messages = [{"role": "user", "content": "Test"}] * 11
 
-        with patch.object(summarizer.simple, 'summarize') as mock_simple_summarize:
+        with patch.object(summarizer.simple, "summarize") as mock_simple_summarize:
             simple_chunk = SummaryChunk(
                 original_message_count=11,
                 original_token_count=2200,
@@ -468,15 +475,16 @@ class TestHybridSummarizer:
                 files_modified=[],
                 files_read=[],
                 commands_executed=[],
-                errors_encountered=[]
+                errors_encountered=[],
             )
             mock_simple_summarize.return_value = simple_chunk
 
-            with patch.object(summarizer.llm, 'summarize', side_effect=Exception("LLM failed")):
+            with patch.object(summarizer.llm, "summarize", side_effect=Exception("LLM failed")):
                 chunk = summarizer.summarize(messages, max_summary_tokens=500)
 
                 # Should fall back to simple summary
                 assert chunk.summary_content == "Simple summary"
+
 
 class TestCreateSummarizer:
     """Test create_summarizer factory function."""
@@ -490,9 +498,7 @@ class TestCreateSummarizer:
         """Test creating LLM-based summarizer with provider."""
         mock_provider = Mock()
         summarizer = create_summarizer(
-            SummarizationStrategy.LLM_BASED,
-            provider=mock_provider,
-            model="gpt-4"
+            SummarizationStrategy.LLM_BASED, provider=mock_provider, model="gpt-4"
         )
         assert isinstance(summarizer, LLMSummarizer)
         assert summarizer.provider == mock_provider
@@ -500,7 +506,7 @@ class TestCreateSummarizer:
 
     def test_create_llm_based_without_provider(self):
         """Test creating LLM-based summarizer without provider (should fallback)."""
-        with patch('cortex.core.summarization.logger') as mock_logger:
+        with patch("cortex.core.summarization.logger") as mock_logger:
             summarizer = create_summarizer(SummarizationStrategy.LLM_BASED, provider=None)
             assert isinstance(summarizer, SimpleSummarizer)
             mock_logger.warning.assert_called()
@@ -509,14 +515,13 @@ class TestCreateSummarizer:
         """Test creating hybrid summarizer."""
         mock_provider = Mock()
         summarizer = create_summarizer(
-            SummarizationStrategy.HYBRID,
-            provider=mock_provider,
-            model="gpt-4"
+            SummarizationStrategy.HYBRID, provider=mock_provider, model="gpt-4"
         )
         assert isinstance(summarizer, HybridSummarizer)
 
     def test_create_unknown_strategy(self):
         """Test creating summarizer with unknown strategy (should default to simple)."""
+
         # Use a mock strategy value
         class UnknownStrategy:
             value = "unknown"

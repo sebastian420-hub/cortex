@@ -15,6 +15,7 @@ from cortex.ui.plan_progress import (
 
 class MockStatus(str, Enum):
     """Mock status enum for testing."""
+
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -25,6 +26,7 @@ class MockStatus(str, Enum):
 @dataclass
 class MockStep:
     """Mock step for testing."""
+
     id: str
     description: str
     status: MockStatus = MockStatus.PENDING
@@ -36,6 +38,7 @@ class MockStep:
 @dataclass
 class MockPlan:
     """Mock plan for testing."""
+
     id: str
     goal: str
     steps: List[MockStep]
@@ -75,7 +78,7 @@ class TestPlanProgressDisplay:
                 MockStep(id="step_1", description="First step", tool_name="read_file"),
                 MockStep(id="step_2", description="Second step", dependencies=["step_1"]),
                 MockStep(id="step_3", description="Third step", expected_outcome="Done"),
-            ]
+            ],
         )
 
     def test_display_initialization(self, display):
@@ -118,9 +121,7 @@ class TestPlanProgressDisplay:
     def test_show_step_start_with_expected_outcome(self, display):
         """Test show_step_start with expected outcome."""
         step = MockStep(
-            id="step_1",
-            description="Test step",
-            expected_outcome="Should complete successfully"
+            id="step_1", description="Test step", expected_outcome="Should complete successfully"
         )
         display.show_step_start(step, 2, 10)
         assert display.console.print.called
@@ -179,7 +180,7 @@ class TestPlanProgressDisplay:
             {"success": True, "content": "Result 2"},
         ]
 
-        with patch('time.time', return_value=5.0):  # 4 seconds elapsed
+        with patch("time.time", return_value=5.0):  # 4 seconds elapsed
             display.show_execution_summary(sample_plan, step_results)
 
         assert display.console.print.called
@@ -215,25 +216,25 @@ class TestShowStepStatus:
 
     def test_show_step_status_in_progress(self):
         """Test showing in_progress status."""
-        with patch('cortex.ui.plan_progress.console') as mock_console:
+        with patch("cortex.ui.plan_progress.console") as mock_console:
             show_step_status(1, 5, "Running tests", "in_progress")
             assert mock_console.print.called
 
     def test_show_step_status_completed(self):
         """Test showing completed status."""
-        with patch('cortex.ui.plan_progress.console') as mock_console:
+        with patch("cortex.ui.plan_progress.console") as mock_console:
             show_step_status(1, 5, "Running tests", "completed", "Done")
             assert mock_console.print.called
 
     def test_show_step_status_failed(self):
         """Test showing failed status."""
-        with patch('cortex.ui.plan_progress.console') as mock_console:
+        with patch("cortex.ui.plan_progress.console") as mock_console:
             show_step_status(1, 5, "Running tests", "failed", "Error occurred")
             assert mock_console.print.called
 
     def test_show_step_status_pending(self):
         """Test showing pending status."""
-        with patch('cortex.ui.plan_progress.console') as mock_console:
+        with patch("cortex.ui.plan_progress.console") as mock_console:
             show_step_status(1, 5, "Waiting", "pending")
             assert mock_console.print.called
 
@@ -246,7 +247,7 @@ class TestIntegrationWithPlanning:
         from cortex.core.planning import PlanningEngine
 
         engine = PlanningEngine()
-        assert hasattr(engine, 'progress_display')
+        assert hasattr(engine, "progress_display")
         assert isinstance(engine.progress_display, PlanProgressDisplay)
 
     def test_planning_engine_creates_plan_with_display(self):

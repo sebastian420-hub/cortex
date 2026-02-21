@@ -17,7 +17,7 @@ class TestStreamingResponseHandling:
             yield {"message": {"reasoning_content": "Let me think about this..."}}
             yield {"message": {"reasoning_content": " The answer is 42."}}
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(mock_stream())
 
         # Should have content from reasoning
@@ -31,13 +31,23 @@ class TestStreamingResponseHandling:
 
         # Mock stream with tool syntax in reasoning
         def mock_stream():
-            yield {"message": {"reasoning_content": "<tool_call>read_file({'path': 'test.py'})</tool_call>"}}  # noqa: E501
+            yield {
+                "message": {
+                    "reasoning_content": "<tool_call>read_file({'path': 'test.py'})</tool_call>"
+                }
+            }  # noqa: E501
 
-        with patch('cortex.core.streaming.console') as mock_console:
-            with patch('cortex.core.streaming._extract_kimi_native_tool_calls_from_streaming') as mock_extract:  # noqa: E501
+        with patch("cortex.core.streaming.console") as mock_console:
+            with patch(
+                "cortex.core.streaming._extract_kimi_native_tool_calls_from_streaming"
+            ) as mock_extract:  # noqa: E501
                 # Return a valid tool call
                 mock_extract.return_value = [
-                    {"id": "call_1", "function": {"name": "read_file", "arguments": '{"path": "test.py"}'}, "type": "function"}  # noqa: E501
+                    {
+                        "id": "call_1",
+                        "function": {"name": "read_file", "arguments": '{"path": "test.py"}'},
+                        "type": "function",
+                    }  # noqa: E501
                 ]
                 result = display_streaming_response(mock_stream())
 
@@ -53,7 +63,7 @@ class TestStreamingResponseHandling:
         def mock_stream():
             yield {"message": {}}
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(mock_stream())
 
         # Should have empty content at minimum
@@ -68,7 +78,7 @@ class TestStreamingResponseHandling:
             yield {"message": {"content": "Hello "}}
             yield {"message": {"content": "world!"}}
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(mock_stream())
 
         assert result["content"] == "Hello world!"
@@ -82,7 +92,7 @@ class TestStreamingResponseHandling:
             yield {"message": {"content": "The answer is ", "reasoning_content": "Thinking..."}}
             yield {"message": {"content": "42", "reasoning_content": "Done"}}
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(mock_stream())
 
         assert result["content"] == "The answer is 42"
@@ -98,11 +108,9 @@ class TestConversationMessageHandling:
 
         conv = Conversation(system_prompt="Test")
 
-        with patch('cortex.core.conversation.logger') as mock_logger:
+        with patch("cortex.core.conversation.logger") as mock_logger:
             conv.add_assistant_message(
-                content="",
-                tool_calls=None,
-                reasoning_content="I need to think about this..."
+                content="", tool_calls=None, reasoning_content="I need to think about this..."
             )
 
         history = conv.get_history()
@@ -121,11 +129,9 @@ class TestConversationMessageHandling:
 
         conv = Conversation(system_prompt="Test")
 
-        with patch('cortex.core.conversation.logger') as mock_logger:
+        with patch("cortex.core.conversation.logger") as mock_logger:
             conv.add_assistant_message(
-                content="",
-                tool_calls=None,
-                reasoning_content="<tool_call>read_file</tool_call>"
+                content="", tool_calls=None, reasoning_content="<tool_call>read_file</tool_call>"
             )
 
         history = conv.get_history()
@@ -143,12 +149,8 @@ class TestConversationMessageHandling:
 
         conv = Conversation(system_prompt="Test")
 
-        with patch('cortex.core.conversation.logger') as mock_logger:
-            conv.add_assistant_message(
-                content="",
-                tool_calls=None,
-                reasoning_content=None
-            )
+        with patch("cortex.core.conversation.logger") as mock_logger:
+            conv.add_assistant_message(content="", tool_calls=None, reasoning_content=None)
 
         history = conv.get_history()
         assistant_msg = [m for m in history if m["role"] == "assistant"][0]
@@ -164,11 +166,7 @@ class TestConversationMessageHandling:
         from cortex.core.conversation import ConversationManager as Conversation
 
         conv = Conversation(system_prompt="Test")
-        conv.add_assistant_message(
-            content="Hello world",
-            tool_calls=None,
-            reasoning_content=None
-        )
+        conv.add_assistant_message(content="Hello world", tool_calls=None, reasoning_content=None)
 
         history = conv.get_history()
         assistant_msg = [m for m in history if m["role"] == "assistant"][0]
@@ -191,7 +189,7 @@ class TestAgentResponseHandling:
         response_message = {
             "content": "",
             "reasoning_content": "Let me think...",
-            "tool_calls": None
+            "tool_calls": None,
         }
 
         # Should not call _output_warning
@@ -209,11 +207,7 @@ class TestEdgeCases:
         from cortex.core.conversation import ConversationManager as Conversation
 
         conv = Conversation(system_prompt="Test")
-        conv.add_assistant_message(
-            content="   ",
-            tool_calls=None,
-            reasoning_content=None
-        )
+        conv.add_assistant_message(content="   ", tool_calls=None, reasoning_content=None)
 
         history = conv.get_history()
         assistant_msg = [m for m in history if m["role"] == "assistant"][0]
@@ -229,7 +223,7 @@ class TestEdgeCases:
             yield {"message": {"reasoning_content": "Actual content"}}
             yield {"message": {"reasoning_content": ""}}
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(mock_stream())
 
         # Should have content from non-empty reasoning
@@ -243,7 +237,7 @@ class TestEdgeCases:
         conv.add_assistant_message(
             content="",
             tool_calls=[{"id": "1", "function": {"name": "test"}}],
-            reasoning_content=None
+            reasoning_content=None,
         )
 
         history = conv.get_history()
@@ -263,9 +257,15 @@ class TestRegressionScenarios:
 
         def mock_stream():
             yield {"message": {"content": "I'll help"}}
-            yield {"message": {"tool_calls": [{"id": "1", "function": {"name": "read_file", "arguments": "{}"}}]}}  # noqa: E501
+            yield {
+                "message": {
+                    "tool_calls": [
+                        {"id": "1", "function": {"name": "read_file", "arguments": "{}"}}
+                    ]
+                }
+            }  # noqa: E501
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(mock_stream())
 
         assert result["content"] == "I'll help"
@@ -279,7 +279,7 @@ class TestRegressionScenarios:
         conv.add_assistant_message(
             content="Let me check",
             tool_calls=[{"id": "1", "function": {"name": "test"}}],
-            reasoning_content=None
+            reasoning_content=None,
         )
 
         history = conv.get_history()

@@ -76,10 +76,7 @@ class TestContextWindowManager:
     def test_add_chunk(self):
         """Test adding a chunk."""
         context = ContextWindowManager(model="test-model", max_tokens=1000)
-        chunk = EditChunk(
-            content="test content",
-            chunk_type=ChunkType.FILE_CONTENT
-        )
+        chunk = EditChunk(content="test content", chunk_type=ChunkType.FILE_CONTENT)
 
         context.add_chunk(chunk)
 
@@ -90,8 +87,7 @@ class TestContextWindowManager:
         """Test adding multiple chunks."""
         context = ContextWindowManager(model="test-model", max_tokens=1000)
         chunks = [
-            EditChunk(content=f"chunk {i}", chunk_type=ChunkType.FILE_CONTENT)
-            for i in range(5)
+            EditChunk(content=f"chunk {i}", chunk_type=ChunkType.FILE_CONTENT) for i in range(5)
         ]
 
         context.add_chunks(chunks)
@@ -101,9 +97,7 @@ class TestContextWindowManager:
     def test_inject_context_all(self):
         """Test context injection with ALL strategy."""
         context = ContextWindowManager(
-            model="test-model",
-            max_tokens=1000,
-            injection_strategy=ContextInjectionStrategy.ALL
+            model="test-model", max_tokens=1000, injection_strategy=ContextInjectionStrategy.ALL
         )
 
         chunks = [
@@ -125,19 +119,19 @@ class TestContextWindowManager:
         context = ContextWindowManager(
             model="test-model",
             max_tokens=1000,
-            injection_strategy=ContextInjectionStrategy.RELEVANT
+            injection_strategy=ContextInjectionStrategy.RELEVANT,
         )
 
         # Create chunks with different relevance
         chunk1 = EditChunk(
             content="python code for processing",
             chunk_type=ChunkType.SOURCE_CODE,
-            metadata={"file_path": "process.py", "function": "process_data"}
+            metadata={"file_path": "process.py", "function": "process_data"},
         )
         chunk2 = EditChunk(
             content="unrelated content",
             chunk_type=ChunkType.FILE_CONTENT,
-            metadata={"file_path": "other.txt"}
+            metadata={"file_path": "other.txt"},
         )
 
         context.add_chunks([chunk1, chunk2])
@@ -155,13 +149,12 @@ class TestContextWindowManager:
             model="test-model",
             max_tokens=100,
             injection_strategy=ContextInjectionStrategy.ALL,
-            budget_per_operation=True
+            budget_per_operation=True,
         )
 
         # Create large chunks that exceed budget
         large_chunk = EditChunk(
-            content="x" * 1000,  # ~250 tokens
-            chunk_type=ChunkType.FILE_CONTENT
+            content="x" * 1000, chunk_type=ChunkType.FILE_CONTENT  # ~250 tokens
         )
         context.add_chunk(large_chunk)
 
@@ -177,8 +170,7 @@ class TestContextWindowManager:
         context = ContextWindowManager(model="test-model", max_tokens=1000)
 
         chunks = [
-            EditChunk(content=f"chunk {i}", chunk_type=ChunkType.FILE_CONTENT)
-            for i in range(3)
+            EditChunk(content=f"chunk {i}", chunk_type=ChunkType.FILE_CONTENT) for i in range(3)
         ]
         context.add_chunks(chunks)
 
@@ -198,10 +190,7 @@ class TestContextWindowManager:
         """Test retrieving chunk by ID."""
         context = ContextWindowManager(model="test-model", max_tokens=1000)
 
-        chunk = EditChunk(
-            content="test",
-            chunk_type=ChunkType.FILE_CONTENT
-        )
+        chunk = EditChunk(content="test", chunk_type=ChunkType.FILE_CONTENT)
         context.add_chunk(chunk)
 
         retrieved = context.get_chunk_by_id(chunk.chunk_id)
@@ -251,10 +240,7 @@ class TestContextWindowFunctions:
         content = "def test():\n    pass\n" * 100  # Large content
 
         context = create_context_window_from_file(
-            content=content,
-            file_path="test.py",
-            model="test-model",
-            max_tokens=5000
+            content=content, file_path="test.py", model="test-model", max_tokens=5000
         )
 
         assert context.max_tokens == 5000
@@ -267,9 +253,7 @@ class TestContextWindowFunctions:
         chunk = EditChunk(content="x" * 1000, chunk_type=ChunkType.FILE_CONTENT)
         context.add_chunk(chunk)
 
-        messages: List[Dict[str, Any]] = [
-            {"role": "user", "content": "test message"}
-        ]
+        messages: List[Dict[str, Any]] = [{"role": "user", "content": "test message"}]
         context.inject_context(messages)
 
         usage = estimate_context_usage(context, messages)
@@ -287,9 +271,7 @@ class TestIntegration:
         """Test complete workflow with chunking and injection."""
         # Create context window
         context = ContextWindowManager(
-            model="test-model",
-            max_tokens=10000,
-            injection_strategy=ContextInjectionStrategy.SMART
+            model="test-model", max_tokens=10000, injection_strategy=ContextInjectionStrategy.SMART
         )
 
         # Add multiple chunks with varying relevance
@@ -297,29 +279,24 @@ class TestIntegration:
             EditChunk(
                 content="python processing functions",
                 chunk_type=ChunkType.SOURCE_CODE,
-                metadata={"file_path": "process.py", "function": "process_data"}
+                metadata={"file_path": "process.py", "function": "process_data"},
             ),
             EditChunk(
                 content="configuration settings",
                 chunk_type=ChunkType.CONFIGURATION,
-                metadata={"file_path": "config.yaml"}
+                metadata={"file_path": "config.yaml"},
             ),
             EditChunk(
                 content="test documentation",
                 chunk_type=ChunkType.DOCUMENTATION,
-                metadata={"file_path": "README.md"}
+                metadata={"file_path": "README.md"},
             ),
         ]
         context.add_chunks(chunks)
 
         # Inject context for specific task
-        messages: List[Dict[str, Any]] = [
-            {"role": "user", "content": "Help me process data"}
-        ]
-        updated, info = context.inject_context(
-            messages,
-            task="process data using python"
-        )
+        messages: List[Dict[str, Any]] = [{"role": "user", "content": "Help me process data"}]
+        updated, info = context.inject_context(messages, task="process data using python")
 
         # Verify injection
         assert len(updated) > len(messages)

@@ -13,7 +13,7 @@ from cortex.core.parallel import (
     BatchResult,
     ExecutionMode,
     PARALLELIZABLE_TOOLS,
-    SERIALIZED_TOOLS
+    SERIALIZED_TOOLS,
 )
 
 
@@ -32,10 +32,7 @@ class TestToolCall:
     def test_tool_call_creation(self):
         """Test creating a ToolCall instance."""
         tool_call = ToolCall(
-            id="call_123",
-            name="read_file",
-            arguments={"path": "test.txt"},
-            index=0
+            id="call_123", name="read_file", arguments={"path": "test.txt"}, index=0
         )
 
         assert tool_call.id == "call_123"
@@ -57,7 +54,7 @@ class TestToolResult:
             index=0,
             success=True,
             error=None,
-            execution_time_ms=50.5
+            execution_time_ms=50.5,
         )
 
         assert tool_result.id == "call_123"
@@ -75,7 +72,7 @@ class TestBatchResult:
         """Test creating a BatchResult instance."""
         results = [
             ToolResult(id="1", name="read_file", result={}, index=0, success=True),
-            ToolResult(id="2", name="grep", result={}, index=1, success=True)
+            ToolResult(id="2", name="grep", result={}, index=1, success=True),
         ]
 
         batch_result = BatchResult(
@@ -83,7 +80,7 @@ class TestBatchResult:
             parallel_count=2,
             serial_count=0,
             total_time_ms=100.0,
-            parallel_time_ms=80.0
+            parallel_time_ms=80.0,
         )
 
         assert batch_result.results == results
@@ -108,11 +105,7 @@ class TestParallelToolExecutor:
 
     def test_initialization(self, mock_execute_fn):
         """Test executor initialization."""
-        executor = ParallelToolExecutor(
-            execute_fn=mock_execute_fn,
-            max_workers=5,
-            enabled=False
-        )
+        executor = ParallelToolExecutor(execute_fn=mock_execute_fn, max_workers=5, enabled=False)
 
         assert executor.execute_fn == mock_execute_fn
         assert executor.max_workers == 5
@@ -164,9 +157,7 @@ class TestParallelToolExecutor:
         """Test executing a single parallel tool."""
         mock_execute_fn.return_value = {"success": True, "content": "test"}
 
-        tool_calls = [
-            ToolCall(id="1", name="read_file", arguments={"path": "test.txt"}, index=0)
-        ]
+        tool_calls = [ToolCall(id="1", name="read_file", arguments={"path": "test.txt"}, index=0)]
 
         batch_result = executor.execute_batch(tool_calls)
 
@@ -188,12 +179,19 @@ class TestParallelToolExecutor:
         mock_execute_fn.return_value = {"success": True}
 
         tool_calls = [
-            ToolCall(id="1", name="write_file", arguments={"path": "test.txt", "content": "test"}, index=0)  # noqa: E501
+            ToolCall(
+                id="1",
+                name="write_file",
+                arguments={"path": "test.txt", "content": "test"},
+                index=0,
+            )  # noqa: E501
         ]
 
         batch_result = executor.execute_batch(tool_calls)
 
-        mock_execute_fn.assert_called_once_with("write_file", {"path": "test.txt", "content": "test"})  # noqa: E501
+        mock_execute_fn.assert_called_once_with(
+            "write_file", {"path": "test.txt", "content": "test"}
+        )  # noqa: E501
 
         assert len(batch_result.results) == 1
         assert batch_result.parallel_count == 0
@@ -201,6 +199,7 @@ class TestParallelToolExecutor:
 
     def test_execute_batch_mixed_parallel_and_serial(self, executor, mock_execute_fn):
         """Test executing a mix of parallel and serial tools."""
+
         # Setup mock to return different results based on tool name
         def execute_side_effect(tool_name, args):
             if tool_name == "read_file":
@@ -215,7 +214,9 @@ class TestParallelToolExecutor:
         tool_calls = [
             ToolCall(id="1", name="read_file", arguments={"path": "a.txt"}, index=0),
             ToolCall(id="2", name="read_file", arguments={"path": "b.txt"}, index=1),
-            ToolCall(id="3", name="write_file", arguments={"path": "c.txt", "content": "test"}, index=2),  # noqa: E501
+            ToolCall(
+                id="3", name="write_file", arguments={"path": "c.txt", "content": "test"}, index=2
+            ),  # noqa: E501
             ToolCall(id="4", name="read_file", arguments={"path": "d.txt"}, index=3),
         ]
 
@@ -258,9 +259,7 @@ class TestParallelToolExecutor:
         """Test error handling during batch execution."""
         mock_execute_fn.side_effect = Exception("Test error")
 
-        tool_calls = [
-            ToolCall(id="1", name="read_file", arguments={"path": "test.txt"}, index=0)
-        ]
+        tool_calls = [ToolCall(id="1", name="read_file", arguments={"path": "test.txt"}, index=0)]
 
         batch_result = executor.execute_batch(tool_calls)
 
@@ -308,7 +307,7 @@ class TestParallelToolExecutor:
 
         assert executor._total_batches == 1
         assert executor._total_parallel == 1  # read_file
-        assert executor._total_serial == 1    # write_file
+        assert executor._total_serial == 1  # write_file
 
         # Execute second batch
         tool_calls2 = [
@@ -319,9 +318,9 @@ class TestParallelToolExecutor:
 
         assert executor._total_batches == 2
         assert executor._total_parallel == 3  # 1 + 2
-        assert executor._total_serial == 1    # unchanged
+        assert executor._total_serial == 1  # unchanged
 
-    @patch('cortex.core.parallel.ThreadPoolExecutor')
+    @patch("cortex.core.parallel.ThreadPoolExecutor")
     def test_thread_pool_creation(self, mock_executor_class, mock_execute_fn):
         """Test that thread pool is created lazily."""
         executor = ParallelToolExecutor(execute_fn=mock_execute_fn)
@@ -341,7 +340,7 @@ class TestParallelToolExecutor:
         """Test that executor can be shut down."""
         mock_execute_fn = Mock()
 
-        with patch('cortex.core.parallel.ThreadPoolExecutor') as mock_executor_class:
+        with patch("cortex.core.parallel.ThreadPoolExecutor") as mock_executor_class:
             mock_executor = Mock()
             mock_executor_class.return_value = mock_executor
 
@@ -379,8 +378,16 @@ class TestConstants:
     def test_parallelizable_tools_set(self):
         """Test that PARALLELIZABLE_TOOLS contains expected tools."""
         expected = {
-            "read_file", "grep", "glob", "list_files", "search_files",
-            "git_status", "git_diff", "git_log", "web_fetch", "web_search"
+            "read_file",
+            "grep",
+            "glob",
+            "list_files",
+            "search_files",
+            "git_status",
+            "git_diff",
+            "git_log",
+            "web_fetch",
+            "web_search",
         }
 
         assert PARALLELIZABLE_TOOLS == frozenset(expected)
@@ -390,10 +397,7 @@ class TestConstants:
 
     def test_serialized_tools_set(self):
         """Test that SERIALIZED_TOOLS contains expected tools."""
-        expected = {
-            "write_file", "edit", "execute_command",
-            "git_commit", "run_tests"
-        }
+        expected = {"write_file", "edit", "execute_command", "git_commit", "run_tests"}
 
         assert SERIALIZED_TOOLS == frozenset(expected)
 

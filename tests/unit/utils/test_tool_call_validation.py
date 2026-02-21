@@ -65,7 +65,7 @@ class TestNormalizeToolCallArguments:
     def test_valid_json_string_returned_as_is(self):
         """Test that valid JSON strings are returned unchanged."""
         assert normalize_tool_call_arguments('{"key": "value"}') == '{"key": "value"}'
-        assert normalize_tool_call_arguments('{}') == '{}'
+        assert normalize_tool_call_arguments("{}") == "{}"
         assert normalize_tool_call_arguments('{"a": 1, "b": true}') == '{"a": 1, "b": true}'
 
     def test_empty_string_returns_empty_object(self):
@@ -109,10 +109,7 @@ class TestValidateToolCallData:
         data = {
             "id": "call_123",
             "type": "function",
-            "function": {
-                "name": "read_file",
-                "arguments": '{"path": "test.txt"}'
-            }
+            "function": {"name": "read_file", "arguments": '{"path": "test.txt"}'},
         }
         result = validate_tool_call_data(data)
 
@@ -177,10 +174,7 @@ class TestValidateToolCallData:
         data = {
             "id": 12345,
             "type": "function",
-            "function": {
-                "name": "read_file",
-                "arguments": '{"path": "README.md"}'
-            }
+            "function": {"name": "read_file", "arguments": '{"path": "README.md"}'},
         }
         result = validate_tool_call_data(data)
         assert result["id"] == "12345"
@@ -192,10 +186,7 @@ class TestValidateToolCallData:
             "id": "call_1",
             "index": 0,
             "type": "function",
-            "function": {
-                "name": "edit",
-                "arguments": ""  # Often empty in first chunk
-            }
+            "function": {"name": "edit", "arguments": ""},  # Often empty in first chunk
         }
         result = validate_tool_call_data(data, index=0)
         assert result["id"] == "call_1"

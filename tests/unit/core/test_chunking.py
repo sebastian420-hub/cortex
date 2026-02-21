@@ -5,7 +5,12 @@ from pathlib import Path
 import tempfile
 import os
 
-from cortex.core.memory_chunked.chunk import EditChunk, ChunkType, create_file_chunk, create_source_code_chunk  # noqa: E501
+from cortex.core.memory_chunked.chunk import (
+    EditChunk,
+    ChunkType,
+    create_file_chunk,
+    create_source_code_chunk,
+)  # noqa: E501
 from cortex.core.memory_chunked.chunking import (
     FileChunker,
     ChunkingStrategy,
@@ -25,7 +30,7 @@ class TestEditChunk:
             content=content,
             chunk_type=ChunkType.SOURCE_CODE,
             parent_context="test.py",
-            metadata={"line_start": 1, "line_end": 3}
+            metadata={"line_start": 1, "line_end": 3},
         )
 
         assert chunk.content == content
@@ -37,10 +42,7 @@ class TestEditChunk:
 
     def test_update_chunk_content(self):
         """Test updating chunk content."""
-        chunk = EditChunk(
-            content="original",
-            chunk_type=ChunkType.FILE_CONTENT
-        )
+        chunk = EditChunk(content="original", chunk_type=ChunkType.FILE_CONTENT)
         original_hash = chunk.hash
 
         chunk.update_content("updated")
@@ -54,7 +56,7 @@ class TestEditChunk:
         chunk = EditChunk(
             content="test content",
             chunk_type=ChunkType.FILE_CONTENT,
-            metadata={"file_path": "test.txt"}
+            metadata={"file_path": "test.txt"},
         )
 
         message = chunk.to_message()
@@ -68,7 +70,7 @@ class TestEditChunk:
         chunk = EditChunk(
             content="x" * 1000,
             chunk_type=ChunkType.FILE_CONTENT,
-            metadata={"file_path": "large_file.txt"}
+            metadata={"file_path": "large_file.txt"},
         )
 
         summary = chunk.get_summary()
@@ -83,10 +85,7 @@ class TestFileChunker:
     def test_chunk_fixed_size(self):
         """Test fixed-size chunking."""
         content = "line1\nline2\nline3\n" * 100  # ~1500 chars
-        chunker = FileChunker(
-            max_chunk_size=500,
-            strategy=ChunkingStrategy.FIXED_SIZE
-        )
+        chunker = FileChunker(max_chunk_size=500, strategy=ChunkingStrategy.FIXED_SIZE)
 
         chunks = chunker.chunk_file(content, "test.txt")
 
@@ -181,11 +180,7 @@ class TestFactoryFunctions:
 
     def test_create_file_chunk(self):
         """Test create_file_chunk convenience function."""
-        chunk = create_file_chunk(
-            content="test content",
-            file_path="test.txt",
-            line_range=(1, 5)
-        )
+        chunk = create_file_chunk(content="test content", file_path="test.txt", line_range=(1, 5))
 
         assert chunk.chunk_type == ChunkType.FILE_CONTENT
         assert chunk.metadata["file_path"] == "test.txt"
@@ -199,7 +194,7 @@ class TestFactoryFunctions:
             file_path="test.py",
             language="python",
             function_name="test",
-            line_range=(1, 1)
+            line_range=(1, 1),
         )
 
         assert chunk.chunk_type == ChunkType.SOURCE_CODE

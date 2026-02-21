@@ -5,10 +5,7 @@ Unit tests for streaming response handling (cortex/core/streaming.py).
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
-from cortex.core.streaming import (
-    stream_model_response,
-    display_streaming_response
-)
+from cortex.core.streaming import stream_model_response, display_streaming_response
 
 
 class TestStreamModelResponse:
@@ -20,10 +17,7 @@ class TestStreamModelResponse:
         mock_provider.supports_streaming.return_value = True
 
         # Create mock stream
-        mock_stream = [
-            {"message": {"content": "Hello"}},
-            {"message": {"content": " world!"}}
-        ]
+        mock_stream = [{"message": {"content": "Hello"}}, {"message": {"content": " world!"}}]
         mock_provider.stream_chat.return_value = iter(mock_stream)
 
         messages = [{"role": "user", "content": "Hi"}]
@@ -35,9 +29,7 @@ class TestStreamModelResponse:
         # Verify provider was called correctly
         mock_provider.supports_streaming.assert_called_once()
         mock_provider.stream_chat.assert_called_once_with(
-            model="test-model",
-            messages=messages,
-            tools=tools
+            model="test-model", messages=messages, tools=tools
         )
 
         # Verify all chunks were yielded
@@ -141,17 +133,23 @@ class TestDisplayStreamingResponse:
         stream_chunks = [
             {
                 "message": {
-                    "tool_calls": [{"id": "call_1", "function": {"name": "read_file", "arguments": "{}"}}]  # noqa: E501
+                    "tool_calls": [
+                        {"id": "call_1", "function": {"name": "read_file", "arguments": "{}"}}
+                    ]  # noqa: E501
                 }
             },
             {
                 "message": {
-                    "tool_calls": [{"id": "call_1", "function": {"arguments": '{"path": "test.txt"}'}}]  # noqa: E501
+                    "tool_calls": [
+                        {"id": "call_1", "function": {"arguments": '{"path": "test.txt"}'}}
+                    ]  # noqa: E501
                 }
             },
             {
                 "message": {
-                    "tool_calls": [{"id": "call_2", "function": {"name": "write_file", "arguments": "{}"}}]  # noqa: E501
+                    "tool_calls": [
+                        {"id": "call_2", "function": {"name": "write_file", "arguments": "{}"}}
+                    ]  # noqa: E501
                 }
             },
         ]
@@ -194,7 +192,9 @@ class TestDisplayStreamingResponse:
 
     def test_display_streaming_response_no_content(self):
         """Test displaying response with no content (only tool calls)."""
-        stream_chunks = [{"message": {"tool_calls": [{"id": "call_1", "function": {"name": "test"}}]}}]  # noqa: E501
+        stream_chunks = [
+            {"message": {"tool_calls": [{"id": "call_1", "function": {"name": "test"}}]}}
+        ]  # noqa: E501
 
         with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(iter(stream_chunks))

@@ -6,13 +6,7 @@ from datetime import datetime
 from unittest.mock import Mock, patch
 import pytest
 
-from cortex.core.planning import (
-    PlanStepStatus,
-    PlanStepType,
-    PlanStep,
-    Plan,
-    PlanningEngine
-)
+from cortex.core.planning import PlanStepStatus, PlanStepType, PlanStep, Plan, PlanningEngine
 
 
 class TestPlanStepStatus:
@@ -53,7 +47,7 @@ class TestPlanStep:
             dependencies=["step_0"],
             expected_outcome="Configuration loaded",
             tool_name="read_file",
-            tool_arguments={"path": "config.yaml"}
+            tool_arguments={"path": "config.yaml"},
         )
 
         assert step.id == "step_1"
@@ -77,7 +71,7 @@ class TestPlanStep:
             tool_arguments={"path": "test.txt"},
             started_at="2024-01-01T00:00:00",
             completed_at="2024-01-01T00:00:05",
-            error=None
+            error=None,
         )
 
         data = step.to_dict()
@@ -103,7 +97,7 @@ class TestPlanStep:
             "expected_outcome": "File read",
             "tool_name": "read_file",
             "tool_arguments": {"path": "file.txt"},
-            "created_at": "2024-01-01T00:00:00"
+            "created_at": "2024-01-01T00:00:00",
         }
 
         step = PlanStep.from_dict(data)
@@ -140,7 +134,7 @@ class TestPlan:
         """Test creating a Plan."""
         steps = [
             PlanStep(id="step_1", description="First step"),
-            PlanStep(id="step_2", description="Second step")
+            PlanStep(id="step_2", description="Second step"),
         ]
 
         plan = Plan(
@@ -148,7 +142,7 @@ class TestPlan:
             goal="Test goal",
             steps=steps,
             status=PlanStepStatus.PENDING,
-            created_at="2024-01-01T00:00:00"
+            created_at="2024-01-01T00:00:00",
         )
 
         assert plan.id == "plan_123"
@@ -163,7 +157,7 @@ class TestPlan:
         """Test iterating over plan steps."""
         steps = [
             PlanStep(id="step_1", description="Step 1"),
-            PlanStep(id="step_2", description="Step 2")
+            PlanStep(id="step_2", description="Step 2"),
         ]
         plan = Plan(id="plan_1", goal="Test", steps=steps)
 
@@ -180,7 +174,7 @@ class TestPlan:
             status=PlanStepStatus.COMPLETED,
             created_at="2024-01-01T00:00:00",
             started_at="2024-01-01T00:00:01",
-            completed_at="2024-01-01T00:00:10"
+            completed_at="2024-01-01T00:00:10",
         )
 
         data = plan.to_dict()
@@ -205,10 +199,10 @@ class TestPlan:
                     "id": "step_1",
                     "description": "Step 1",
                     "step_type": "tool_call",
-                    "status": "pending"
+                    "status": "pending",
                 }
             ],
-            "created_at": "2024-01-01T00:00:00"
+            "created_at": "2024-01-01T00:00:00",
         }
 
         plan = Plan.from_dict(data)
@@ -223,7 +217,7 @@ class TestPlan:
         """Test retrieving a step by ID."""
         steps = [
             PlanStep(id="step_1", description="Step 1"),
-            PlanStep(id="step_2", description="Step 2")
+            PlanStep(id="step_2", description="Step 2"),
         ]
         plan = Plan(id="plan_1", goal="Test", steps=steps)
 
@@ -260,7 +254,7 @@ class TestPlanningEngine:
             project_dir="test_project",
             skill_loader=mock_skill_loader,
             tool_executor=mock_tool_executor,
-            reflection_callback=mock_reflection_callback
+            reflection_callback=mock_reflection_callback,
         )
 
     def test_initialization(self, mock_skill_loader, mock_tool_executor, mock_reflection_callback):
@@ -270,10 +264,10 @@ class TestPlanningEngine:
             skill_loader=mock_skill_loader,
             tool_executor=mock_tool_executor,
             reflection_callback=mock_reflection_callback,
-            max_plan_steps=50
+            max_plan_steps=50,
         )
 
-        assert engine.project_dir.name == 'test_project'
+        assert engine.project_dir.name == "test_project"
         assert engine.skill_loader == mock_skill_loader
         assert engine.tool_executor == mock_tool_executor
         assert engine.reflection_callback == mock_reflection_callback
@@ -302,13 +296,13 @@ class TestPlanningEngine:
             {
                 "description": "Custom step 1",
                 "tool_name": "read_file",
-                "tool_arguments": {"path": "test.py"}
+                "tool_arguments": {"path": "test.py"},
             },
             {
                 "description": "Custom step 2",
                 "dependencies": ["step_1"],
-                "expected_outcome": "Done"
-            }
+                "expected_outcome": "Done",
+            },
         ]
 
         plan = planning_engine.create_plan(goal, steps=steps)
@@ -335,7 +329,7 @@ class TestPlanningEngine:
             description="Read configuration",
             step_type=PlanStepType.TOOL_CALL,
             tool_name="read_file",
-            tool_arguments={"path": "config.yaml"}
+            tool_arguments={"path": "config.yaml"},
         )
 
         assert step is not None
@@ -367,9 +361,7 @@ class TestPlanningEngine:
 
         # Update status
         updated = planning_engine.update_step_status(
-            plan_id=plan.id,
-            step_id=step.id,
-            status=PlanStepStatus.IN_PROGRESS
+            plan_id=plan.id, step_id=step.id, status=PlanStepStatus.IN_PROGRESS
         )
 
         assert updated is True
@@ -380,7 +372,7 @@ class TestPlanningEngine:
             plan_id=plan.id,
             step_id=step.id,
             status=PlanStepStatus.FAILED,
-            error="Something went wrong"
+            error="Something went wrong",
         )
 
         assert step.status == PlanStepStatus.FAILED
@@ -390,10 +382,7 @@ class TestPlanningEngine:
         """Test executing a tool call step."""
         planning_engine = PlanningEngine(tool_executor=mock_tool_executor)
         # Setup
-        mock_tool_executor.return_value = {
-            "success": True,
-            "content": "File content"
-        }
+        mock_tool_executor.return_value = {"success": True, "content": "File content"}
 
         plan = planning_engine.create_plan("Test")
         step = planning_engine.add_step(
@@ -401,17 +390,14 @@ class TestPlanningEngine:
             "Read file",
             step_type=PlanStepType.TOOL_CALL,
             tool_name="read_file",
-            tool_arguments={"path": "test.txt"}
+            tool_arguments={"path": "test.txt"},
         )
 
         # Execute step
         result = planning_engine.execute_step(plan.id, step.id)
 
         # Verify tool executor was called
-        mock_tool_executor.assert_called_once_with(
-            "read_file",
-            {"path": "test.txt"}
-        )
+        mock_tool_executor.assert_called_once_with("read_file", {"path": "test.txt"})
 
         # Verify step status updated
         assert step.status == PlanStepStatus.COMPLETED
@@ -421,10 +407,7 @@ class TestPlanningEngine:
     def test_execute_step_with_error(self, mock_tool_executor):
         """Test executing a step that results in error."""
         planning_engine = PlanningEngine(tool_executor=mock_tool_executor)
-        mock_tool_executor.return_value = {
-            "success": False,
-            "error": "File not found"
-        }
+        mock_tool_executor.return_value = {"success": False, "error": "File not found"}
 
         plan = planning_engine.create_plan("Test")
         step = planning_engine.add_step(
@@ -432,7 +415,7 @@ class TestPlanningEngine:
             "Read file",
             step_type=PlanStepType.TOOL_CALL,
             tool_name="read_file",
-            tool_arguments={"path": "missing.txt"}
+            tool_arguments={"path": "missing.txt"},
         )
 
         result = planning_engine.execute_step(plan.id, step.id)
@@ -455,7 +438,7 @@ class TestPlanningEngine:
             "Step 1",
             step_type=PlanStepType.TOOL_CALL,
             tool_name="read_file",
-            tool_arguments={"path": "file1.txt"}
+            tool_arguments={"path": "file1.txt"},
         )
 
         step2 = planning_engine.add_step(
@@ -463,7 +446,7 @@ class TestPlanningEngine:
             "Step 2",
             step_type=PlanStepType.TOOL_CALL,
             tool_name="read_file",
-            tool_arguments={"path": "file2.txt"}
+            tool_arguments={"path": "file2.txt"},
         )
 
         # Execute plan
@@ -480,15 +463,12 @@ class TestPlanningEngine:
     def test_execute_plan_with_step_callback(self, mock_tool_executor):
         """Test that step_callback is triggered during execute_plan."""
         step_callback = Mock()
-        engine = PlanningEngine(
-            tool_executor=mock_tool_executor,
-            step_callback=step_callback
-        )
+        engine = PlanningEngine(tool_executor=mock_tool_executor, step_callback=step_callback)
         mock_tool_executor.return_value = {"success": True}
 
         steps = [
             {"description": "Step 1", "tool_name": "tool1"},
-            {"description": "Step 2", "tool_name": "tool2"}
+            {"description": "Step 2", "tool_name": "tool2"},
         ]
         plan = engine.create_plan("Test goal", steps=steps)
 
@@ -527,15 +507,14 @@ class TestPlanningEngine:
         """Test generating a plan from a goal description."""
         # This is a complex method that might use AI/LLM
         # We'll mock the internal generation
-        with patch.object(planning_engine, '_generate_plan_steps') as mock_generate:
+        with patch.object(planning_engine, "_generate_plan_steps") as mock_generate:
             mock_generate.return_value = [
                 PlanStep(id="gen_1", description="Generated step 1"),
-                PlanStep(id="gen_2", description="Generated step 2")
+                PlanStep(id="gen_2", description="Generated step 2"),
             ]
 
             plan = planning_engine.generate_plan_from_goal(
-                goal="Add logging",
-                context="Python application"
+                goal="Add logging", context="Python application"
             )
 
             assert plan is not None

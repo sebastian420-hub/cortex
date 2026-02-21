@@ -71,8 +71,10 @@ class TestOpenRouterProvider:
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message = MagicMock(role="assistant", content="Mocked OpenRouter response")  # noqa: E501
-        mock_response.choices[0].message.tool_calls = [] # No tool calls
+        mock_response.choices[0].message = MagicMock(
+            role="assistant", content="Mocked OpenRouter response"
+        )  # noqa: E501
+        mock_response.choices[0].message.tool_calls = []  # No tool calls
         mock_openai_client.chat.completions.create.return_value = mock_response
 
         messages = [{"role": "user", "content": "Hello"}]
@@ -80,9 +82,7 @@ class TestOpenRouterProvider:
         response = provider.chat("devstral-2512", messages, tools)
 
         mock_openai_client.chat.completions.create.assert_called_once_with(
-            model="devstral-2512",
-            messages=messages,
-            tools=tools
+            model="devstral-2512", messages=messages, tools=tools
         )
         assert response["message"]["role"] == "assistant"
         assert response["message"]["content"] == "Mocked OpenRouter response"
@@ -99,7 +99,9 @@ class TestOpenRouterProvider:
         mock_tool_call_obj.function.arguments = '{"param": "value"}'
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message = MagicMock(role="assistant", content=None, tool_calls=[mock_tool_call_obj])  # noqa: E501
+        mock_response.choices[0].message = MagicMock(
+            role="assistant", content=None, tool_calls=[mock_tool_call_obj]
+        )  # noqa: E501
         mock_openai_client.chat.completions.create.return_value = mock_response
 
         messages = [{"role": "user", "content": "Use tool"}]
@@ -135,12 +137,13 @@ class TestOpenRouterProvider:
         provider = OpenRouterProvider()
 
         mock_tool_call_delta = MagicMock(
-            function=MagicMock(),
-            id="call_stream_1", index=0, type="function"
+            function=MagicMock(), id="call_stream_1", index=0, type="function"
         )
         mock_tool_call_delta.function.name = "test_tool_stream"
         mock_tool_call_delta.function.arguments = '{"param": "value"}'
-        chunk_tool = MagicMock(choices=[MagicMock(delta=MagicMock(content=None, tool_calls=[mock_tool_call_delta]))])  # noqa: E501
+        chunk_tool = MagicMock(
+            choices=[MagicMock(delta=MagicMock(content=None, tool_calls=[mock_tool_call_delta]))]
+        )  # noqa: E501
         mock_openai_client.chat.completions.create.return_value = [chunk_tool]
 
         messages = [{"role": "user", "content": "Stream tool call"}]
@@ -150,7 +153,6 @@ class TestOpenRouterProvider:
         assert len(chunks) == 1
         assert "tool_calls" in chunks[0]["message"]
         assert chunks[0]["message"]["tool_calls"][0]["function"]["name"] == "test_tool_stream"
-
 
     def test_supports_streaming(self):
         """Test supports_streaming returns True."""
@@ -170,6 +172,7 @@ class TestOpenRouterProvider:
         os.environ["OPENROUTER_API_KEY"] = "test_api_key"
         provider = OpenRouterProvider()
         assert provider.validate_api_key() is True
+
 
 class TestProviderFactoryOpenRouter:
     @pytest.fixture(autouse=True)

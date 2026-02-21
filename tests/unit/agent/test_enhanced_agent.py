@@ -30,7 +30,7 @@ class TestEnhancedCortexInitialization:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL,
             enable_planning=True,
-            enable_layered_memory=True
+            enable_layered_memory=True,
         )
 
         assert agent.model == "llama3.2"
@@ -51,7 +51,7 @@ class TestEnhancedCortexInitialization:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL,
             enable_planning=False,
-            enable_layered_memory=True
+            enable_layered_memory=True,
         )
 
         assert agent.enable_planning is False
@@ -66,7 +66,7 @@ class TestEnhancedCortexInitialization:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL,
             enable_planning=True,
-            enable_layered_memory=False
+            enable_layered_memory=False,
         )
 
         assert agent.enable_planning is True
@@ -81,7 +81,7 @@ class TestEnhancedCortexInitialization:
         agent = EnhancedCortex(
             model="claude-3-5-sonnet",
             project_dir=str(tmp_project_dir),
-            permission_mode=PermissionMode.NORMAL
+            permission_mode=PermissionMode.NORMAL,
         )
 
         # Get system prompt from conversation
@@ -99,20 +99,20 @@ class TestEnhancedCortexInitialization:
         agent = EnhancedCortex(
             model="llama3.2",
             project_dir=str(tmp_project_dir),
-            permission_mode=PermissionMode.NORMAL
+            permission_mode=PermissionMode.NORMAL,
         )
 
         # Verify base agent methods are available
-        assert hasattr(agent, 'execute_tool')
-        assert hasattr(agent, 'clear_conversation')
-        assert hasattr(agent, 'get_conversation_history')
-        assert hasattr(agent, 'load_project_context')
+        assert hasattr(agent, "execute_tool")
+        assert hasattr(agent, "clear_conversation")
+        assert hasattr(agent, "get_conversation_history")
+        assert hasattr(agent, "load_project_context")
 
         # Verify enhanced methods are available
-        assert hasattr(agent, 'process_with_planning')
-        assert hasattr(agent, '_load_skill')
-        assert hasattr(agent, '_execute_tool_for_planning')
-        assert hasattr(agent, '_on_plan_reflection')
+        assert hasattr(agent, "process_with_planning")
+        assert hasattr(agent, "_load_skill")
+        assert hasattr(agent, "_execute_tool_for_planning")
+        assert hasattr(agent, "_on_plan_reflection")
 
 
 class TestEnhancedCortexPlanningSystem:
@@ -126,7 +126,7 @@ class TestEnhancedCortexPlanningSystem:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL,
             enable_planning=True,
-            enable_layered_memory=False
+            enable_layered_memory=False,
         )
 
     def test_planning_engine_initialization(self, planning_agent):
@@ -151,7 +151,7 @@ class TestEnhancedCortexPlanningSystem:
         """Test the _execute_tool_for_planning method."""
         # Mock the execute_tool method
         mock_result = {"success": True, "content": "test"}
-        with patch.object(planning_agent, 'execute_tool', return_value=mock_result) as mock_execute:
+        with patch.object(planning_agent, "execute_tool", return_value=mock_result) as mock_execute:
             result = planning_agent._execute_tool_for_planning("read_file", {"path": "test.txt"})
 
             mock_execute.assert_called_once_with("read_file", {"path": "test.txt"})
@@ -185,7 +185,7 @@ class TestEnhancedCortexLayeredMemory:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL,
             enable_planning=False,
-            enable_layered_memory=True
+            enable_layered_memory=True,
         )
 
     def test_enhanced_memory_bank_initialization(self, memory_agent):
@@ -218,18 +218,20 @@ class TestEnhancedCortexProcessing:
             project_dir=str(tmp_project_dir),
             permission_mode=PermissionMode.NORMAL,
             enable_planning=True,
-            enable_layered_memory=True
+            enable_layered_memory=True,
         )
 
     def test_process_with_planning_method_exists(self, enhanced_agent):
         """Test that process_with_planning method is available."""
-        assert hasattr(enhanced_agent, 'process_with_planning')
+        assert hasattr(enhanced_agent, "process_with_planning")
         assert callable(enhanced_agent.process_with_planning)
 
-    @patch('cortex.agent_enhanced.console')
-    @patch('cortex.agent_enhanced.stream_model_response')
-    @patch('cortex.agent_enhanced.display_streaming_response')
-    def test_process_with_planning_basic_flow(self, mock_display, mock_stream, mock_console, enhanced_agent):  # noqa: E501
+    @patch("cortex.agent_enhanced.console")
+    @patch("cortex.agent_enhanced.stream_model_response")
+    @patch("cortex.agent_enhanced.display_streaming_response")
+    def test_process_with_planning_basic_flow(
+        self, mock_display, mock_stream, mock_console, enhanced_agent
+    ):  # noqa: E501
         """Test basic flow of process_with_planning."""
         # Mock provider
         mock_provider = Mock()
@@ -237,13 +239,8 @@ class TestEnhancedCortexProcessing:
         enhanced_agent.provider = mock_provider
 
         # Mock model response without tool calls
-        mock_response = {
-            "message": {
-                "content": "I'll help you with that.",
-                "tool_calls": None
-            }
-        }
-        with patch.object(enhanced_agent, '_call_model', return_value=mock_response):
+        mock_response = {"message": {"content": "I'll help you with that.", "tool_calls": None}}
+        with patch.object(enhanced_agent, "_call_model", return_value=mock_response):
             # Mock hook manager
             mock_hook_manager = Mock()
             mock_hook_manager.dispatch.return_value.action = "CONTINUE"
@@ -275,12 +272,12 @@ class TestEnhancedCortexMetrics:
         agent = EnhancedCortex(
             model="llama3.2",
             project_dir=str(tmp_project_dir),
-            permission_mode=PermissionMode.NORMAL
+            permission_mode=PermissionMode.NORMAL,
         )
 
-        assert hasattr(agent, 'plans_generated')
-        assert hasattr(agent, 'plans_executed')
-        assert hasattr(agent, 'plans_completed')
+        assert hasattr(agent, "plans_generated")
+        assert hasattr(agent, "plans_executed")
+        assert hasattr(agent, "plans_completed")
 
         assert agent.plans_generated == 0
         assert agent.plans_executed == 0
@@ -293,11 +290,13 @@ class TestEnhancedCortexIntegration:
 
     def test_enhanced_agent_with_mocked_provider(self, tmp_project_dir, mock_ollama_provider):
         """Test enhanced agent integration with mocked provider."""
-        with patch('cortex.core.providers.ProviderFactory.get_provider', return_value=mock_ollama_provider):  # noqa: E501
+        with patch(
+            "cortex.core.providers.ProviderFactory.get_provider", return_value=mock_ollama_provider
+        ):  # noqa: E501
             agent = EnhancedCortex(
                 model="llama3.2",
                 project_dir=str(tmp_project_dir),
-                permission_mode=PermissionMode.NORMAL
+                permission_mode=PermissionMode.NORMAL,
             )
 
             assert agent.provider == mock_ollama_provider

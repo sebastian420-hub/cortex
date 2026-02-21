@@ -22,13 +22,13 @@ def test_ast_status():
     print(f"Tree-sitter installed: {status.get('tree_sitter_installed', False)}")
     print(f"Supported languages: {status.get('supported_languages', [])}")
 
-    if status.get('available', False):
+    if status.get("available", False):
         print("✓ AST parsing is available")
     else:
         print("✗ AST parsing is not available")
         print(f"Error: {status.get('error', 'Unknown error')}")
 
-    return status.get('available', False)
+    return status.get("available", False)
 
 
 def test_tool_registration():
@@ -42,7 +42,7 @@ def test_tool_registration():
     # Check for AST tools
     ast_tools = []
     for tool_name in registry.list_tools():
-        if tool_name.startswith('ast_'):
+        if tool_name.startswith("ast_"):
             ast_tools.append(tool_name)
 
     print(f"Found AST tools: {ast_tools}")
@@ -52,7 +52,9 @@ def test_tool_registration():
         for tool_name in ast_tools:
             schema = registry.get_schema(tool_name)
             if schema:
-                print(f"  - {tool_name}: {schema.get('function', {}).get('description', 'No description')}")  # noqa: E501
+                print(
+                    f"  - {tool_name}: {schema.get('function', {}).get('description', 'No description')}"
+                )  # noqa: E501
     else:
         print("✗ No AST tools found")
 
@@ -99,6 +101,7 @@ class Calculator:
 
         # Test language detection
         from cortex.code_ast.languages import detect_language
+
         language = detect_language(test_file)
         print(f"Detected language: {language}")
 
@@ -139,6 +142,7 @@ class Calculator:
     except Exception as e:
         print(f"✗ AST parsing test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
