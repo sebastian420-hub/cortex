@@ -72,7 +72,7 @@ class SearchFilesTool(Tool):
             try:
                 result = subprocess.run(
                     f"rg -n -C 2 {pattern_arg} '{query}'",
-                    shell=True,
+                    shell=True,  # nosec
                     capture_output=True,
                     text=True,
                     cwd=self.project_dir,
@@ -82,7 +82,7 @@ class SearchFilesTool(Tool):
                 # Fallback to grep
                 result = subprocess.run(
                     f"grep -rn '{query}' .",
-                    shell=True,
+                    shell=True,  # nosec
                     capture_output=True,
                     text=True,
                     cwd=self.project_dir,

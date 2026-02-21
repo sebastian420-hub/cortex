@@ -258,7 +258,7 @@ ASK_USER_TOOL_SCHEMA = {
     "type": "function",
     "function": {
         "name": "ask_user_question",
-        "description": "Ask the user structured questions with multiple choice options. Use this when you need to clarify requirements, get user preferences, or make decisions about implementation approach. Users can always select 'Other' to provide custom input.",
+        "description": "Ask the user structured questions with multiple choice options. Use this when you need to clarify requirements, get user preferences, or make decisions about implementation approach. Users can always select 'Other' to provide custom input.",  # noqa: E501
         "parameters": {
             "type": "object",
             "properties": {

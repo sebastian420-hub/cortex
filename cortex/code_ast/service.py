@@ -110,7 +110,7 @@ class ASTService:
         """Get hash of file contents for change detection."""
         try:
             content = file_path.read_bytes()
-            return hashlib.md5(content).hexdigest()
+            return hashlib.sha256(content).hexdigest()
         except Exception as e:
             logger.error(f"Failed to hash {file_path}: {e}")
             return ""

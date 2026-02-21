@@ -58,7 +58,7 @@ class WebFetchCache:
 
     def _get_key(self, url: str) -> str:
         """Generate cache key from URL."""
-        return hashlib.md5(url.encode()).hexdigest()
+        return hashlib.sha256(url.encode()).hexdigest()
 
     def get(self, url: str) -> Optional[Dict[str, Any]]:
         """Get cached content if not expired."""
@@ -179,7 +179,7 @@ class WebFetchTool(Tool):
                         "url": url,
                         "redirect_url": final_url,
                         "redirected": True,
-                        "message": f"Redirected to different host: {final_url}. Make a new request with this URL.",
+                        "message": f"Redirected to different host: {final_url}. Make a new request with this URL.",  # noqa: E501
                     }
                 )
 

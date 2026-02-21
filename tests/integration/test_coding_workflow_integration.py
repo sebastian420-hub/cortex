@@ -31,11 +31,11 @@ def mock_tools():
     tools = MagicMock()
 
     mock_read_file_instance = MagicMock()
-    mock_read_file_instance.execute.return_value = {"success": True, "content": "def foo():\n    pass\n"}
+    mock_read_file_instance.execute.return_value = {"success": True, "content": "def foo():\n    pass\n"}  # noqa: E501
     tools.read_file_tool_instance = mock_read_file_instance
 
     mock_edit_tool_instance = MagicMock()
-    mock_edit_tool_instance.execute.return_value = {"success": True, "message": "File edited.", "diff": "mock diff"}
+    mock_edit_tool_instance.execute.return_value = {"success": True, "message": "File edited.", "diff": "mock diff"}  # noqa: E501
     tools.edit_tool_instance = mock_edit_tool_instance
 
     mock_glob_tool_instance = MagicMock()
@@ -102,7 +102,7 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
                 "glob": mock_tools.glob_tool_instance,
                 "grep": mock_tools.grep_tool_instance,
                 "write_file": mock_tools.write_file_tool_instance,
-            }.get(tool_name) or MagicMock(execute=MagicMock(return_value={"success": False, "error": f"Mocked tool {tool_name} not found"}))
+            }.get(tool_name) or MagicMock(execute=MagicMock(return_value={"success": False, "error": f"Mocked tool {tool_name} not found"}))  # noqa: E501
 
             agent = Cortex(
                 model="mock-model",
@@ -116,10 +116,10 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
 
             # Assertions
             history = agent.get_conversation_history()
-            assert len(history) >= 5 # System + User + Agent (read) + Tool (read) + Agent (edit) + Tool (edit) + Agent (summary)
+            assert len(history) >= 5 # System + User + Agent (read) + Tool (read) + Agent (edit) + Tool (edit) + Agent (summary)  # noqa: E501
 
             # Verify read_file.execute was called
-            mock_tools.read_file_tool_instance.execute.assert_called_once_with(path=str(target_file))
+            mock_tools.read_file_tool_instance.execute.assert_called_once_with(path=str(target_file))  # noqa: E501
 
             # Verify edit.execute was called
             mock_tools.edit_tool_instance.execute.assert_called_once_with(
@@ -131,5 +131,5 @@ def test_refactor_workflow_integration(tmp_path, mock_llm_provider, mock_tools):
 
             # Verify the final agent message
             final_agent_message = history[-1]["content"]
-            assert "The `foo` function in `bar.py` has been refactored to `foo_refactored`." in final_agent_message
+            assert "The `foo` function in `bar.py` has been refactored to `foo_refactored`." in final_agent_message  # noqa: E501
 

@@ -189,7 +189,7 @@ class ConsolidatedDisplay:
         self._progress_tracker = OperationTracker(self.console)
         self._plan_display = PlanProgressDisplay(self.console)
 
-        # Threading - use RLock to prevent deadlock when update_operation_status is called from within track_operations
+        # Threading - use RLock to prevent deadlock when update_operation_status is called from within track_operations  # noqa: E501
         self._lock = threading.RLock()
 
         # Context stats for footer

@@ -164,4 +164,4 @@ class BaseHook(ABC):
         self.enabled = False
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(name={self.name!r}, priority={self.priority}, enabled={self.enabled})"
+        return f"{self.__class__.__name__}(name={self.name!r}, priority={self.priority}, enabled={self.enabled})"  # noqa: E501

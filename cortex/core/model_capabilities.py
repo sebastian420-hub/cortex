@@ -455,7 +455,7 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         supports_vision=True,
         supports_function_calling=True,
         recommended_temperature=0.3,
-        notes="Moonshot AI's native multimodal model. Uses native token-based tool format that requires special parsing.",
+        notes="Moonshot AI's native multimodal model. Uses native token-based tool format that requires special parsing.",  # noqa: E501
         exposes_thinking=True,
         thinking_field="reasoning_content",
     ),
@@ -471,7 +471,7 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         supports_vision=True,
         supports_function_calling=True,
         recommended_temperature=0.3,
-        notes="1T parameter MoE model with 32B active per forward pass. Native tool format requires special parsing.",
+        notes="1T parameter MoE model with 32B active per forward pass. Native tool format requires special parsing.",  # noqa: E501
         exposes_thinking=True,
         thinking_field="reasoning_content",
     ),

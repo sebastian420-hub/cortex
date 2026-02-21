@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from cortex.tools import create_tool_instance
 from cortex.models import PermissionMode
-from cortex.utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType
+from cortex.utils.errors import create_error_response, create_success_response, create_permission_denial, ErrorType  # noqa: E501
 from cortex.ui.console import console
 
 def test_error_format_consistency():
@@ -254,7 +254,7 @@ def test_error_recovery_suggestions():
 def test_error_timestamp_inclusion():
     """Test that errors include timestamp for debugging"""
     # Create error with context to include timestamp
-    error = create_error_response("Test error", ErrorType.EXECUTION, {"timestamp": "2026-01-13T03:53:00"})
+    error = create_error_response("Test error", ErrorType.EXECUTION, {"timestamp": "2026-01-13T03:53:00"})  # noqa: E501
 
     # Check that context is included when provided
     assert "error_context" in error
@@ -328,7 +328,7 @@ def test_error_retryable_flag():
     assert retryable_error["retryable"] is True
 
     # Test non-retryable error
-    non_retryable_error = create_error_response("Validation error", ErrorType.VALIDATION, retryable=False)
+    non_retryable_error = create_error_response("Validation error", ErrorType.VALIDATION, retryable=False)  # noqa: E501
     assert non_retryable_error["retryable"] is False
 
     # Test default (should be False)

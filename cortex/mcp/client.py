@@ -90,7 +90,7 @@ class MCPClient:
                 self._list_tools(server_name)
             else:
                 print(
-                    f"Warning: Unsupported transport type {server_config.transport} for server {server_name}"
+                    f"Warning: Unsupported transport type {server_config.transport} for server {server_name}"  # noqa: E501
                 )
 
         self.initialized = True
@@ -136,7 +136,7 @@ class MCPClient:
 
         if response.error:
             print(
-                f"Warning: Failed to list tools from MCP server {server_name}: {response.error.message}"
+                f"Warning: Failed to list tools from MCP server {server_name}: {response.error.message}"  # noqa: E501
             )
             return []
 

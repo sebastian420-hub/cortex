@@ -310,7 +310,7 @@ class TaskTool(Tool):
                     final_response = substantive[-1]  # Last substantive response
                     # Add earlier analysis if available
                     if len(substantive) > 1:
-                        final_response = f"## Analysis Summary\n{substantive[0][:500]}...\n\n## Final Result\n{final_response}"
+                        final_response = f"## Analysis Summary\n{substantive[0][:500]}...\n\n## Final Result\n{final_response}"  # noqa: E501
                 else:
                     final_response = all_content[-1] if all_content else ""
 

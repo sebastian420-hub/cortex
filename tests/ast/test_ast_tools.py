@@ -52,7 +52,7 @@ def test_tool_registration():
         for tool_name in ast_tools:
             schema = registry.get_schema(tool_name)
             if schema:
-                print(f"  - {tool_name}: {schema.get('function', {}).get('description', 'No description')}")
+                print(f"  - {tool_name}: {schema.get('function', {}).get('description', 'No description')}")  # noqa: E501
     else:
         print("✗ No AST tools found")
 

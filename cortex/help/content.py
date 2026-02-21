@@ -39,7 +39,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/help",
         short_desc="Show available commands",
-        long_desc="Display a list of all available commands and their descriptions. Use /help <topic> for detailed information about a specific topic.",
+        long_desc="Display a list of all available commands and their descriptions. Use /help <topic> for detailed information about a specific topic.",  # noqa: E501
         category=HelpCategory.SESSION,
         examples=["/help", "/help git", "/help search files"],
         keywords=["help", "commands", "usage", "documentation"],
@@ -48,7 +48,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/clear",
         short_desc="Clear conversation history",
-        long_desc="Clears all messages from the current conversation. The system prompt is preserved. Use /reset-context to preserve memory bank as well.",
+        long_desc="Clears all messages from the current conversation. The system prompt is preserved. Use /reset-context to preserve memory bank as well.",  # noqa: E501
         category=HelpCategory.SESSION,
         examples=["/clear"],
         related=["/reset-context", "/memory"],
@@ -58,7 +58,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/mode",
         short_desc="Change permission mode",
-        long_desc="Switch between permission modes:\n- normal: Ask for confirmation before file modifications\n- auto: Auto-approve all actions (dangerous!)\n- plan: Read-only mode for exploration",
+        long_desc="Switch between permission modes:\n- normal: Ask for confirmation before file modifications\n- auto: Auto-approve all actions (dangerous!)\n- plan: Read-only mode for exploration",  # noqa: E501
         category=HelpCategory.SESSION,
         examples=["/mode normal", "/mode auto", "/mode plan", "/mode"],
         keywords=["mode", "permission", "auto", "plan", "normal", "approve"],
@@ -67,7 +67,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/project",
         short_desc="Show project information",
-        long_desc="Display current project details including path, permission mode, model being used, session duration, and token usage.",
+        long_desc="Display current project details including path, permission mode, model being used, session duration, and token usage.",  # noqa: E501
         category=HelpCategory.SESSION,
         examples=["/project"],
         keywords=["project", "info", "status", "tokens"],
@@ -76,7 +76,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/save",
         short_desc="Save current session",
-        long_desc="Save the current conversation session to a file. Sessions can be loaded later to continue work. If no name is provided, a timestamp-based name is used.",
+        long_desc="Save the current conversation session to a file. Sessions can be loaded later to continue work. If no name is provided, a timestamp-based name is used.",  # noqa: E501
         category=HelpCategory.SESSION,
         examples=["/save", "/save myproject", "/save feature-auth"],
         related=["/load", "/sessions"],
@@ -86,7 +86,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/load",
         short_desc="Load a saved session",
-        long_desc="Load a previously saved session to continue work. Use /sessions to see available sessions.",
+        long_desc="Load a previously saved session to continue work. Use /sessions to see available sessions.",  # noqa: E501
         category=HelpCategory.SESSION,
         examples=["/load myproject", "/load feature-auth"],
         related=["/save", "/sessions"],
@@ -116,7 +116,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/summary",
         short_desc="Show conversation summary",
-        long_desc="Display a summary of the current conversation, highlighting key topics discussed and actions taken.",
+        long_desc="Display a summary of the current conversation, highlighting key topics discussed and actions taken.",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/summary"],
         related=["/stats", "/memory"],
@@ -126,7 +126,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/plan",
         short_desc="Enter planning mode",
-        long_desc="Switch to read-only planning mode for exploring code without making changes. Useful for analyzing code before modifications.",
+        long_desc="Switch to read-only planning mode for exploring code without making changes. Useful for analyzing code before modifications.",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/plan"],
         related=["/mode"],
@@ -136,7 +136,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/reset-context",
         short_desc="Clear history, keep memory",
-        long_desc="Clear the conversation history but preserve the memory bank. Useful for starting fresh while retaining learned information about the project.",
+        long_desc="Clear the conversation history but preserve the memory bank. Useful for starting fresh while retaining learned information about the project.",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/reset-context"],
         related=["/clear", "/memory"],
@@ -146,7 +146,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/focus",
         short_desc="Focus on a directory",
-        long_desc="Tell the agent to prioritize a specific directory for future searches and operations. Helpful for large projects.",
+        long_desc="Tell the agent to prioritize a specific directory for future searches and operations. Helpful for large projects.",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/focus src/components", "/focus backend/api"],
         keywords=["focus", "directory", "prioritize", "scope"],
@@ -155,7 +155,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/memory",
         short_desc="Show memory bank",
-        long_desc="Display the contents of the memory bank, which stores facts and context learned during the session.",
+        long_desc="Display the contents of the memory bank, which stores facts and context learned during the session.",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/memory"],
         related=["/stats", "/summary"],
@@ -165,7 +165,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/stats",
         short_desc="Show session statistics",
-        long_desc="Display detailed statistics about the current session including message counts, token usage, tools used, and context management info.",
+        long_desc="Display detailed statistics about the current session including message counts, token usage, tools used, and context management info.",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/stats"],
         related=["/project", "/memory"],
@@ -176,7 +176,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/thinking",
         short_desc="Toggle thinking display",
-        long_desc="Toggle the display of the model's thinking/reasoning process. Some models like DeepSeek-R1 expose their reasoning steps.",
+        long_desc="Toggle the display of the model's thinking/reasoning process. Some models like DeepSeek-R1 expose their reasoning steps.",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/thinking", "/thinking on", "/thinking off"],
         keywords=["thinking", "reasoning", "display", "toggle"],
@@ -185,7 +185,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/storage",
         short_desc="Show storage statistics",
-        long_desc="Display storage statistics for saved sessions, including total size and count limits.",
+        long_desc="Display storage statistics for saved sessions, including total size and count limits.",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/storage"],
         related=["/cleanup", "/sessions"],
@@ -195,7 +195,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/cleanup",
         short_desc="Clean up old sessions",
-        long_desc="Remove old sessions based on age, count, and size limits configured in settings.",
+        long_desc="Remove old sessions based on age, count, and size limits configured in settings.",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/cleanup"],
         related=["/storage", "/sessions"],
@@ -205,7 +205,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/cache",
         short_desc="Show or clear file cache",
-        long_desc="Display file cache statistics including hit rate and memory usage. Use '/cache clear' to clear the cache.",
+        long_desc="Display file cache statistics including hit rate and memory usage. Use '/cache clear' to clear the cache.",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/cache", "/cache clear"],
         keywords=["cache", "memory", "performance", "clear"],
@@ -214,7 +214,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/rollback",
         short_desc="Rollback file changes",
-        long_desc="Rollback the current transaction, restoring all modified files to their original state. Works with active transactions only.",
+        long_desc="Rollback the current transaction, restoring all modified files to their original state. Works with active transactions only.",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/rollback"],
         related=["/transactions"],
@@ -224,7 +224,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="/transactions",
         short_desc="Show transaction info",
-        long_desc="Display transaction statistics including active transaction status, history count, and backup directory.",
+        long_desc="Display transaction statistics including active transaction status, history count, and backup directory.",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/transactions"],
         related=["/rollback"],
@@ -235,7 +235,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="read file",
         short_desc="Read file contents",
-        long_desc="Ask the agent to read a file. It will display the contents with syntax highlighting.",
+        long_desc="Ask the agent to read a file. It will display the contents with syntax highlighting.",  # noqa: E501
         category=HelpCategory.FILE,
         examples=["Read the file src/main.py", "Show me config.yaml", "What's in package.json?"],
         keywords=["read", "file", "show", "display", "contents"],
@@ -244,7 +244,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="write file",
         short_desc="Create or modify files",
-        long_desc="Ask the agent to create a new file or modify an existing one. The agent will show you the changes before applying.",
+        long_desc="Ask the agent to create a new file or modify an existing one. The agent will show you the changes before applying.",  # noqa: E501
         category=HelpCategory.FILE,
         examples=[
             "Create a new file called utils.py",
@@ -257,7 +257,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="edit file",
         short_desc="Make precise edits",
-        long_desc="Make surgical edits to files by replacing specific strings. More precise than full file writes.",
+        long_desc="Make surgical edits to files by replacing specific strings. More precise than full file writes.",  # noqa: E501
         category=HelpCategory.FILE,
         examples=[
             "Change the function name from foo to bar",
@@ -271,7 +271,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="search files",
         short_desc="Search for patterns",
-        long_desc="Search for text patterns across files using regex. Find definitions, usages, or any text patterns.",
+        long_desc="Search for text patterns across files using regex. Find definitions, usages, or any text patterns.",  # noqa: E501
         category=HelpCategory.SEARCH,
         examples=[
             "Search for 'class User'",
@@ -284,7 +284,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="list files",
         short_desc="List project files",
-        long_desc="List files in a directory or find files matching patterns. Useful for exploring project structure.",
+        long_desc="List files in a directory or find files matching patterns. Useful for exploring project structure.",  # noqa: E501
         category=HelpCategory.SEARCH,
         examples=[
             "List all Python files",
@@ -307,7 +307,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="git diff",
         short_desc="Show changes",
-        long_desc="Show the diff of changes for files. Can show all changes or changes to a specific file.",
+        long_desc="Show the diff of changes for files. Can show all changes or changes to a specific file.",  # noqa: E501
         category=HelpCategory.GIT,
         examples=["Show the diff", "What changed in main.py?", "Show me what I modified"],
         keywords=["git", "diff", "changes", "compare"],
@@ -316,7 +316,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="git commit",
         short_desc="Commit changes",
-        long_desc="Commit staged changes with a message. The agent can help write a good commit message.",
+        long_desc="Commit staged changes with a message. The agent can help write a good commit message.",  # noqa: E501
         category=HelpCategory.GIT,
         examples=[
             "Commit these changes",
@@ -350,7 +350,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="web fetch",
         short_desc="Fetch web content",
-        long_desc="Fetch content from a URL and convert it to readable markdown. Useful for reading documentation.",
+        long_desc="Fetch content from a URL and convert it to readable markdown. Useful for reading documentation.",  # noqa: E501
         category=HelpCategory.WEB,
         examples=[
             "Fetch the React docs for hooks",
@@ -363,7 +363,7 @@ HELP_ENTRIES: List[HelpEntry] = [
     HelpEntry(
         command="web search",
         short_desc="Search the web",
-        long_desc="Search the web for information using DuckDuckGo. Returns titles, URLs, and snippets.",
+        long_desc="Search the web for information using DuckDuckGo. Returns titles, URLs, and snippets.",  # noqa: E501
         category=HelpCategory.WEB,
         examples=[
             "Search for Python async best practices",
@@ -407,7 +407,7 @@ HELP_ENTRIES: List[HelpEntry] = [
 - `git_checkout(branch="feat/new-thing")` - Switch branches
 - `git_push(remote="origin", branch="main")` - Push to remote
 
-Use tools efficiently: Start with search (glob/grep) before reading, use edit for small changes, write_file for large changes.""",
+Use tools efficiently: Start with search (glob/grep) before reading, use edit for small changes, write_file for large changes.""",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=[
             "What tools are available?",

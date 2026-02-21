@@ -372,7 +372,7 @@ class PromptBuilder:
         mode_instruction = {
             "NORMAL": "Ask for user approval before making changes.",
             "AUTO_APPROVE": "You can make changes without asking. Be careful!",
-            "PLAN": "You are in PLAN MODE - read-only. Do not write files or execute commands. Only analyze and create plans.",
+            "PLAN": "You are in PLAN MODE - read-only. Do not write files or execute commands. Only analyze and create plans.",  # noqa: E501
         }.get(permission_mode.upper(), "Follow safety protocols.")
 
         if self.profile.prompt_style == PromptStyle.EXPLICIT:
@@ -408,7 +408,7 @@ Key behaviors:
         else:  # DETAILED
             core_prompt = f"""# Cortex AI Assistant
 
-You are Cortex, a highly capable AI assistant specialized in software development and coding tasks. You have access to a comprehensive set of tools for file operations, code search, command execution, and more.
+You are Cortex, a highly capable AI assistant specialized in software development and coding tasks. You have access to a comprehensive set of tools for file operations, code search, command execution, and more.  # noqa: E501
 Project directory: {self.project_dir}
 
 Permission Mode: {permission_mode.upper()}
@@ -439,7 +439,7 @@ Permission Mode: {permission_mode.upper()}
 Today's date: {self.current_date}
 Knowledge cutoff: {self.knowledge_cutoff}
 
-For events after the cutoff, use reasoning based on prior patterns. When uncertain, state it clearly."""
+For events after the cutoff, use reasoning based on prior patterns. When uncertain, state it clearly."""  # noqa: E501
 
                 core_prompt += date_section
 
@@ -460,13 +460,13 @@ For events after the cutoff, use reasoning based on prior patterns. When uncerta
 When exploring a new codebase, build understanding systematically:
 
 ## Phase 1: Structure Discovery
-Use `glob(pattern="**/*.py")` (or similar) to map all source files. Identify entry points, core packages, and test locations.
+Use `glob(pattern="**/*.py")` (or similar) to map all source files. Identify entry points, core packages, and test locations.  # noqa: E501
 
 ## Phase 2: Architecture Understanding
-Use `grep` to find top-level class and function definitions. Build a mental map of how data flows from entry points to utilities.
+Use `grep` to find top-level class and function definitions. Build a mental map of how data flows from entry points to utilities.  # noqa: E501
 
 ## Phase 3: Targeted Deep Dives
-Only read files when you have a specific reason. Track what you've read to avoid re-reading. Use `files_with_matches` mode in grep for breadth first."""
+Only read files when you have a specific reason. Track what you've read to avoid re-reading. Use `files_with_matches` mode in grep for breadth first."""  # noqa: E501
 
     def _build_tool_guide(self) -> str:
         """Build tool usage guide section."""
@@ -581,7 +581,7 @@ Skip planning for simple, single-step tasks."""
         else:  # DETAILED
             return """# Planning System
 
-You have access to a powerful structured planning engine for managing complex, multi-step engineering tasks systematically.
+You have access to a powerful structured planning engine for managing complex, multi-step engineering tasks systematically.  # noqa: E501
 
 ## When to Use Planning
 
@@ -591,26 +591,26 @@ You have access to a powerful structured planning engine for managing complex, m
 - You want to maintain high autonomy and ensure all results are reported back turn-by-turn.
 
 **RULES FOR COMPLEX TASKS:**
-1. **NO MANUAL TOOL CALLS**: For tasks with 4+ steps, do NOT call `glob`, `grep`, or `read_file` manually in parallel. Instead, define them as steps in a plan.
-2. **ACTIVE PLAN CONSTRAINT**: If a plan is currently ACTIVE (in_progress), you are FORBIDDEN from using manual tools. You MUST use `execute_plan` to continue the workflow or `update_plan` to adjust it.
-3. **USE ATOMIC EXECUTION**: Prefer `create_and_execute_plan` over manual `create_plan` + `execute_plan` sequences.
-4. **MAINTAIN CONTEXT**: The engine will report results back to your history after each step executes.
+1. **NO MANUAL TOOL CALLS**: For tasks with 4+ steps, do NOT call `glob`, `grep`, or `read_file` manually in parallel. Instead, define them as steps in a plan.  # noqa: E501
+2. **ACTIVE PLAN CONSTRAINT**: If a plan is currently ACTIVE (in_progress), you are FORBIDDEN from using manual tools. You MUST use `execute_plan` to continue the workflow or `update_plan` to adjust it.  # noqa: E501
+3. **USE ATOMIC EXECUTION**: Prefer `create_and_execute_plan` over manual `create_plan` + `execute_plan` sequences.  # noqa: E501
+4. **MAINTAIN CONTEXT**: The engine will report results back to your history after each step executes.  # noqa: E501
 
 **Planning Tools:**
-- `create_and_execute_plan`: (PREFERRED) Atomic creation and execution. Use this to start a multi-step workflow immediately.
+- `create_and_execute_plan`: (PREFERRED) Atomic creation and execution. Use this to start a multi-step workflow immediately.  # noqa: E501
 - `create_plan`: Create a structured plan for manual review (Advanced use only).
 - `execute_plan`: Run a previously created plan.
 - `monitor_plan`: Check status of an active plan.
 - `update_plan`: Modify or add steps if the plan needs adjustment.
 
 **How to Create a Plan:**
-When calling `create_and_execute_plan`, ALWAYS provide a concrete `steps` list. Each step should include:
+When calling `create_and_execute_plan`, ALWAYS provide a concrete `steps` list. Each step should include:  # noqa: E501
 - `description`: Clear action (e.g., 'Extract auth logic from agent.py')
 - `tool_name`: The specific tool for the step (e.g., 'read_file', 'edit')
 - `tool_arguments`: The arguments for that tool.
 - `dependencies`: (Optional) List of step IDs that must complete first.
 
-**Note on todo_write:** Use `todo_write` ONLY for simple progress tracking of 2-3 basic manual steps. For anything involving coordinated codebase changes, you MUST use `create_and_execute_plan`."""
+**Note on todo_write:** Use `todo_write` ONLY for simple progress tracking of 2-3 basic manual steps. For anything involving coordinated codebase changes, you MUST use `create_and_execute_plan`."""  # noqa: E501
 
     def _build_memory_section(self, memory_bank_context: Optional[str]) -> str:
         """Build memory system guidance section."""
@@ -657,7 +657,7 @@ For complex operations (planning, commands, multiple edits), you MUST use this J
 }
 ```
 
-**Note**: For simple questions or direct information where no tools are needed, you may respond with plain Markdown text.
+**Note**: For simple questions or direct information where no tools are needed, you may respond with plain Markdown text.  # noqa: E501
 """
 
     def _build_model_adaptation(self) -> str:

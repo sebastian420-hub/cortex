@@ -88,7 +88,7 @@ class TestRedisCache:
         })
         # Cache may be disabled or may have fallen back to local cache
         # which is enabled by default
-        assert cache.enabled is False or hasattr(cache, '_local_cache') or not hasattr(cache, 'redis_connected')
+        assert cache.enabled is False or hasattr(cache, '_local_cache') or not hasattr(cache, 'redis_connected')  # noqa: E501
 
     @pytest.mark.skipif(not REDIS_AVAILABLE, reason="Redis not installed")
     def test_redis_cache_get_set(self):

@@ -77,7 +77,7 @@ class DelegateToModelTool(Tool):
             remaining = self.delegation_tracker.get_remaining()
             return {
                 "success": False,
-                "error": f"Maximum delegations reached ({self.delegation_tracker.max_delegations}). "
+                "error": f"Maximum delegations reached ({self.delegation_tracker.max_delegations}). "  # noqa: E501
                 f"You must complete this task yourself.",
                 "action": "none",
                 "remaining_delegations": remaining,

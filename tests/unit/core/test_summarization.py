@@ -148,13 +148,13 @@ class TestSimpleSummarizer:
     def test_should_summarize(self, summarizer):
         """Test should_summarize method."""
         # Below threshold
-        assert summarizer.should_summarize([], current_tokens=400, max_tokens=1000, threshold=0.5) is False
+        assert summarizer.should_summarize([], current_tokens=400, max_tokens=1000, threshold=0.5) is False  # noqa: E501
 
         # At threshold
-        assert summarizer.should_summarize([], current_tokens=500, max_tokens=1000, threshold=0.5) is False
+        assert summarizer.should_summarize([], current_tokens=500, max_tokens=1000, threshold=0.5) is False  # noqa: E501
 
         # Above threshold
-        assert summarizer.should_summarize([], current_tokens=600, max_tokens=1000, threshold=0.5) is True
+        assert summarizer.should_summarize([], current_tokens=600, max_tokens=1000, threshold=0.5) is True  # noqa: E501
 
         # Default threshold
         assert summarizer.should_summarize([], current_tokens=850, max_tokens=1000) is True
@@ -260,7 +260,7 @@ class TestSimpleSummarizer:
 
     def test_extract_decisions(self, summarizer):
         """Test decision extraction from content."""
-        content = "I'll add logging to the main module. Let me check the existing code first. I decided to use the logging module."
+        content = "I'll add logging to the main module. Let me check the existing code first. I decided to use the logging module."  # noqa: E501
 
         decisions = summarizer._extract_decisions(content)
 
@@ -350,7 +350,7 @@ class TestLLMSummarizer:
         """Test formatting messages for summary prompt."""
         messages = [
             {"role": "user", "content": "Short message"},
-            {"role": "assistant", "content": "This is a longer message that might get truncated if it exceeds certain length limits."},
+            {"role": "assistant", "content": "This is a longer message that might get truncated if it exceeds certain length limits."},  # noqa: E501
             {"role": "tool", "content": json.dumps({"success": True, "result": "data"})}
         ]
 

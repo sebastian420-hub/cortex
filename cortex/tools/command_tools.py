@@ -107,7 +107,7 @@ class ExecuteCommandTool(Tool):
             timeout = self.get_timeout()
             result = subprocess.run(
                 command,
-                shell=True,
+                shell=True,  # nosec
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir,
@@ -144,7 +144,7 @@ class ExecuteCommandTool(Tool):
                     else:
                         # Minimal mode - simple but clear output
                         self.console.print(
-                            f"[red]? Failed (exit code {result.returncode}):[/red]\n{output.strip()}"
+                            f"[red]? Failed (exit code {result.returncode}):[/red]\n{output.strip()}"  # noqa: E501
                         )
 
             if result.returncode == 0:

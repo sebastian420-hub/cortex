@@ -35,7 +35,7 @@ def test_git_checkout_tool(git_repo):
     assert result["success"]
 
     # Check if the branch was created
-    branches_result = subprocess.run(["git", "branch"], cwd=git_repo, capture_output=True, text=True, check=True)
+    branches_result = subprocess.run(["git", "branch"], cwd=git_repo, capture_output=True, text=True, check=True)  # noqa: E501
     assert "new_feature" in branches_result.stdout
 
     # Test switching to the new branch
@@ -55,7 +55,7 @@ def test_git_reset_tool(git_repo):
     subprocess.run(["git", "add", "file2.txt"], cwd=git_repo, check=True)
 
     # Verify file2.txt is staged
-    status_before_reset = subprocess.run(["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True)
+    status_before_reset = subprocess.run(["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True)  # noqa: E501
     assert "Changes to be committed" in status_before_reset.stdout
     assert "file2.txt" in status_before_reset.stdout
 
@@ -64,7 +64,7 @@ def test_git_reset_tool(git_repo):
     assert result["success"]
 
     # Check if the file is unstaged
-    status_after_reset = subprocess.run(["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True)
+    status_after_reset = subprocess.run(["git", "status"], cwd=git_repo, capture_output=True, text=True, check=True)  # noqa: E501
     assert "Changes not staged for commit" in status_after_reset.stdout
     assert "file2.txt" in status_after_reset.stdout
     assert "Changes to be committed" not in status_after_reset.stdout

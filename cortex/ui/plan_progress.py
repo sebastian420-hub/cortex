@@ -78,7 +78,7 @@ class PlanProgressDisplay:
         steps_branch = tree.add(f"[bold]Steps ({len(plan.steps)})[/bold]")
         for i, step in enumerate(plan.steps, 1):
             icon, color = self.STATUS_STYLES.get(step.status.value, ("?", "white"))
-            step_text = f"[{color}]{icon}[/{color}] {i}. {step.description[:50]}{'...' if len(step.description) > 50 else ''}"
+            step_text = f"[{color}]{icon}[/{color}] {i}. {step.description[:50]}{'...' if len(step.description) > 50 else ''}"  # noqa: E501
             step_node = steps_branch.add(step_text)
 
             # Add step details if present

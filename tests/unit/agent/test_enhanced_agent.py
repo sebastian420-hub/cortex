@@ -229,7 +229,7 @@ class TestEnhancedCortexProcessing:
     @patch('cortex.agent_enhanced.console')
     @patch('cortex.agent_enhanced.stream_model_response')
     @patch('cortex.agent_enhanced.display_streaming_response')
-    def test_process_with_planning_basic_flow(self, mock_display, mock_stream, mock_console, enhanced_agent):
+    def test_process_with_planning_basic_flow(self, mock_display, mock_stream, mock_console, enhanced_agent):  # noqa: E501
         """Test basic flow of process_with_planning."""
         # Mock provider
         mock_provider = Mock()
@@ -293,7 +293,7 @@ class TestEnhancedCortexIntegration:
 
     def test_enhanced_agent_with_mocked_provider(self, tmp_project_dir, mock_ollama_provider):
         """Test enhanced agent integration with mocked provider."""
-        with patch('cortex.core.providers.ProviderFactory.get_provider', return_value=mock_ollama_provider):
+        with patch('cortex.core.providers.ProviderFactory.get_provider', return_value=mock_ollama_provider):  # noqa: E501
             agent = EnhancedCortex(
                 model="llama3.2",
                 project_dir=str(tmp_project_dir),

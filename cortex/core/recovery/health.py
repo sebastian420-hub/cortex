@@ -336,7 +336,7 @@ class SessionHealthMonitor:
             issues.append(
                 {
                     "type": "excessive_length",
-                    "message": f"Conversation has {len(conversation_history)} messages - may impact performance",
+                    "message": f"Conversation has {len(conversation_history)} messages - may impact performance",  # noqa: E501
                     "severity": "medium",
                 }
             )

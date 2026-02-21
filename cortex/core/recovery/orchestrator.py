@@ -252,7 +252,7 @@ class RecoveryOrchestrator:
 
             return RecoveryAction(
                 strategy=strategy,
-                message=f"Rollback to checkpoint from {checkpoint.timestamp.strftime('%H:%M:%S') if checkpoint else 'unknown'}",
+                message=f"Rollback to checkpoint from {checkpoint.timestamp.strftime('%H:%M:%S') if checkpoint else 'unknown'}",  # noqa: E501
                 confidence=confidence,
                 requires_user_confirmation=True,
                 suggested_checkpoint=checkpoint,
@@ -406,7 +406,7 @@ class RecoveryOrchestrator:
 
         return {
             "success": True,
-            "message": f"Manual repair prepared - {len(repairable)} auto-fixable, {len(manual)} manual issues",
+            "message": f"Manual repair prepared - {len(repairable)} auto-fixable, {len(manual)} manual issues",  # noqa: E501
             "new_history": conversation_history,  # No changes made
             "repair_suggestions": suggestions,
         }

@@ -68,7 +68,7 @@ class CreatePlanTool(Tool):
             )
 
         # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
@@ -158,7 +158,7 @@ class ExecutePlanTool(Tool):
             )
 
         # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
@@ -269,7 +269,7 @@ class MonitorPlanTool(Tool):
             )
 
         # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
@@ -339,7 +339,7 @@ class MonitorPlanTool(Tool):
                 completion_pct = progress.get("completion_percentage", 0)
                 status_color = "green" if plan.status == PlanStepStatus.COMPLETED else \
                               "yellow" if plan.status == PlanStepStatus.IN_PROGRESS else "dim"
-                self.console.print(f"[{status_color}]Plan status: {plan.status.value} ({completion_pct:.1f}%)[/{status_color}]")
+                self.console.print(f"[{status_color}]Plan status: {plan.status.value} ({completion_pct:.1f}%)[/{status_color}]")  # noqa: E501
 
             return create_success_response(result)
 
@@ -400,7 +400,7 @@ class UpdatePlanTool(Tool):
             )
 
         # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
@@ -569,7 +569,7 @@ class CreateAndExecutePlanTool(Tool):
             self.console.print(f"[cyan]🚀 Creating and executing plan for goal:[/cyan] {goal}")
 
         # Check if we have access to planning engine
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
@@ -642,7 +642,7 @@ CREATE_PLAN_SCHEMA = {
                 "constraints": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Constraints to consider (e.g., 'Must work with existing tests')",
+                    "description": "Constraints to consider (e.g., 'Must work with existing tests')",  # noqa: E501
                 },
                 "assumptions": {
                     "type": "array",
@@ -652,7 +652,7 @@ CREATE_PLAN_SCHEMA = {
                 "skill_hints": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Suggested skills to apply (e.g., ['authentication', 'testing'])",
+                    "description": "Suggested skills to apply (e.g., ['authentication', 'testing'])",  # noqa: E501
                 },
                 "context": {
                     "type": "object",
@@ -661,7 +661,7 @@ CREATE_PLAN_SCHEMA = {
                 },
                 "steps": {
                     "type": "array",
-                    "description": "List of concrete steps for the plan. Each step should be actionable.",
+                    "description": "List of concrete steps for the plan. Each step should be actionable.",  # noqa: E501
                     "items": {
                         "type": "object",
                         "properties": {
@@ -671,7 +671,7 @@ CREATE_PLAN_SCHEMA = {
                             },
                             "step_type": {
                                 "type": "string",
-                                "enum": ["tool_call", "subtask", "decision", "checkpoint", "reflection", "skill_application"],
+                                "enum": ["tool_call", "subtask", "decision", "checkpoint", "reflection", "skill_application"],  # noqa: E501
                                 "description": "The type of step (default: 'tool_call')",
                             },
                             "dependencies": {
@@ -685,7 +685,7 @@ CREATE_PLAN_SCHEMA = {
                             },
                             "tool_name": {
                                 "type": "string",
-                                "description": "The tool to use for 'tool_call' steps (e.g., 'read_file')",
+                                "description": "The tool to use for 'tool_call' steps (e.g., 'read_file')",  # noqa: E501
                             },
                             "tool_arguments": {
                                 "type": "object",
@@ -715,8 +715,8 @@ CREATE_AND_EXECUTE_PLAN_SCHEMA = {
     "function": {
         "name": "create_and_execute_plan",
         "description": (
-            "The MOST POWERFUL planning tool. Atomic: Creates a plan AND starts execution immediately. "
-            "Use this for complex tasks (4+ steps) to maintain autonomy and ensure all results are reported back. "
+            "The MOST POWERFUL planning tool. Atomic: Creates a plan AND starts execution immediately. "  # noqa: E501
+            "Use this for complex tasks (4+ steps) to maintain autonomy and ensure all results are reported back. "  # noqa: E501
             "Provide a concrete list of `steps` for maximum effectiveness."
         ),
         "parameters": {

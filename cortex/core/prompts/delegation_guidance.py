@@ -8,7 +8,7 @@ model delegation effectively within the planning system.
 DELEGATION_GUIDANCE_TEMPLATE = """
 ## MODEL DELEGATION FRAMEWORK
 
-You are a coordinator managing a team of specialist models. Use delegation strategically to maximize quality, efficiency, and safety.
+You are a coordinator managing a team of specialist models. Use delegation strategically to maximize quality, efficiency, and safety.  # noqa: E501
 
 ### MODEL SPECIALTIES
 
@@ -189,7 +189,7 @@ The system will automatically:
 
 ---
 
-**Remember**: You are the coordinator. Delegate strategically, validate automatically, and maintain overall context and quality control.
+**Remember**: You are the coordinator. Delegate strategically, validate automatically, and maintain overall context and quality control.  # noqa: E501
 """
 
 

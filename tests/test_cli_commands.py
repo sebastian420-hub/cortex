@@ -18,10 +18,10 @@ def mock_agent():
     agent.config.provider = None # Default provider for the mock config
 
     agent.conversation = MagicMock()
-    agent.conversation.history = [{"role": "system", "content": "You are Cortex."}] # A simple history
+    agent.conversation.history = [{"role": "system", "content": "You are Cortex."}] # A simple history  # noqa: E501
     agent.conversation.update_model = MagicMock() # Mock the method
 
-    agent._get_system_prompt.return_value = "You are Cortex updated system prompt." # Mock system prompt update
+    agent._get_system_prompt.return_value = "You are Cortex updated system prompt." # Mock system prompt update  # noqa: E501
 
     # Ensure switch_model is a mock method that can be configured
     agent.switch_model = MagicMock()
@@ -42,7 +42,7 @@ def test_handle_model_switch_success(mock_agent, mock_repl):
     """Test successful model switch using /model command."""
     new_model_name = "deepseek-coder"
     # Configure the mock switch_model to simulate success
-    mock_agent.switch_model.side_effect = lambda new_m, provider_o: setattr(mock_agent, 'model', new_m)
+    mock_agent.switch_model.side_effect = lambda new_m, provider_o: setattr(mock_agent, 'model', new_m)  # noqa: E501
 
     with patch.object(console, 'print') as mock_console_print:
         handle_command(f"/model {new_model_name}", mock_agent, MagicMock(), mock_repl)
@@ -52,7 +52,7 @@ def test_handle_model_switch_success(mock_agent, mock_repl):
 
         # Verify system prompt was updated
         mock_agent._get_system_prompt.assert_called_once()
-        assert mock_agent.conversation.history[0]["content"] == mock_agent._get_system_prompt.return_value
+        assert mock_agent.conversation.history[0]["content"] == mock_agent._get_system_prompt.return_value  # noqa: E501
         assert mock_agent.model == new_model_name # Check if agent's model attribute was updated
 
 
@@ -79,7 +79,7 @@ def test_handle_model_switch_provider_error(mock_agent, mock_repl):
         handle_command(f"/model {new_model_name}", mock_agent, MagicMock(), mock_repl)
 
         mock_agent.switch_model.assert_called_once_with(new_model_name, mock_agent.config.provider)
-        mock_console_print.assert_any_call(f"[red]Error switching model:[/red] API key not set for provider.")
+        mock_console_print.assert_any_call(f"[red]Error switching model:[/red] API key not set for provider.")  # noqa: E501
         # System prompt should not be updated on error
         mock_agent._get_system_prompt.assert_not_called()
         # Agent's model should not change on error
@@ -95,7 +95,7 @@ def test_handle_model_switch_unexpected_error(mock_agent, mock_repl):
         handle_command(f"/model {new_model_name}", mock_agent, MagicMock(), mock_repl)
 
         mock_agent.switch_model.assert_called_once_with(new_model_name, mock_agent.config.provider)
-        mock_console_print.assert_any_call(f"[red]An unexpected error occurred:[/red] Some unexpected issue.")
+        mock_console_print.assert_any_call(f"[red]An unexpected error occurred:[/red] Some unexpected issue.")  # noqa: E501
         # System prompt should not be updated on error
         mock_agent._get_system_prompt.assert_not_called()
         # Agent's model should not change on error

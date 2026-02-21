@@ -99,7 +99,7 @@ class RecoveryManager:
         if not self.should_attempt_recovery(context):
             return RecoveryAction(
                 strategy=RecoveryStrategy.ESCALATE,
-                message=f"Max recovery attempts reached for {context.error_type} in {context.tool_name}",
+                message=f"Max recovery attempts reached for {context.error_type} in {context.tool_name}",  # noqa: E501
             )
 
         # Error-type specific recovery strategies
@@ -272,7 +272,7 @@ class RecoveryManager:
                 f"A module couldn't be imported.\n"
                 f"1. Check if the package is installed in the environment\n"
                 f"2. Check for typos in the import path\n"
-                f"3. Verify the module exists: glob(pattern=\"**/{context.arguments.get('command', '').split()[-1] if 'import' in error_msg else '*'}.py\")\n\n"
+                f"3. Verify the module exists: glob(pattern=\"**/{context.arguments.get('command', '').split()[-1] if 'import' in error_msg else '*'}.py\")\n\n"  # noqa: E501
             )
         elif "test" in context.tool_name.lower() or "test" in error_msg:
             specific_guidance = (

@@ -39,7 +39,7 @@ Returns structured data including docstrings, decorators, parameters, return typ
                 "extract_type": {
                     "type": "string",
                     "enum": ["function", "class", "import", "all"],
-                    "description": "What to extract: 'function' for functions, 'class' for classes, 'import' for imports, 'all' for everything",
+                    "description": "What to extract: 'function' for functions, 'class' for classes, 'import' for imports, 'all' for everything",  # noqa: E501
                 },
                 "pattern": {
                     "type": "string",
@@ -143,7 +143,7 @@ class ASTExtractTool(Tool):
             extract_type_enum = ExtractType(extract_type)
         except ValueError:
             return create_error_response(
-                f"Invalid extract_type: {extract_type}. Must be one of: {[t.value for t in ExtractType]}",
+                f"Invalid extract_type: {extract_type}. Must be one of: {[t.value for t in ExtractType]}",  # noqa: E501
                 ErrorType.VALIDATION,
                 {"extract_type": extract_type},
             )

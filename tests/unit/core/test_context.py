@@ -29,7 +29,7 @@ class TestEstimateTokens:
 
         # Patch inside the module where estimate_tokens lives
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.get_encoding_for_model', return_value=mock_encoding) as mock_get_enc:
+            with patch('cortex.core.context.get_encoding_for_model', return_value=mock_encoding) as mock_get_enc:  # noqa: E501
                 token_count = estimate_tokens(test_text, model="gpt-4")
 
                 # Verify interaction
@@ -45,7 +45,7 @@ class TestEstimateTokens:
         mock_encoding.encode.return_value = [1, 2, 3]
 
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.get_encoding_for_model', return_value=mock_encoding) as mock_get_enc:
+            with patch('cortex.core.context.get_encoding_for_model', return_value=mock_encoding) as mock_get_enc:  # noqa: E501
                 token_count = estimate_tokens(test_text, model="unknown-model")
 
                 mock_get_enc.assert_called_once_with("unknown-model")

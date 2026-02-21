@@ -154,7 +154,7 @@ class ReadFileTool(Tool):
                 # Minimal mode: simpler message
                 if offset > 0 or limit > 0:
                     self.console.print(
-                        f"[dim][FILE] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})[/dim]"
+                        f"[dim][FILE] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})[/dim]"  # noqa: E501
                     )
                 else:
                     self.console.print(f"[dim][FILE] {path}[/dim]")
@@ -162,7 +162,7 @@ class ReadFileTool(Tool):
                 # Normal/debug mode: current display
                 if offset > 0 or limit > 0:
                     self.console.print(
-                        f"[cyan]Reading:[/cyan] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})"
+                        f"[cyan]Reading:[/cyan] {path} (lines {offset + 1}-{offset + (limit or self.DEFAULT_LIMIT)})"  # noqa: E501
                     )
                 else:
                     self.console.print(f"[cyan]Reading:[/cyan] {path}")
@@ -188,13 +188,13 @@ class ReadFileTool(Tool):
             if file_size > self.MAX_FILE_SIZE_BYTES:
                 size_mb = file_size / 1_000_000
                 return create_error_response(
-                    f"File is very large ({size_mb:.1f} MB). Use offset and limit parameters to read specific portions.",
+                    f"File is very large ({size_mb:.1f} MB). Use offset and limit parameters to read specific portions.",  # noqa: E501
                     ErrorType.VALIDATION,
                     {
                         "path": path,
                         "size_bytes": file_size,
                         "size_mb": round(size_mb, 2),
-                        "hint": f"Try: read_file(path='{path}', offset=0, limit=500) to read first 500 lines",
+                        "hint": f"Try: read_file(path='{path}', offset=0, limit=500) to read first 500 lines",  # noqa: E501
                     },
                 )
 
@@ -214,7 +214,7 @@ class ReadFileTool(Tool):
                     {
                         "path": path,
                         "reason": binary_reason,
-                        "hint": "Binary files cannot be displayed as text. Use appropriate tools for this file type.",
+                        "hint": "Binary files cannot be displayed as text. Use appropriate tools for this file type.",  # noqa: E501
                     },
                 )
 
@@ -286,7 +286,7 @@ class ReadFileTool(Tool):
                     total_display = f" of {total_lines}" if was_truncated else ""
                     cache_indicator = " [dim](cached)[/dim]" if from_cache else ""
                     self.console.print(
-                        f"[cyan][FILE] {path}{cache_indicator} ({line_count} lines{total_display})[/cyan]"
+                        f"[cyan][FILE] {path}{cache_indicator} ({line_count} lines{total_display})[/cyan]"  # noqa: E501
                     )
                     if truncated_lines:
                         # Show first few lines
@@ -466,7 +466,7 @@ class WriteFileTool(Tool):
                 ErrorType.VALIDATION,
                 {
                     "path": path,
-                    "hint": "This may indicate a JSON parsing error in the tool arguments. Please provide actual file content.",
+                    "hint": "This may indicate a JSON parsing error in the tool arguments. Please provide actual file content.",  # noqa: E501
                     "content_length": len(content) if content else 0,
                 },
             )
@@ -486,7 +486,7 @@ class WriteFileTool(Tool):
                 if self.console:
                     if is_minimal_mode():
                         self.console.print(
-                            f"[yellow][DIFF] {path} ({len(old_content)} ? {len(content)} bytes)[/yellow]"
+                            f"[yellow][DIFF] {path} ({len(old_content)} ? {len(content)} bytes)[/yellow]"  # noqa: E501
                         )
                     else:
                         self.console.print(
@@ -550,7 +550,7 @@ class WriteFileTool(Tool):
                 written_content = full_path.read_text(encoding="utf-8")
                 if written_content != content:
                     return create_error_response(
-                        "Content verification failed - written content does not match intended content",
+                        "Content verification failed - written content does not match intended content",  # noqa: E501
                         ErrorType.EXECUTION,
                         {
                             "path": path,

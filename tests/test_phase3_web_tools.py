@@ -216,7 +216,7 @@ class TestWebFetchMocked:
         result = tool.execute(url="https://example.com", use_cache=False)
 
         assert result["success"] is True
-        assert result["data"].get("redirected") is True or "different-host.com" in result["data"].get("url", "")
+        assert result["data"].get("redirected") is True or "different-host.com" in result["data"].get("url", "")  # noqa: E501
 
 
 class TestWebSearchToolBasics:

@@ -39,7 +39,7 @@ Returns detailed metrics and actionable insights about code quality.""",
                 "analysis_type": {
                     "type": "string",
                     "enum": ["complexity", "dependencies", "issues", "all"],
-                    "description": "Type of analysis: 'complexity' for metrics, 'dependencies' for import analysis, 'issues' for code smells, 'all' for everything",
+                    "description": "Type of analysis: 'complexity' for metrics, 'dependencies' for import analysis, 'issues' for code smells, 'all' for everything",  # noqa: E501
                 },
                 "max_depth": {
                     "type": "integer",
@@ -47,7 +47,7 @@ Returns detailed metrics and actionable insights about code quality.""",
                 },
                 "include_metrics": {
                     "type": "boolean",
-                    "description": "Include code metrics (lines, functions, classes). Default: true",
+                    "description": "Include code metrics (lines, functions, classes). Default: true",  # noqa: E501
                 },
                 "include_dependencies": {
                     "type": "boolean",
@@ -358,7 +358,7 @@ class ASTAnalyzeTool(Tool):
                             "type": "long_function",
                             "file": rel_path,
                             "line": func.start_line,
-                            "message": f"Function '{func.name}' is {length} lines long (consider refactoring)",
+                            "message": f"Function '{func.name}' is {length} lines long (consider refactoring)",  # noqa: E501
                             "severity": "warning",
                         }
                     )
@@ -370,7 +370,7 @@ class ASTAnalyzeTool(Tool):
                             "type": "many_parameters",
                             "file": rel_path,
                             "line": func.start_line,
-                            "message": f"Function '{func.name}' has {len(func.parameters)} parameters (consider using data classes or kwargs)",
+                            "message": f"Function '{func.name}' has {len(func.parameters)} parameters (consider using data classes or kwargs)",  # noqa: E501
                             "severity": "warning",
                         }
                     )

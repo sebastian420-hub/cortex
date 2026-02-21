@@ -55,7 +55,7 @@ class REPL:
 
         ui_mode = get_ui_mode()
         banner = Panel(
-            f"[bright_cyan]Cortex[/bright_cyan] - Unified Agent for Coding, Cybersecurity, and Personal Assistance\n\n"
+            f"[bright_cyan]Cortex[/bright_cyan] - Unified Agent for Coding, Cybersecurity, and Personal Assistance\n\n"  # noqa: E501
             f"Project: [cyan]{project_name}[/cyan]\n"
             f"Model: [cyan]{model}[/cyan]\n"
             f"Mode: [cyan]{permission_mode}[/cyan]\n"

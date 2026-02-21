@@ -99,7 +99,7 @@ class DeepSeekProvider(ModelProvider):
                             }
                         }
 
-                        # Handle reasoning_content in streaming (required for DeepSeek thinking mode)
+                        # Handle reasoning_content in streaming (required for DeepSeek thinking mode)  # noqa: E501
                         if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                             result["message"]["reasoning_content"] = delta.reasoning_content
 

@@ -51,14 +51,14 @@ class ASTCache:
             file_path: Path to the file
 
         Returns:
-            MD5 hash of file contents or empty string if file doesn't exist
+            SHA256 hash of file contents or empty string if file doesn't exist
         """
         try:
             if not file_path.exists():
                 return ""
 
             content = file_path.read_bytes()
-            return hashlib.md5(content).hexdigest()
+            return hashlib.sha256(content).hexdigest()
 
         except Exception as e:
             logger.warning(f"Failed to hash file {file_path}: {e}")

@@ -68,7 +68,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         tool_class=ASTSearchTool,
         schema=build_schema(
             tool_name="ast_search",
-            description="Enhanced search with AST understanding. Combines traditional text search with AST-based structural search for smarter code understanding.",
+            description="Enhanced search with AST understanding. Combines traditional text search with AST-based structural search for smarter code understanding.",  # noqa: E501
             parameters=[
                 {
                     "name": "pattern",
@@ -85,7 +85,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
                 {
                     "name": "search_type",
                     "type": "string",
-                    "description": "Search type: 'text', 'structure', 'smart', 'function', 'class', 'import'",
+                    "description": "Search type: 'text', 'structure', 'smart', 'function', 'class', 'import'",  # noqa: E501
                     "default": "smart",
                     "enum": ["text", "structure", "smart", "function", "class", "import"],
                 },
@@ -148,7 +148,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         tool_class=ASTExtractTool,
         schema=build_schema(
             tool_name="ast_extract",
-            description="Extract code structures using AST parsing. Provides semantic extraction of functions, classes, imports, and other code structures.",
+            description="Extract code structures using AST parsing. Provides semantic extraction of functions, classes, imports, and other code structures.",  # noqa: E501
             parameters=[
                 {
                     "name": "path",
@@ -221,7 +221,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         tool_class=ASTAnalyzeTool,
         schema=build_schema(
             tool_name="ast_analyze",
-            description="Code analysis using AST parsing. Provides metrics for code complexity, dependencies, and quality.",
+            description="Code analysis using AST parsing. Provides metrics for code complexity, dependencies, and quality.",  # noqa: E501
             parameters=[
                 {
                     "name": "path",
@@ -232,7 +232,7 @@ def register_ast_tools(registry: ToolRegistry) -> None:
                 {
                     "name": "analysis_type",
                     "type": "string",
-                    "description": "Analysis type: 'complexity', 'dependencies', 'issues', or 'all'",
+                    "description": "Analysis type: 'complexity', 'dependencies', 'issues', or 'all'",  # noqa: E501
                     "default": "complexity",
                     "enum": ["complexity", "dependencies", "issues", "all"],
                 },
@@ -278,7 +278,7 @@ def get_ast_tool_descriptions() -> List[Dict[str, Any]]:
     return [
         {
             "name": "ast_search",
-            "description": "Enhanced search with AST understanding. Combines traditional text search with AST-based structural search for smarter code understanding.",
+            "description": "Enhanced search with AST understanding. Combines traditional text search with AST-based structural search for smarter code understanding.",  # noqa: E501
             "examples": [
                 "ast_search pattern='def test_' search_type='function'",
                 "ast_search pattern='class.*Service' search_type='structure'",
@@ -287,7 +287,7 @@ def get_ast_tool_descriptions() -> List[Dict[str, Any]]:
         },
         {
             "name": "ast_extract",
-            "description": "Extract code structures using AST parsing. Provides semantic extraction of functions, classes, imports, and other code structures.",
+            "description": "Extract code structures using AST parsing. Provides semantic extraction of functions, classes, imports, and other code structures.",  # noqa: E501
             "examples": [
                 "ast_extract path='.' extract_type='function'",
                 "ast_extract path='src/' extract_type='class' pattern='Service'",
@@ -296,7 +296,7 @@ def get_ast_tool_descriptions() -> List[Dict[str, Any]]:
         },
         {
             "name": "ast_analyze",
-            "description": "Code analysis using AST parsing. Provides metrics for code complexity, dependencies, and quality.",
+            "description": "Code analysis using AST parsing. Provides metrics for code complexity, dependencies, and quality.",  # noqa: E501
             "examples": [
                 "ast_analyze path='.' analysis_type='complexity'",
                 "ast_analyze path='src/' analysis_type='dependencies' max_depth=5",

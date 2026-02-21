@@ -64,7 +64,7 @@ def process_model_output(content: Any) -> str:
                 # Look for common fields models use when they "over-JSON"
                 for key in ["answer", "content", "response", "text", "message", "summary"]:
                     if key in data and data[key]:
-                        # Recursively process in case the value also needs unescaping or has its own JSON
+                        # Recursively process in case the value also needs unescaping or has its own JSON  # noqa: E501
                         return process_model_output(data[key])
         except (json.JSONDecodeError, TypeError, ValueError):
             # Not valid JSON or other error, return as is (but with \\n fixed)

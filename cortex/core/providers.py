@@ -315,7 +315,7 @@ class DeepSeekProvider(ModelProvider):
                             }
                         }
 
-                        # Handle reasoning_content in streaming (required for DeepSeek thinking mode)
+                        # Handle reasoning_content in streaming (required for DeepSeek thinking mode)  # noqa: E501
                         if hasattr(delta, "reasoning_content") and delta.reasoning_content:
                             result["message"]["reasoning_content"] = delta.reasoning_content
 
@@ -929,7 +929,7 @@ class ProviderFactory:
         if model_lower.startswith("ollama/"):
             return OllamaProvider()
 
-        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
+        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)  # noqa: E501
         if "/" in model_name:
             return OpenRouterProvider()
 
@@ -1012,7 +1012,7 @@ class ProviderFactory:
         if model_lower.startswith("ollama/"):
             return False
 
-        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
+        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)  # noqa: E501
         if "/" in model_name:
             return True
 
@@ -1076,7 +1076,7 @@ class ProviderFactory:
         if model_lower.startswith("ollama/"):
             return "ollama"
 
-        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)
+        # Generic slash detection for OpenRouter models (user requested: models with slashes are OpenRouter)  # noqa: E501
         if "/" in model_name:
             return "openrouter"
 

@@ -442,7 +442,7 @@ class TransparencyDisplay:
             f"User ID: {decision.user_id or 'N/A'}",
             "-" * 60,
             f"MODEL: {decision.model_name}",
-            f"PROVIDER: {provider_info['icon']} {provider_info['name']} ({decision.provider_type.value})",
+            f"PROVIDER: {provider_info['icon']} {provider_info['name']} ({decision.provider_type.value})",  # noqa: E501
             f"SOURCE: {decision.decision_source.value}",
             f"CONFIDENCE: {decision.confidence_score:.2f}",
             "",

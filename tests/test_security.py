@@ -57,7 +57,7 @@ def test_dangerous_command_with_quotes():
     # Relative paths with ./ should be safer (no dangerous flags on relative paths)
     # But rm -rf with -rf flag is still dangerous even on relative paths
     # The implementation is conservative and flags rm -rf as dangerous regardless
-    # assert is_dangerous_command('rm -rf "./tmp"') is False  # Would be nice but conservative approach flags it
+    # assert is_dangerous_command('rm -rf "./tmp"') is False  # Would be nice but conservative approach flags it  # noqa: E501
 
 
 def test_dangerous_command_case_variations():

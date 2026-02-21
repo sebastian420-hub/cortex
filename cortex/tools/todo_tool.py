@@ -96,7 +96,7 @@ class TodoManager:
                 status = TodoStatus(item["status"])
             except (ValueError, KeyError):
                 return create_error_response(
-                    f"Invalid status: {item.get('status')}. Must be pending, in_progress, or completed",
+                    f"Invalid status: {item.get('status')}. Must be pending, in_progress, or completed",  # noqa: E501
                     ErrorType.VALIDATION,
                     context={"invalid_status": item.get("status")},
                 )
@@ -253,7 +253,7 @@ class TodoWriteTool(Tool):
             {
                 "progress": progress,
                 "current_task": current.active_form if current else None,
-                "message": f"Todo list updated: {progress['completed']}/{progress['total']} completed",
+                "message": f"Todo list updated: {progress['completed']}/{progress['total']} completed",  # noqa: E501
             }
         )
 
@@ -308,7 +308,7 @@ TODO_TOOL_SCHEMA = {
     "type": "function",
     "function": {
         "name": "todo_write",
-        "description": "Manage and track tasks for the current session. Use this to plan complex multi-step tasks and track progress. Only use when working on tasks with 3+ steps. Mark tasks as in_progress BEFORE starting work, and completed IMMEDIATELY after finishing. Only ONE task can be in_progress at a time.",
+        "description": "Manage and track tasks for the current session. Use this to plan complex multi-step tasks and track progress. Only use when working on tasks with 3+ steps. Mark tasks as in_progress BEFORE starting work, and completed IMMEDIATELY after finishing. Only ONE task can be in_progress at a time.",  # noqa: E501
         "parameters": {
             "type": "object",
             "properties": {
@@ -320,7 +320,7 @@ TODO_TOOL_SCHEMA = {
                         "properties": {
                             "content": {
                                 "type": "string",
-                                "description": "Task description (imperative form, e.g., 'Run tests')",
+                                "description": "Task description (imperative form, e.g., 'Run tests')",  # noqa: E501
                             },
                             "status": {
                                 "type": "string",

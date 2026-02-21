@@ -31,13 +31,13 @@ class TestStreamingResponseHandling:
 
         # Mock stream with tool syntax in reasoning
         def mock_stream():
-            yield {"message": {"reasoning_content": "<tool_call>read_file({'path': 'test.py'})</tool_call>"}}
+            yield {"message": {"reasoning_content": "<tool_call>read_file({'path': 'test.py'})</tool_call>"}}  # noqa: E501
 
         with patch('cortex.core.streaming.console') as mock_console:
-            with patch('cortex.core.streaming._extract_kimi_native_tool_calls_from_streaming') as mock_extract:
+            with patch('cortex.core.streaming._extract_kimi_native_tool_calls_from_streaming') as mock_extract:  # noqa: E501
                 # Return a valid tool call
                 mock_extract.return_value = [
-                    {"id": "call_1", "function": {"name": "read_file", "arguments": '{"path": "test.py"}'}, "type": "function"}
+                    {"id": "call_1", "function": {"name": "read_file", "arguments": '{"path": "test.py"}'}, "type": "function"}  # noqa: E501
                 ]
                 result = display_streaming_response(mock_stream())
 
@@ -263,7 +263,7 @@ class TestRegressionScenarios:
 
         def mock_stream():
             yield {"message": {"content": "I'll help"}}
-            yield {"message": {"tool_calls": [{"id": "1", "function": {"name": "read_file", "arguments": "{}"}}]}}
+            yield {"message": {"tool_calls": [{"id": "1", "function": {"name": "read_file", "arguments": "{}"}}]}}  # noqa: E501
 
         with patch('cortex.core.streaming.console') as mock_console:
             result = display_streaming_response(mock_stream())

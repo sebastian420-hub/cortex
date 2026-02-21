@@ -109,7 +109,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "read_file",
-            "description": "Read the contents of a file. Supports reading large files in chunks with offset and limit. Use this when you need to read code or file contents.",
+            "description": "Read the contents of a file. Supports reading large files in chunks with offset and limit. Use this when you need to read code or file contents.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -119,7 +119,7 @@ TOOLS: List[Dict[str, Any]] = [
                     },
                     "offset": {
                         "type": "integer",
-                        "description": "Line number to start reading from (0-indexed). Useful for large files.",
+                        "description": "Line number to start reading from (0-indexed). Useful for large files.",  # noqa: E501
                     },
                     "limit": {
                         "type": "integer",
@@ -134,7 +134,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "write_file",
-            "description": "Write or overwrite a file with new content. Always read the file first if it exists. Use this when the user explicitly requests creating or modifying a file. Do NOT use this for greetings, questions, or casual conversation.",
+            "description": "Write or overwrite a file with new content. Always read the file first if it exists. Use this when the user explicitly requests creating or modifying a file. Do NOT use this for greetings, questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -149,7 +149,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "execute_command",
-            "description": "Execute a shell command. Use this ONLY when the user explicitly requests running a command (e.g., 'install dependencies', 'run tests', 'git status'). Use for git, npm, pip, pytest, etc. Be cautious with destructive commands. Do NOT use this for greetings, questions, or casual conversation.",
+            "description": "Execute a shell command. Use this ONLY when the user explicitly requests running a command (e.g., 'install dependencies', 'run tests', 'git status'). Use for git, npm, pip, pytest, etc. Be cautious with destructive commands. Do NOT use this for greetings, questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -167,7 +167,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "list_files",
-            "description": "List files in a directory or search for files matching a pattern. Use this when the user explicitly requests listing files or exploring the project structure. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "List files in a directory or search for files matching a pattern. Use this when the user explicitly requests listing files or exploring the project structure. Do NOT use this for greetings, general questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -188,7 +188,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "search_files",
-            "description": "[DEPRECATED - Use 'grep' instead] Basic text search. The 'grep' tool is more powerful.",
+            "description": "[DEPRECATED - Use 'grep' instead] Basic text search. The 'grep' tool is more powerful.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -206,17 +206,17 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "grep",
-            "description": "Powerful regex search tool. Searches for patterns in files with multiple output modes. Use this to find code, text, or patterns across the codebase.",
+            "description": "Powerful regex search tool. Searches for patterns in files with multiple output modes. Use this to find code, text, or patterns across the codebase.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Regex pattern to search for (e.g., 'def.*async', 'class\\s+\\w+')",
+                        "description": "Regex pattern to search for (e.g., 'def.*async', 'class\\s+\\w+')",  # noqa: E501
                     },
                     "path": {
                         "type": "string",
-                        "description": "Directory or file to search in (default: current directory)",
+                        "description": "Directory or file to search in (default: current directory)",  # noqa: E501
                     },
                     "glob": {
                         "type": "string",
@@ -229,7 +229,7 @@ TOOLS: List[Dict[str, Any]] = [
                     "output_mode": {
                         "type": "string",
                         "enum": ["files_with_matches", "content", "count"],
-                        "description": "Output mode: 'files_with_matches' (default), 'content' (show matches), 'count' (match counts)",
+                        "description": "Output mode: 'files_with_matches' (default), 'content' (show matches), 'count' (match counts)",  # noqa: E501
                     },
                     "case_insensitive": {
                         "type": "boolean",
@@ -256,13 +256,13 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "glob",
-            "description": "Fast file pattern matching. Find files by glob patterns like '**/*.py'. Results sorted by modification time (newest first).",
+            "description": "Fast file pattern matching. Find files by glob patterns like '**/*.py'. Results sorted by modification time (newest first).",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Glob pattern to match (e.g., '**/*.py', 'src/**/*.ts', '*.md')",
+                        "description": "Glob pattern to match (e.g., '**/*.py', 'src/**/*.ts', '*.md')",  # noqa: E501
                     },
                     "path": {
                         "type": "string",
@@ -285,22 +285,22 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "edit",
-            "description": "Surgical file editing - replace exact strings. More precise than rewriting entire files. The old_string must match exactly (including whitespace/indentation).",
+            "description": "Surgical file editing - replace exact strings. More precise than rewriting entire files. The old_string must match exactly (including whitespace/indentation).",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "file_path": {"type": "string", "description": "Path to the file to edit"},
                     "old_string": {
                         "type": "string",
-                        "description": "Exact text to replace (must be unique in file unless using replace_all)",
+                        "description": "Exact text to replace (must be unique in file unless using replace_all)",  # noqa: E501
                     },
                     "new_string": {
                         "type": "string",
-                        "description": "Text to replace it with (must be different from old_string)",
+                        "description": "Text to replace it with (must be different from old_string)",  # noqa: E501
                     },
                     "replace_all": {
                         "type": "boolean",
-                        "description": "Replace all occurrences (default: false, requires unique match)",
+                        "description": "Replace all occurrences (default: false, requires unique match)",  # noqa: E501
                     },
                 },
                 "required": ["file_path", "old_string", "new_string"],
@@ -311,7 +311,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "git_status",
-            "description": "Show git status and uncommitted changes. Use this when the user explicitly requests git status or wants to see what files have changed. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "Show git status and uncommitted changes. Use this when the user explicitly requests git status or wants to see what files have changed. Do NOT use this for greetings, general questions, or casual conversation.",  # noqa: E501
             "parameters": {"type": "object", "properties": {}, "required": []},
         },
     },
@@ -319,7 +319,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "git_diff",
-            "description": "Show git diff for a file or all changes. Use this when the user explicitly requests to see differences or changes. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "Show git diff for a file or all changes. Use this when the user explicitly requests to see differences or changes. Do NOT use this for greetings, general questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -336,7 +336,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "git_commit",
-            "description": "Commit changes with a message. Use this when the user explicitly requests to commit changes. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "Commit changes with a message. Use this when the user explicitly requests to commit changes. Do NOT use this for greetings, general questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {"message": {"type": "string", "description": "Commit message"}},
@@ -348,7 +348,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "git_log",
-            "description": "Show recent git commits. Use this when the user explicitly requests to see commit history. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "Show recent git commits. Use this when the user explicitly requests to see commit history. Do NOT use this for greetings, general questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -372,7 +372,7 @@ TOOLS: List[Dict[str, Any]] = [
                     "action": {
                         "type": "string",
                         "enum": ["list", "create", "delete"],
-                        "description": "The action to perform: 'list', 'create', or 'delete'. Defaults to 'list'.",
+                        "description": "The action to perform: 'list', 'create', or 'delete'. Defaults to 'list'.",  # noqa: E501
                     },
                     "branch_name": {
                         "type": "string",
@@ -380,7 +380,7 @@ TOOLS: List[Dict[str, Any]] = [
                     },
                     "force": {
                         "type": "boolean",
-                        "description": "Force deletion of the branch. Use with caution. Defaults to false.",
+                        "description": "Force deletion of the branch. Use with caution. Defaults to false.",  # noqa: E501
                     },
                 },
                 "required": [],
@@ -401,7 +401,7 @@ TOOLS: List[Dict[str, Any]] = [
                     },
                     "branch": {
                         "type": "string",
-                        "description": "The local branch to push. If not specified, Git's default behavior is used.",
+                        "description": "The local branch to push. If not specified, Git's default behavior is used.",  # noqa: E501
                     },
                 },
                 "required": [],
@@ -491,7 +491,7 @@ TOOLS: List[Dict[str, Any]] = [
                 "properties": {
                     "remote": {
                         "type": "string",
-                        "description": "The name of the remote to fetch from. Defaults to 'origin'.",
+                        "description": "The name of the remote to fetch from. Defaults to 'origin'.",  # noqa: E501
                     },
                 },
                 "required": [],
@@ -512,7 +512,7 @@ TOOLS: List[Dict[str, Any]] = [
                     },
                     "branch": {
                         "type": "string",
-                        "description": "The remote branch to pull. If not specified, Git's default behavior is used.",
+                        "description": "The remote branch to pull. If not specified, Git's default behavior is used.",  # noqa: E501
                     },
                 },
                 "required": [],
@@ -523,7 +523,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "git_add",
-            "description": "Stage changes for the next commit. Use to add specific files or all changes.",
+            "description": "Stage changes for the next commit. Use to add specific files or all changes.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -534,7 +534,7 @@ TOOLS: List[Dict[str, Any]] = [
                     },
                     "add_all": {
                         "type": "boolean",
-                        "description": "Stage all changes in the repository (equivalent to 'git add --all').",
+                        "description": "Stage all changes in the repository (equivalent to 'git add --all').",  # noqa: E501
                     },
                 },
                 "required": [],
@@ -545,13 +545,13 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "run_tests",
-            "description": "Run test suite or specific tests. Auto-detects pytest or unittest. Use this when the user explicitly requests running tests. Do NOT use this for greetings, general questions, or casual conversation.",
+            "description": "Run test suite or specific tests. Auto-detects pytest or unittest. Use this when the user explicitly requests running tests. Do NOT use this for greetings, general questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "pattern": {
                         "type": "string",
-                        "description": "Test pattern (e.g., 'test_auth.py' or 'tests/test_auth.py')",
+                        "description": "Test pattern (e.g., 'test_auth.py' or 'tests/test_auth.py')",  # noqa: E501
                     },
                     "verbose": {"type": "boolean", "description": "Verbose output"},
                 },
@@ -564,13 +564,13 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "web_fetch",
-            "description": "Fetch content from a URL and convert to markdown. Use this to read documentation, web pages, or API responses. Includes 15-minute cache.",
+            "description": "Fetch content from a URL and convert to markdown. Use this to read documentation, web pages, or API responses. Includes 15-minute cache.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "url": {
                         "type": "string",
-                        "description": "The URL to fetch (e.g., 'https://docs.python.org/3/library/json.html')",
+                        "description": "The URL to fetch (e.g., 'https://docs.python.org/3/library/json.html')",  # noqa: E501
                     },
                     "prompt": {
                         "type": "string",
@@ -589,13 +589,13 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "web_search",
-            "description": "Search the web for information. Returns titles, URLs, and snippets. Use to find documentation, examples, or solutions.",
+            "description": "Search the web for information. Returns titles, URLs, and snippets. Use to find documentation, examples, or solutions.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "query": {
                         "type": "string",
-                        "description": "Search query (e.g., 'python requests library documentation')",
+                        "description": "Search query (e.g., 'python requests library documentation')",  # noqa: E501
                     },
                     "max_results": {
                         "type": "integer",
@@ -620,14 +620,14 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "skill_loader",
-            "description": "Load and manage development skills for common tasks like TDD, refactoring, debugging, etc.",
+            "description": "Load and manage development skills for common tasks like TDD, refactoring, debugging, etc.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
                         "enum": ["list", "load", "suggest", "get"],
-                        "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)",
+                        "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)",  # noqa: E501
                     },
                     "skill_name": {
                         "type": "string",

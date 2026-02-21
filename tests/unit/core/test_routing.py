@@ -60,7 +60,7 @@ class TestTaskAnalysis:
         from cortex.core.routing.task_analysis import TaskAnalysisEngine, TaskType
 
         engine = TaskAnalysisEngine()
-        result = engine.analyze("Analyze the authentication system for security vulnerabilities and potential exploits")
+        result = engine.analyze("Analyze the authentication system for security vulnerabilities and potential exploits")  # noqa: E501
 
         assert result is not None
         assert result.task_type == TaskType.SECURITY

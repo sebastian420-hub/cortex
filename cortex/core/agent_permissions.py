@@ -191,7 +191,7 @@ class PermissionManager:
         operation_str = f"{tool_name}:{arg_str}"
 
         # Hash it
-        return hashlib.md5(operation_str.encode()).hexdigest()
+        return hashlib.sha256(operation_str.encode()).hexdigest()
 
     def clear_approvals(self):
         """Clear all cached approvals"""

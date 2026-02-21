@@ -91,10 +91,10 @@ class TestDisplayStreamingResponse:
         stream_chunks = [
             {"message": {"reasoning_content": "Let me think"}},
             {"message": {"reasoning_content": " about this."}},
-            {"message": {"content": "The answer is 42."}}
+            {"message": {"content": "The answer is 42."}},
         ]
 
-        with patch('cortex.core.streaming.console'):
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(iter(stream_chunks))
 
             assert result["role"] == "assistant"
@@ -109,7 +109,7 @@ class TestDisplayStreamingResponse:
                     "tool_calls": [
                         {
                             "id": "call_1",
-                            "function": {"name": "read_file", "arguments": "{\"path\": \"test.txt\"}"}
+                            "function": {"name": "read_file", "arguments": '{"path": "test.txt"}'},
                         }
                     ]
                 }
@@ -119,14 +119,14 @@ class TestDisplayStreamingResponse:
                     "tool_calls": [
                         {
                             "id": "call_2",
-                            "function": {"name": "write_file", "arguments": "{\"path\": \"out.txt\"}"}
+                            "function": {"name": "write_file", "arguments": '{"path": "out.txt"}'},
                         }
                     ]
                 }
-            }
+            },
         ]
 
-        with patch('cortex.core.streaming.console'):
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(iter(stream_chunks))
 
             assert result["role"] == "assistant"
@@ -141,37 +141,22 @@ class TestDisplayStreamingResponse:
         stream_chunks = [
             {
                 "message": {
-                    "tool_calls": [
-                        {
-                            "id": "call_1",
-                            "function": {"name": "read_file", "arguments": "{}"}
-                        }
-                    ]
+                    "tool_calls": [{"id": "call_1", "function": {"name": "read_file", "arguments": "{}"}}]  # noqa: E501
                 }
             },
             {
                 "message": {
-                    "tool_calls": [
-                        {
-                            "id": "call_1",
-                            "function": {"arguments": "{\"path\": \"test.txt\"}"}
-                        }
-                    ]
+                    "tool_calls": [{"id": "call_1", "function": {"arguments": '{"path": "test.txt"}'}}]  # noqa: E501
                 }
             },
             {
                 "message": {
-                    "tool_calls": [
-                        {
-                            "id": "call_2",
-                            "function": {"name": "write_file", "arguments": "{}"}
-                        }
-                    ]
+                    "tool_calls": [{"id": "call_2", "function": {"name": "write_file", "arguments": "{}"}}]  # noqa: E501
                 }
-            }
+            },
         ]
 
-        with patch('cortex.core.streaming.console'):
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(iter(stream_chunks))
 
             tool_calls = result["tool_calls"]
@@ -180,7 +165,7 @@ class TestDisplayStreamingResponse:
             # First tool call should have merged data
             call_1 = next(tc for tc in tool_calls if tc["id"] == "call_1")
             assert call_1["function"]["name"] == "read_file"
-            assert call_1["function"]["arguments"] == "{\"path\": \"test.txt\"}"
+            assert call_1["function"]["arguments"] == '{"path": "test.txt"}'
 
             call_2 = next(tc for tc in tool_calls if tc["id"] == "call_2")
             assert call_2["function"]["name"] == "write_file"
@@ -189,7 +174,7 @@ class TestDisplayStreamingResponse:
         """Test displaying empty stream."""
         empty_stream = iter([])
 
-        with patch('cortex.core.streaming.console'):
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(empty_stream)
 
             # Now always includes empty content to prevent API errors
@@ -197,10 +182,10 @@ class TestDisplayStreamingResponse:
             # Should not crash
 
     def test_display_streaming_response_custom_title(self):
-        """Test displaying with custom title (title parameter is ignored in current implementation)."""
+        """Test displaying with custom title (title parameter is ignored in current implementation)."""  # noqa: E501
         stream_chunks = [{"message": {"content": "Test"}}]
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console"):
             # Title parameter exists but may not be used
             result = display_streaming_response(iter(stream_chunks), title="Custom Title")
 
@@ -209,11 +194,9 @@ class TestDisplayStreamingResponse:
 
     def test_display_streaming_response_no_content(self):
         """Test displaying response with no content (only tool calls)."""
-        stream_chunks = [
-            {"message": {"tool_calls": [{"id": "call_1", "function": {"name": "test"}}]}}
-        ]
+        stream_chunks = [{"message": {"tool_calls": [{"id": "call_1", "function": {"name": "test"}}]}}]  # noqa: E501
 
-        with patch('cortex.core.streaming.console') as mock_console:
+        with patch("cortex.core.streaming.console") as mock_console:
             result = display_streaming_response(iter(stream_chunks))
 
             # Now always includes empty content to prevent API errors
@@ -221,47 +204,44 @@ class TestDisplayStreamingResponse:
             assert result["content"] == ""
             assert "tool_calls" in result
             # console.print should not be called since there's no content
-            # (Actually current implementation prints only if content exists)
-            # Let's check: print is called with Markdown only if content exists
-            # So we need to verify that console.print was not called with Markdown
-            # but might be called with something else? We'll just ensure no error.
+            mock_console.print.assert_not_called()
 
-        @patch("cortex.core.streaming.Markdown")
-        def test_display_streaming_response_markdown_rendering(self, mock_markdown):
-            """Test that content is rendered as Markdown when tool calls are present."""
-            stream_chunks = [
-                {
-                    "message": {
-                        "content": "# Heading\n\nContent",
-                        "tool_calls": [{"id": "1", "function": {"name": "t"}}],
-                    }
+    @patch("cortex.core.streaming.Markdown")
+    def test_display_streaming_response_markdown_rendering(self, mock_markdown):
+        """Test that content is rendered as Markdown when tool calls are present."""
+        stream_chunks = [
+            {
+                "message": {
+                    "content": "# Heading\n\nContent",
+                    "tool_calls": [{"id": "1", "function": {"name": "t"}}],
                 }
-            ]
-    
-            mock_markdown_instance = Mock()
-            mock_markdown.return_value = mock_markdown_instance
-    
-            with patch("cortex.core.streaming.console") as mock_console:
-                result = display_streaming_response(iter(stream_chunks))
-    
-                # Verify Markdown was created with the content
-                mock_markdown.assert_called_once_with("# Heading\n\nContent")
-                # Verify console printed the Markdown
-                mock_console.print.assert_called_once_with(mock_markdown_instance)
-    
-        def test_display_streaming_response_prints_with_tools(self):
-            """Test that content IS printed when tool calls are present."""
-            stream_chunks = [
-                {
-                    "message": {
-                        "content": "Executing...",
-                        "tool_calls": [{"id": "1", "function": {"name": "test_tool"}}],
-                    }
+            }
+        ]
+
+        mock_markdown_instance = Mock()
+        mock_markdown.return_value = mock_markdown_instance
+
+        with patch("cortex.core.streaming.console") as mock_console:
+            display_streaming_response(iter(stream_chunks))
+
+            # Verify Markdown was created with the content
+            mock_markdown.assert_called_once_with("# Heading\n\nContent")
+            # Verify console printed the Markdown
+            mock_console.print.assert_called_once_with(mock_markdown_instance)
+
+    def test_display_streaming_response_prints_with_tools(self):
+        """Test that content IS printed when tool calls are present."""
+        stream_chunks = [
+            {
+                "message": {
+                    "content": "Executing...",
+                    "tool_calls": [{"id": "1", "function": {"name": "test_tool"}}],
                 }
-            ]
-    
-            with patch("cortex.core.streaming.console") as mock_console:
-                display_streaming_response(iter(stream_chunks))
-    
-                # Verify console printed the content
-                mock_console.print.assert_called_once()
+            }
+        ]
+
+        with patch("cortex.core.streaming.console") as mock_console:
+            display_streaming_response(iter(stream_chunks))
+
+            # Verify console printed the content
+            mock_console.print.assert_called_once()

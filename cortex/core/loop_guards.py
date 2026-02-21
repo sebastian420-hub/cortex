@@ -189,7 +189,7 @@ class LoopGuard:
             iterations_since_last_reflection = self.iteration_count - self.last_reflection_iteration
             if iterations_since_last_reflection >= self.reflection_threshold_iterations:
                 triggers.append(
-                    f"iteration_threshold ({iterations_since_last_reflection} iterations since last reflection)"
+                    f"iteration_threshold ({iterations_since_last_reflection} iterations since last reflection)"  # noqa: E501
                 )
 
         # Check consecutive failures threshold

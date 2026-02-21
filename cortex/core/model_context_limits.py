@@ -141,7 +141,7 @@ def get_model_context_limit(model_name: str) -> int:
 
     # Fallback to default
     logger.info(
-        f"No context limit found for model '{model_name}', using default: {DEFAULT_CONTEXT_LIMIT:,} tokens"
+        f"No context limit found for model '{model_name}', using default: {DEFAULT_CONTEXT_LIMIT:,} tokens"  # noqa: E501
     )
     return DEFAULT_CONTEXT_LIMIT
 

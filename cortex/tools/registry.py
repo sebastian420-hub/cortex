@@ -344,7 +344,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "read_file",
-                    "description": "Read the contents of a file. Supports reading large files in chunks with offset and limit.",
+                    "description": "Read the contents of a file. Supports reading large files in chunks with offset and limit.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -369,7 +369,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "write_file",
-                    "description": "Write or overwrite a file with new content. Always read the file first if it exists.",
+                    "description": "Write or overwrite a file with new content. Always read the file first if it exists.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -387,7 +387,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "execute_command",
-                    "description": "Execute a shell command. Use for git, npm, pip, pytest, etc. Be cautious with destructive commands.",
+                    "description": "Execute a shell command. Use for git, npm, pip, pytest, etc. Be cautious with destructive commands.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -408,17 +408,17 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "list_files",
-                    "description": "List files in a directory or search for files matching a pattern.",
+                    "description": "List files in a directory or search for files matching a pattern.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "path": {
                                 "type": "string",
-                                "description": "Directory path to list (default: current directory)",
+                                "description": "Directory path to list (default: current directory)",  # noqa: E501
                             },
                             "pattern": {
                                 "type": "string",
-                                "description": "Optional glob pattern to filter files (e.g., '*.py')",
+                                "description": "Optional glob pattern to filter files (e.g., '*.py')",  # noqa: E501
                             },
                         },
                         "required": [],
@@ -429,14 +429,14 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "search_files",
-                    "description": "Search for text content across files in the project. Similar to grep.",
+                    "description": "Search for text content across files in the project. Similar to grep.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "query": {"type": "string", "description": "Text to search for"},
                             "file_pattern": {
                                 "type": "string",
-                                "description": "Limit search to files matching pattern (e.g., '*.py')",
+                                "description": "Limit search to files matching pattern (e.g., '*.py')",  # noqa: E501
                             },
                         },
                         "required": ["query"],
@@ -503,7 +503,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "git_add",
-                    "description": "Stage changes for the next commit. Use to add specific files or all changes.",
+                    "description": "Stage changes for the next commit. Use to add specific files or all changes.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -514,7 +514,7 @@ class ToolRegistry:
                             },
                             "add_all": {
                                 "type": "boolean",
-                                "description": "Stage all changes in the repository (equivalent to 'git add --all').",
+                                "description": "Stage all changes in the repository (equivalent to 'git add --all').",  # noqa: E501
                             },
                         },
                         "required": [],
@@ -532,15 +532,15 @@ class ToolRegistry:
                             "action": {
                                 "type": "string",
                                 "enum": ["list", "create", "delete"],
-                                "description": "The action to perform: 'list', 'create', or 'delete'. Defaults to 'list'.",
+                                "description": "The action to perform: 'list', 'create', or 'delete'. Defaults to 'list'.",  # noqa: E501
                             },
                             "branch_name": {
                                 "type": "string",
-                                "description": "The name of the branch for 'create' or 'delete' actions.",
+                                "description": "The name of the branch for 'create' or 'delete' actions.",  # noqa: E501
                             },
                             "force": {
                                 "type": "boolean",
-                                "description": "Force deletion of the branch. Use with caution. Defaults to false.",
+                                "description": "Force deletion of the branch. Use with caution. Defaults to false.",  # noqa: E501
                             },
                         },
                         "required": [],
@@ -551,17 +551,17 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "git_push",
-                    "description": "Push commits to a remote repository. This is a high-risk operation.",
+                    "description": "Push commits to a remote repository. This is a high-risk operation.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "remote": {
                                 "type": "string",
-                                "description": "The name of the remote to push to. Defaults to 'origin'.",
+                                "description": "The name of the remote to push to. Defaults to 'origin'.",  # noqa: E501
                             },
                             "branch": {
                                 "type": "string",
-                                "description": "The local branch to push. If not specified, Git's default behavior is used.",
+                                "description": "The local branch to push. If not specified, Git's default behavior is used.",  # noqa: E501
                             },
                         },
                         "required": [],
@@ -651,7 +651,7 @@ class ToolRegistry:
                         "properties": {
                             "remote": {
                                 "type": "string",
-                                "description": "The name of the remote to fetch from. Defaults to 'origin'.",
+                                "description": "The name of the remote to fetch from. Defaults to 'origin'.",  # noqa: E501
                             },
                         },
                         "required": [],
@@ -662,17 +662,17 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "git_pull",
-                    "description": "Fetch from and integrate with another repository or a local branch.",
+                    "description": "Fetch from and integrate with another repository or a local branch.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "remote": {
                                 "type": "string",
-                                "description": "The name of the remote to pull from. Defaults to 'origin'.",
+                                "description": "The name of the remote to pull from. Defaults to 'origin'.",  # noqa: E501
                             },
                             "branch": {
                                 "type": "string",
-                                "description": "The remote branch to pull. If not specified, Git's default behavior is used.",
+                                "description": "The remote branch to pull. If not specified, Git's default behavior is used.",  # noqa: E501
                             },
                         },
                         "required": [],
@@ -683,7 +683,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "run_tests",
-                    "description": "Run test suite or specific tests. Auto-detects pytest or unittest.",
+                    "description": "Run test suite or specific tests. Auto-detects pytest or unittest.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -702,7 +702,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "grep",
-                    "description": "Powerful regex search tool. Searches for patterns in files with multiple output modes.",
+                    "description": "Powerful regex search tool. Searches for patterns in files with multiple output modes.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -857,14 +857,14 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "skill_loader",
-                    "description": "Load and manage development skills for common tasks like TDD, refactoring, debugging, etc.",
+                    "description": "Load and manage development skills for common tasks like TDD, refactoring, debugging, etc.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "action": {
                                 "type": "string",
                                 "enum": ["list", "load", "suggest", "get"],
-                                "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)",
+                                "description": "Action to perform: 'list' (list skills), 'load' (load specific skill), 'suggest' (suggest skills for task), 'get' (get skill details)",  # noqa: E501
                             },
                             "skill_name": {
                                 "type": "string",
@@ -876,7 +876,7 @@ class ToolRegistry:
                             },
                             "limit": {
                                 "type": "integer",
-                                "description": "Maximum number of skills to return (for list/suggest)",
+                                "description": "Maximum number of skills to return (for list/suggest)",  # noqa: E501
                             },
                         },
                         "required": ["action"],

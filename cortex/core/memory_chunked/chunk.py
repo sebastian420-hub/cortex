@@ -115,7 +115,7 @@ class EditChunk:
         return f"{file_info} - {self.token_estimate} tokens - {self.current_length} chars"
 
     def __str__(self) -> str:
-        return f"EditChunk(id={self.chunk_id}, type={self.chunk_type.value}, tokens={self.token_estimate})"
+        return f"EditChunk(id={self.chunk_id}, type={self.chunk_type.value}, tokens={self.token_estimate})"  # noqa: E501
 
     def __repr__(self) -> str:
         return self.__str__()

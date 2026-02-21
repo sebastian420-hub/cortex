@@ -274,7 +274,7 @@ class ContextWindowManager:
 
         lines = [
             "┌─ Context Window Status ─────────────────────────────┐",
-            f"│ Tokens: {total_tokens:>5}/{self.max_tokens:<5} ({percentage:>5.1f}%)                  │",
+            f"│ Tokens: {total_tokens:>5}/{self.max_tokens:<5} ({percentage:>5.1f}%)                  │",  # noqa: E501
             f"│ Active Chunks: {len(self.active_chunks):>2}                                │",
             f"│ Available Chunks: {len(self.available_chunks):>2}                         │",
         ]

@@ -71,7 +71,7 @@ class TestOpenRouterProvider:
 
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message = MagicMock(role="assistant", content="Mocked OpenRouter response")
+        mock_response.choices[0].message = MagicMock(role="assistant", content="Mocked OpenRouter response")  # noqa: E501
         mock_response.choices[0].message.tool_calls = [] # No tool calls
         mock_openai_client.chat.completions.create.return_value = mock_response
 
@@ -99,7 +99,7 @@ class TestOpenRouterProvider:
         mock_tool_call_obj.function.arguments = '{"param": "value"}'
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message = MagicMock(role="assistant", content=None, tool_calls=[mock_tool_call_obj])
+        mock_response.choices[0].message = MagicMock(role="assistant", content=None, tool_calls=[mock_tool_call_obj])  # noqa: E501
         mock_openai_client.chat.completions.create.return_value = mock_response
 
         messages = [{"role": "user", "content": "Use tool"}]
@@ -140,7 +140,7 @@ class TestOpenRouterProvider:
         )
         mock_tool_call_delta.function.name = "test_tool_stream"
         mock_tool_call_delta.function.arguments = '{"param": "value"}'
-        chunk_tool = MagicMock(choices=[MagicMock(delta=MagicMock(content=None, tool_calls=[mock_tool_call_delta]))])
+        chunk_tool = MagicMock(choices=[MagicMock(delta=MagicMock(content=None, tool_calls=[mock_tool_call_delta]))])  # noqa: E501
         mock_openai_client.chat.completions.create.return_value = [chunk_tool]
 
         messages = [{"role": "user", "content": "Stream tool call"}]

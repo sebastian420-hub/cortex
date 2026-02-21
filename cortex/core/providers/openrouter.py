@@ -298,7 +298,7 @@ class OpenRouterProvider(ModelProvider):
             return None
 
         # Pattern to match individual tool calls within the section
-        # Format: <|tool_call_begin|>functions.name:idx<|tool_call_argument_begin|>{args}<|tool_call_end|>
+        # Format: <|tool_call_begin|>functions.name:idx<|tool_call_argument_begin|>{args}<|tool_call_end|>  # noqa: E501
         call_pattern = (
             r"<\|tool_call_begin\|>\s*"
             r"(?P<tool_id>[\w\.]+:\d+)\s*"

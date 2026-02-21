@@ -446,7 +446,7 @@ class GitBranchTool(Tool):
 
         delete_flag = "-D" if force else "-d"
         confirm_msg = (
-            f"[bold red]Permanently delete branch '{branch_name}'? This cannot be undone.[/bold red]"
+            f"[bold red]Permanently delete branch '{branch_name}'? This cannot be undone.[/bold red]"  # noqa: E501
             if force
             else f"[bold]Delete branch '{branch_name}'?[/bold]"
         )

@@ -431,7 +431,7 @@ class CostTracker:
     def _generate_request_id(self) -> str:
         """Generate a unique request ID."""
         timestamp = int(time.time() * 1000)
-        random_part = hashlib.md5(str(timestamp).encode()).hexdigest()[:8]
+        random_part = hashlib.sha256(str(timestamp).encode()).hexdigest()[:8]
         return f"req_{timestamp}_{random_part}"
 
     def _persist_record(self, record: CostRecord) -> None:

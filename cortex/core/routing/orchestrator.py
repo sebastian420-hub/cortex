@@ -588,11 +588,11 @@ class RoutingOrchestrator:
         # Simple cache key based on request hash and context summary
         import hashlib
 
-        request_hash = hashlib.md5(user_request.encode()).hexdigest()[:16]
+        request_hash = hashlib.sha256(user_request.encode()).hexdigest()[:16]
 
         if context:
             context_summary = f"{context.session_id or ''}:{context.user_id or ''}"
-            context_hash = hashlib.md5(context_summary.encode()).hexdigest()[:8]
+            context_hash = hashlib.sha256(context_summary.encode()).hexdigest()[:8]
             return f"route_{request_hash}_{context_hash}"
         else:
             return f"route_{request_hash}"

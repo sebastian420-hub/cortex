@@ -322,7 +322,7 @@ class DelegationRules:
                         rule_name="critical_risk_mandatory",
                         rule_type=RuleType.MANDATORY,
                         severity=RuleSeverity.CRITICAL,
-                        message="Critical risk steps MUST use reasoning specialist (deepseek-reasoner)",
+                        message="Critical risk steps MUST use reasoning specialist (deepseek-reasoner)",  # noqa: E501
                         required_model=required_model,
                         actual_model=step.required_model,
                     )
@@ -429,7 +429,7 @@ class DelegationRules:
                     rule_name="cost_limit_exceeded",
                     rule_type=RuleType.OPTIMIZATION,
                     severity=RuleSeverity.MEDIUM,
-                    message=f"Step cost limit ${step.max_cost_usd:.2f} exceeds maximum ${MAX_COST_PER_STEP:.2f}",
+                    message=f"Step cost limit ${step.max_cost_usd:.2f} exceeds maximum ${MAX_COST_PER_STEP:.2f}",  # noqa: E501
                 )
             )
 

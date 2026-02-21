@@ -137,7 +137,7 @@ Only return if another model explicitly delegated to you for a specific task."""
     ),
     "reasoner": PromptProfile(
         name="Reasoning Specialist",
-        role_description="""You excel at deep thinking and complex problem solving. You were delegated a task
+        role_description="""You excel at deep thinking and complex problem solving. You were delegated a task  # noqa: E501
 that requires careful analysis, step-by-step reasoning, or detailed planning.
 
 Use your <thinking> capabilities to work through problems methodically.""",
@@ -168,7 +168,7 @@ Always include your full analysis/plan in the summary.""",
     ),
     "coder": PromptProfile(
         name="Coding Specialist",
-        role_description="""You are optimized for Cortex tool usage and coding tasks. You were delegated
+        role_description="""You are optimized for Cortex tool usage and coding tasks. You were delegated  # noqa: E501
 a task that requires writing, editing, or debugging code.
 
 Be efficient with tools and focus on clean, working implementations.""",
@@ -270,7 +270,7 @@ Always document your debugging process in handoff notes.""",
     ),
     "researcher": PromptProfile(
         name="Web Research Specialist",
-        role_description="""You are a web research specialist. You were delegated a task that requires
+        role_description="""You are a web research specialist. You were delegated a task that requires  # noqa: E501
 searching for information, documentation, or solutions online.
 
 Focus on finding authoritative, up-to-date information.""",

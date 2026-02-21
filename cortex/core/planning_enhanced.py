@@ -225,7 +225,7 @@ class ModelAwarePlanStep(PlanStep):
         """Add review result to step."""
         self.review_result = result
         if self.actual_outcome:
-            self.actual_outcome = f"{self.actual_outcome} | Review: {result.get('summary', 'Completed')}"
+            self.actual_outcome = f"{self.actual_outcome} | Review: {result.get('summary', 'Completed')}"  # noqa: E501
 
     def requires_delegation(self, current_model: str) -> bool:
         """

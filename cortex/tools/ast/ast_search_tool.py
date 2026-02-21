@@ -48,16 +48,16 @@ Use grep instead for: text patterns, strings, comments, or quick text searches."
                 "search_type": {
                     "type": "string",
                     "enum": ["smart", "function", "class", "import", "text", "structure"],
-                    "description": "Type of search: 'function' finds function definitions, 'class' finds classes, 'import' finds imports, 'smart' auto-detects",
+                    "description": "Type of search: 'function' finds function definitions, 'class' finds classes, 'import' finds imports, 'smart' auto-detects",  # noqa: E501
                 },
                 "file_type": {
                     "type": "string",
-                    "description": "Filter by file extension (e.g., 'py' for Python, 'js' for JavaScript)",
+                    "description": "Filter by file extension (e.g., 'py' for Python, 'js' for JavaScript)",  # noqa: E501
                 },
                 "output_mode": {
                     "type": "string",
                     "enum": ["files_with_matches", "content", "count"],
-                    "description": "Output format: 'content' shows matching code, 'files_with_matches' shows file paths, 'count' shows match counts",
+                    "description": "Output format: 'content' shows matching code, 'files_with_matches' shows file paths, 'count' shows match counts",  # noqa: E501
                 },
                 "context": {
                     "type": "integer",
@@ -178,7 +178,7 @@ class ASTSearchTool(Tool):
             search_type_enum = SearchType(search_type)
         except ValueError:
             return create_error_response(
-                f"Invalid search_type: {search_type}. Must be one of: {[t.value for t in SearchType]}",
+                f"Invalid search_type: {search_type}. Must be one of: {[t.value for t in SearchType]}",  # noqa: E501
                 ErrorType.VALIDATION,
                 {"search_type": search_type},
             )
@@ -512,7 +512,7 @@ class ASTSearchTool(Tool):
                 elif output_mode == "content":
                     for element in elements:
                         if element_type == "function":
-                            result_text = f"{rel_path}:{element.start_line}: def {element.name}({', '.join(element.parameters)})"
+                            result_text = f"{rel_path}:{element.start_line}: def {element.name}({', '.join(element.parameters)})"  # noqa: E501
                         elif element_type == "class":
                             result_text = f"{rel_path}:{element.start_line}: class {element.name}"
                         elif element_type == "import":

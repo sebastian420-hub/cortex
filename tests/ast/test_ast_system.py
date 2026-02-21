@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Comprehensive AST system test - final version."""
 
+import os
 import sys
 import tempfile
-import os
 from pathlib import Path
-sys.path.insert(0, '.')
 
+import pytest
+
+sys.path.insert(0, ".")
+
+from cortex.code_ast.languages import detect_language
 from cortex.code_ast.parser import ASTParser
 from cortex.code_ast.queries import ASTQueries
 from cortex.code_ast.service import ASTService
-from cortex.code_ast.languages import detect_language
-
-import pytest
 
 @pytest.fixture(scope="module")
 def parser():
@@ -155,7 +156,7 @@ class TestClass:
 
         # Test query
         print("\n5. Testing query...")
-        query_results = service.query(temp_file, "(function_definition name: (identifier) @name)", 'python')
+        query_results = service.query(temp_file, "(function_definition name: (identifier) @name)", 'python')  # noqa: E501
         print(f"   Query returned {len(query_results)} results")
 
         # Test cache - note: cache stats may not have 'enabled' key

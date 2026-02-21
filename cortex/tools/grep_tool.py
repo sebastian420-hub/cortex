@@ -444,7 +444,7 @@ class GrepTool(Tool):
                                         prefix = "--" if ctx_line_num != line_num - 1 else ""
                                         if show_line_numbers:
                                             results.append(
-                                                f"{rel_path}:{ctx_line_num + 1}{prefix}: {lines[ctx_line_num]}"
+                                                f"{rel_path}:{ctx_line_num + 1}{prefix}: {lines[ctx_line_num]}"  # noqa: E501
                                             )
                                         else:
                                             results.append(

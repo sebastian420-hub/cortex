@@ -14,7 +14,7 @@ MAX_GENERIC_RESULT_LENGTH = 100000  # ~25,000 tokens - reduced to prevent overfl
 
 # Truncation messages
 TRUNCATION_MESSAGE = "\n\n[... Content truncated to prevent context overflow. {} items removed ...]"
-FILE_LIST_TRUNCATION = "\n\n[... File list truncated. Showing {} of {} total files. Use more specific patterns or filters to reduce results ...]"
+FILE_LIST_TRUNCATION = "\n\n[... File list truncated. Showing {} of {} total files. Use more specific patterns or filters to reduce results ...]"  # noqa: E501
 
 
 def estimate_token_count(text: str) -> int:
@@ -98,7 +98,7 @@ def truncate_tool_result(
                 data["total_count"] = original_count
                 data["truncated"] = True
                 data["truncation_reason"] = (
-                    f"File list truncated to prevent context overflow. Showing {max_files} of {original_count} total files."
+                    f"File list truncated to prevent context overflow. Showing {max_files} of {original_count} total files."  # noqa: E501
                 )
 
                 truncated = True
@@ -109,7 +109,7 @@ def truncate_tool_result(
                 }
 
                 logger.warning(
-                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_files)} files "
+                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_files)} files "  # noqa: E501
                     f"(saved ~{estimate_token_count(files_json) // 1000}K tokens)"
                 )
 
@@ -145,7 +145,7 @@ def truncate_tool_result(
                 }
 
                 logger.warning(
-                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_results)} matches "
+                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_results)} matches "  # noqa: E501
                     f"(saved ~{estimate_token_count(results_json) // 1000}K tokens)"
                 )
 
@@ -161,7 +161,7 @@ def truncate_tool_result(
             if last_newline > 0:
                 truncated_content = truncated_content[:last_newline]
 
-            truncated_content += f"\n\n[... Content truncated at {len(truncated_content)} characters. Original file is {original_length} characters. Use offset/limit parameters to read specific portions ...]"
+            truncated_content += f"\n\n[... Content truncated at {len(truncated_content)} characters. Original file is {original_length} characters. Use offset/limit parameters to read specific portions ...]"  # noqa: E501
 
             data["content"] = truncated_content
             data["truncated"] = True
@@ -176,7 +176,7 @@ def truncate_tool_result(
             }
 
             logger.warning(
-                f"Truncated {tool_name} result: {original_length} -> {len(truncated_content)} chars "
+                f"Truncated {tool_name} result: {original_length} -> {len(truncated_content)} chars "  # noqa: E501
                 f"(saved ~{(original_length - len(truncated_content)) // 4000}K tokens)"
             )
 
@@ -210,7 +210,7 @@ def truncate_tool_result(
                 }
 
                 logger.warning(
-                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_extracted)} structures "
+                    f"Truncated {tool_name} result: {original_count} -> {len(truncated_extracted)} structures "  # noqa: E501
                     f"(saved ~{estimate_token_count(extracted_json) // 1000}K tokens)"
                 )
 

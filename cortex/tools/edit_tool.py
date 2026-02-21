@@ -117,7 +117,7 @@ class EditTool(Tool):
             # Find the locations
             locations = self._find_occurrences(content, old_string)
             return create_error_response(
-                f"String appears {count} times in file. Use replace_all=true or provide more context to make it unique.",
+                f"String appears {count} times in file. Use replace_all=true or provide more context to make it unique.",  # noqa: E501
                 ErrorType.VALIDATION,
                 {
                     "file_path": file_path,
@@ -140,11 +140,11 @@ class EditTool(Tool):
             # The replacement didn't change anything - old_string must be gone
             # But if new_content == content, it means no replacement occurred
             return create_error_response(
-                "Replacement verification failed - old_string not found or replacement had no effect",
+                "Replacement verification failed - old_string not found or replacement had no effect",  # noqa: E501
                 ErrorType.EXECUTION,
                 {
                     "file_path": file_path,
-                    "hint": "The old_string was not found in the file. Check for whitespace differences (tabs vs spaces) or line ending differences.",
+                    "hint": "The old_string was not found in the file. Check for whitespace differences (tabs vs spaces) or line ending differences.",  # noqa: E501
                     "file_preview": content[:500],
                 },
             )
@@ -177,7 +177,7 @@ class EditTool(Tool):
 
         if self.console:
             self.console.print(
-                f"[green]Edited {file_path}[/green] ({replacements} replacement{'s' if replacements > 1 else ''})"
+                f"[green]Edited {file_path}[/green] ({replacements} replacement{'s' if replacements > 1 else ''})"  # noqa: E501
             )
 
         return create_success_response(

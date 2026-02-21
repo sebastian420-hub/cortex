@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import os
 
-from cortex.core.memory_chunked.chunk import EditChunk, ChunkType, create_file_chunk, create_source_code_chunk
+from cortex.core.memory_chunked.chunk import EditChunk, ChunkType, create_file_chunk, create_source_code_chunk  # noqa: E501
 from cortex.core.memory_chunked.chunking import (
     FileChunker,
     ChunkingStrategy,

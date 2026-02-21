@@ -52,5 +52,5 @@ class ResetContextCommand(Command):
 
         console.print("[green]✓[/green] Context cleared. Memory preserved.")
         console.print(
-            f"[dim]Memory items: {len(ctx.agent.memory_bank.items) if ctx.agent.memory_bank else 0}[/dim]"
+            f"[dim]Memory items: {len(ctx.agent.memory_bank.items) if ctx.agent.memory_bank else 0}[/dim]"  # noqa: E501
         )

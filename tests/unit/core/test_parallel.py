@@ -188,12 +188,12 @@ class TestParallelToolExecutor:
         mock_execute_fn.return_value = {"success": True}
 
         tool_calls = [
-            ToolCall(id="1", name="write_file", arguments={"path": "test.txt", "content": "test"}, index=0)
+            ToolCall(id="1", name="write_file", arguments={"path": "test.txt", "content": "test"}, index=0)  # noqa: E501
         ]
 
         batch_result = executor.execute_batch(tool_calls)
 
-        mock_execute_fn.assert_called_once_with("write_file", {"path": "test.txt", "content": "test"})
+        mock_execute_fn.assert_called_once_with("write_file", {"path": "test.txt", "content": "test"})  # noqa: E501
 
         assert len(batch_result.results) == 1
         assert batch_result.parallel_count == 0
@@ -215,7 +215,7 @@ class TestParallelToolExecutor:
         tool_calls = [
             ToolCall(id="1", name="read_file", arguments={"path": "a.txt"}, index=0),
             ToolCall(id="2", name="read_file", arguments={"path": "b.txt"}, index=1),
-            ToolCall(id="3", name="write_file", arguments={"path": "c.txt", "content": "test"}, index=2),
+            ToolCall(id="3", name="write_file", arguments={"path": "c.txt", "content": "test"}, index=2),  # noqa: E501
             ToolCall(id="4", name="read_file", arguments={"path": "d.txt"}, index=3),
         ]
 
@@ -230,7 +230,7 @@ class TestParallelToolExecutor:
 
         # Verify parallel and serial counts
         # read_file is parallel, write_file is serial
-        # However, serial tools cause sequential execution: all parallel tools before serial are executed first,
+        # However, serial tools cause sequential execution: all parallel tools before serial are executed first,  # noqa: E501
         # then serial, then remaining parallel tools after serial? Need to check actual logic.
         # We'll just check that results exist.
         assert batch_result.parallel_count >= 2

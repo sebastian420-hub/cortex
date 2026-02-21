@@ -42,7 +42,7 @@ class GlobTool(Tool):
             path: Base directory to search from (default: current directory)
             sort_by_mtime: Sort by modification time, newest first (default: True)
             include_hidden: Include hidden files/directories (default: False)
-            max_results: Maximum number of results (default: 200, reduced to prevent context overflow)
+            max_results: Maximum number of results (default: 200, reduced to prevent context overflow)  # noqa: E501
 
         Returns:
             Standardized response with matching file paths

@@ -43,8 +43,8 @@ class ASTQueries:
             """,
             "import": """
                 (import_statement (dotted_name) @module) @import
-                (import_statement (aliased_import (dotted_name) @module (identifier) @alias)) @import_with_alias
-                (import_from_statement (dotted_name) @module_name (dotted_name) @imported_name) @import_from
+                (import_statement (aliased_import (dotted_name) @module (identifier) @alias)) @import_with_alias  # noqa: E501
+                (import_from_statement (dotted_name) @module_name (dotted_name) @imported_name) @import_from  # noqa: E501
             """,
             "decorator": """
                 (decorator) @decorator
