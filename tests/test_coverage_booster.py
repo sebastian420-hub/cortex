@@ -30,33 +30,33 @@ def test_permission_manager_coverage():
     """Exercise PermissionManager."""
     agent = MagicMock()
     pm = PermissionManager(agent)
-    
+
     # AUTO_APPROVE
     agent.permission_mode = PermissionMode.AUTO_APPROVE
     assert pm.check("write_file", {"path": "test.txt"}) is True
-    
+
     # PLAN
     agent.permission_mode = PermissionMode.PLAN
     assert pm.check("read_file", {"path": "test.txt"}) is True
     assert pm.check("write_file", {"path": "test.txt"}) is False
-    
+
     # NORMAL - safe
     agent.permission_mode = PermissionMode.NORMAL
     assert pm.check("read_file", {"path": "test.txt"}) is True
-    
+
     # NORMAL - dangerous command
     with patch("rich.prompt.Confirm.ask") as mock_ask:
         mock_ask.return_value = True
         assert pm.check("execute_command", {"command": "rm -rf /"}) is True
         assert pm.get_approval_count() == 1
-        
+
         # Check cache
         assert pm.check("execute_command", {"command": "rm -rf /"}) is True
         assert pm.get_approval_count() == 1
-        
+
         pm.clear_approvals()
         assert pm.get_approval_count() == 0
-        
+
     # NORMAL - dangerous write
     with patch("rich.prompt.Confirm.ask") as mock_ask:
         mock_ask.return_value = False
@@ -68,37 +68,40 @@ def test_feature_manager_coverage():
     # Reset singleton for testing
     FeatureManager.reset()
     fm = FeatureManager.get_instance({"rust_search": True})
-    
+
     assert fm.is_enabled(FeatureFlag.RUST_SEARCH) is True
     assert fm.is_enabled(FeatureFlag.RUST_AST) is False
-    
+
     fm.enable(FeatureFlag.RUST_AST)
     assert fm.is_enabled(FeatureFlag.RUST_AST) is True
-    
+
     fm.disable(FeatureFlag.RUST_AST)
     assert fm.is_enabled(FeatureFlag.RUST_AST) is False
-    
+
     # Check stats
     fm._record_stat("rust_search", "test_event")
     stats = fm.get_stats()
     assert "rust_search" in stats
-    
+
     flag_stats = fm.get_flag_stats(FeatureFlag.RUST_SEARCH)
     assert flag_stats["test_event"] == 1
-    
+
     # Check fallback
-    def native_fn(x): return x * 2
-    def fallback_fn(x): return x + 2
-    
+    def native_fn(x):
+        return x * 2
+
+    def fallback_fn(x):
+        return x + 2
+
     # Enabled
     assert fm.with_fallback(FeatureFlag.RUST_SEARCH, native_fn, fallback_fn, 5) == 10
     # Disabled
     assert fm.with_fallback(FeatureFlag.GO_CACHE, native_fn, fallback_fn, 5) == 7
-    
+
     # All flags
     all_flags = fm.get_all_flags()
     assert "rust_search" in all_flags
-    
+
     # Capability check (likely false in CI without native)
     fm.check_capability(FeatureFlag.RUST_SEARCH)
     fm.clear_capability_cache()
