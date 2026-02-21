@@ -12,8 +12,6 @@ This module provides advanced model routing capabilities including:
 from typing import Dict, Any, Optional, List
 import logging
 
-logger = logging.getLogger(__name__)
-
 # Re-export for backward compatibility
 from ..providers import (
     ModelProvider,
@@ -24,6 +22,7 @@ from ..providers import (
     ProviderError,
     ProviderFactory as LegacyProviderFactory,
 )
+
 
 # Export task analysis components
 from .task_analysis import (
@@ -76,6 +75,8 @@ from .orchestrator import (
     get_orchestrator,
     route_request,
 )
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     # Legacy compatibility
