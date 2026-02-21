@@ -106,7 +106,7 @@ class SearchFilesTool(Tool):
                 return create_success_response(
                     {
                         "results": output,
-                        "match_count": len([l for l in output.split("\n") if l.strip()]),
+                        "match_count": len([line for line in output.split("\n") if line.strip()]),
                     }
                 )
             else:

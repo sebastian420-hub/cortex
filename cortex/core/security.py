@@ -117,7 +117,7 @@ def _check_dangerous_paths(tokens: List[str]) -> bool:
             elif path.lower() in command_str:
                 # For paths like /etc, /usr, etc., check they're not part of safe paths
                 # Allow /tmp, /home, /var (common safe directories)
-                safe_paths = ["/tmp", "/home", "/var", "/opt"]
+                safe_paths = ["/tmp", "/home", "/var", "/opt"]  # nosec B108
                 is_safe = any(safe in command_str for safe in safe_paths)
                 if not is_safe:
                     return True

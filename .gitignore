@@ -77,6 +77,5 @@ fix_*.py
 planning_*.py
 replicate_test.py
 run_single_test.py
-test_*.py
 nul
 

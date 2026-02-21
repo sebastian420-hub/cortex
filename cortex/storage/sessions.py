@@ -42,7 +42,7 @@ class SessionManager:
     def __init__(self, sessions_dir: Path):
         self.sessions_dir = sessions_dir
         self._ensure_secure_directory()
-        self._lock_timeout = 5.0  # Timeout for acquiring locks (seconds)
+        self._lock_timeout = 10.0  # Timeout for acquiring locks (seconds)
 
     def _ensure_secure_directory(self) -> None:
         """Create storage directory with secure permissions"""
@@ -143,30 +143,29 @@ class SessionManager:
             self._secure_file(temp_file)
 
             # Acquire exclusive lock on lock file
-            lock_acquired = False
             start_time = time.time()
 
-            while not lock_acquired and (time.time() - start_time) < self._lock_timeout:
+            while (time.time() - start_time) < self._lock_timeout:
                 try:
                     with open(lock_file, "w") as lock_f:
                         if self._acquire_lock(lock_f, exclusive=True, blocking=False):
-                            lock_acquired = True
                             # Atomic rename (works on both Unix and Windows)
-                            temp_file.replace(file_path)
-                            # Set secure permissions on final file
-                            self._secure_file(file_path)
-                            return True
+                            # On Windows, this can still fail if the file is open elsewhere,
+                            # so we catch OSError and retry within the loop.
+                            try:
+                                temp_file.replace(file_path)
+                                # Set secure permissions on final file
+                                self._secure_file(file_path)
+                                return True
+                            except OSError:
+                                # Replace failed, release lock and retry
+                                pass
                 except (IOError, OSError):
-                    pass  # Ignore errors and retry
+                    pass  # Ignore lock file errors and retry
                 time.sleep(0.1)  # Brief wait before retry
 
-            # If we couldn't acquire lock, still try atomic rename
-            # (on some systems, rename is atomic even without explicit locking)
-            if not lock_acquired:
-                temp_file.replace(file_path)
-                # Set secure permissions on final file
-                self._secure_file(file_path)
-                return True
+            # If we reached here, we timed out
+            raise TimeoutError(f"Timed out trying to atomically write {file_path.name}")
 
         except Exception as e:
             logger.warning(f"Could not acquire lock for {file_path.name}: {e}")

@@ -8,6 +8,7 @@ Providers
    :members:
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 Conversation
 ------------
