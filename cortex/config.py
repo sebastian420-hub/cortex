@@ -146,7 +146,9 @@ DEFAULT_SERVICES = {
 
 # Default context compression/summarization settings
 DEFAULT_CONTEXT_COMPRESSION = {
-    "summarization_threshold": 0.75,  # Trigger at 75% (was 0.8)
+    "enabled": True,
+    "strategy": "simple",  # Strategy: "simple", "llm", "hybrid"
+    "threshold": 0.75,  # Trigger at 75%
     "compression_ratio": 0.2,  # Target 20% of original
     "preserve_tool_results": True,
     "preserve_errors": True,
@@ -209,6 +211,8 @@ class AgentConfig:
         rate_limit: Optional[Dict[str, Any]] = None,
         # Routing settings (new)
         routing: Optional[Dict[str, Any]] = None,
+        # Summarization settings (new)
+        summarization: Optional[Dict[str, Any]] = None,
         # Hybrid architecture settings
         profiling: Optional[Dict[str, Any]] = None,
         feature_flags: Optional[Dict[str, Any]] = None,
@@ -282,6 +286,9 @@ class AgentConfig:
         # Routing settings (merge with defaults)
         self.routing = {**DEFAULT_ROUTING, **(routing or {})}
 
+        # Summarization settings (merge with defaults)
+        self.summarization = {**DEFAULT_CONTEXT_COMPRESSION, **(summarization or {})}
+
         # Hybrid architecture settings (merge with defaults)
         self.profiling = {**DEFAULT_PROFILING, **(profiling or {})}
         self.feature_flags = {**DEFAULT_FEATURE_FLAGS, **(feature_flags or {})}
@@ -331,6 +338,10 @@ class AgentConfig:
     def get_routing_config(self) -> Dict[str, Any]:
         """Get configuration for RoutingOrchestrator."""
         return self.routing
+
+    def get_summarization_config(self) -> Dict[str, Any]:
+        """Get configuration for context summarization."""
+        return self.summarization
 
     def get_profiling_config(self) -> Dict[str, Any]:
         """Get configuration for PerformanceProfiler."""
@@ -429,6 +440,15 @@ class AgentConfig:
                 os.getenv("CORTEX_RECOVERY_ENABLED").lower() == "true"
             )
 
+        # Build summarization settings from env vars
+        summarization = {}
+        if os.getenv("CORTEX_SUMMARIZATION_ENABLED"):
+            summarization["enabled"] = os.getenv("CORTEX_SUMMARIZATION_ENABLED").lower() == "true"
+        if os.getenv("CORTEX_SUMMARIZATION_STRATEGY"):
+            summarization["strategy"] = os.getenv("CORTEX_SUMMARIZATION_STRATEGY")
+        if os.getenv("CORTEX_SUMMARIZATION_THRESHOLD"):
+            summarization["threshold"] = float(os.getenv("CORTEX_SUMMARIZATION_THRESHOLD"))
+
         return cls(
             model=os.getenv("CORTEX_MODEL", "moonshotai/kimi-k2.5"),
             permission_mode=os.getenv("CORTEX_MODE", "normal"),
@@ -444,6 +464,7 @@ class AgentConfig:
             timeouts=timeouts if timeouts else None,
             session_retention=session_retention if session_retention else None,
             error_recovery=error_recovery if error_recovery else None,
+            summarization=summarization if summarization else None,
         )
 
     @classmethod
@@ -481,6 +502,7 @@ class AgentConfig:
             config.tool_timeouts = file_config.tool_timeouts
             config.session_retention = file_config.session_retention
             config.error_recovery = file_config.error_recovery
+            config.summarization = file_config.summarization
 
         # Override with environment variables
         env_config = cls.from_env()

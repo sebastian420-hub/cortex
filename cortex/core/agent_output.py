@@ -27,8 +27,10 @@ class AgentOutputMixin:
             return
 
         if self._is_text_output():
+            from ..utils.output_processing import process_model_output
+            processed_content = process_model_output(content)
             # Always use simple markdown output (no Panel boxes)
-            console.print(Markdown(content))
+            console.print(Markdown(processed_content))
         else:
             formatted = self.formatter.format_response(response)
             self.formatter.write(formatted)
@@ -100,12 +102,23 @@ class AgentOutputMixin:
 
         for i, msg in enumerate(messages):
             role = msg.get("role", "")
-            content = msg.get("content", "")
+            content = msg.get("content")
             tool_calls = msg.get("tool_calls")
 
-            # Validate assistant messages - must have content or tool_calls
+            # Validate assistant messages
             if role == "assistant":
-                if not content and not tool_calls:
+                # Check for missing content key entirely
+                if "content" not in msg:
+                    issues.append(
+                        {
+                            "index": i,
+                            "type": "missing_content_key",
+                            "message": f"Assistant message at index {i} is missing 'content' key (strictly required by some providers)",
+                            "severity": "critical",
+                        }
+                    )
+                # Check for both empty content and empty tool calls
+                elif not content and not tool_calls:
                     issues.append(
                         {
                             "index": i,
@@ -153,10 +166,12 @@ class AgentOutputMixin:
         repaired_messages = messages.copy()
 
         for issue in issues:
-            if issue["type"] == "invalid_assistant_message":
-                idx = issue["index"]
-                msg = repaired_messages[idx]
+            idx = issue["index"]
+            msg = repaired_messages[idx]
 
+            if issue["type"] == "missing_content_key":
+                repaired_messages[idx]["content"] = ""
+            elif issue["type"] == "invalid_assistant_message":
                 # Try to fix by converting reasoning_content to content
                 if msg.get("reasoning_content"):
                     content = f"[Reasoning: {msg['reasoning_content'][:200]}{'...' if len(msg['reasoning_content']) > 200 else ''}]"
@@ -320,5 +335,13 @@ class AgentOutputMixin:
         if self._is_text_output():
             console.print(
                 f"[yellow]Context truncated:[/yellow] Removed {messages_removed} old messages "
+                f"({remaining} remaining)"
+            )
+
+    def _on_context_summarization(self, messages_removed: int, remaining: int) -> None:
+        """Callback when context is summarized."""
+        if self._is_text_output():
+            console.print(
+                f"[green]Context summarized:[/green] Compressed {messages_removed} old messages into a summary "
                 f"({remaining} remaining)"
             )

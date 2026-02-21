@@ -9,6 +9,7 @@ from rich.prompt import Confirm
 from .base import Tool
 from ..core.security import is_dangerous_command
 from ..models import PermissionMode
+from ..ui.modes import should_show_panels, is_minimal_mode
 from ..utils.errors import (
     create_error_response,
     create_success_response,
@@ -117,21 +118,32 @@ class ExecuteCommandTool(Tool):
 
             if self.console:
                 if result.returncode == 0:
-                    self.console.print(
-                        Panel(
-                            output or "[dim]Command completed successfully[/dim]",
-                            title="✓ Output",
-                            border_style="green",
+                    if should_show_panels():
+                        self.console.print(
+                            Panel(
+                                output or "[dim]Command completed successfully[/dim]",
+                                title="✓ Output",
+                                border_style="green",
+                            )
                         )
-                    )
+                    else:
+                        # Minimal mode - simple but clear output
+                        if output:
+                            self.console.print(f"[green]✓ Output:[/green]\n{output.strip()}")
+                        else:
+                            self.console.print("[green]✓ Command completed successfully[/green]")
                 else:
-                    self.console.print(
-                        Panel(
-                            output,
-                            title=f"✗ Failed (exit code {result.returncode})",
-                            border_style="red",
+                    if should_show_panels():
+                        self.console.print(
+                            Panel(
+                                output,
+                                title=f"✗ Failed (exit code {result.returncode})",
+                                border_style="red",
+                            )
                         )
-                    )
+                    else:
+                        # Minimal mode - simple but clear output
+                        self.console.print(f"[red]✗ Failed (exit code {result.returncode}):[/red]\n{output.strip()}")
 
             if result.returncode == 0:
                 return create_success_response({"output": output, "exit_code": result.returncode})

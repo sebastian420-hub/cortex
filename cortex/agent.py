@@ -21,7 +21,7 @@ from .config import AgentConfig
 from .core.parallel import ParallelToolExecutor, ToolCall
 from .core.streaming import stream_model_response, display_streaming_response
 from .core.providers import ProviderFactory, ProviderError
-from .core.planning import PlanningEngine, Plan
+from .core.planning import PlanningEngine, Plan, PlanStep, PlanStepType
 
 # Import routing system (optional, gracefully handle if not available)
 try:
@@ -72,6 +72,7 @@ from .hooks import (
 )
 from .output import OutputFormat
 from .utils.result_truncation import truncate_tool_result
+from .utils.output_processing import process_model_output
 
 # stream_model_response and display_streaming_response already imported above
 
@@ -135,6 +136,7 @@ class Cortex:
                 "skill_loader": self._load_skill,
                 "tool_executor": self._execute_tool_for_planning,
                 "reflection_callback": self._on_plan_reflection,
+                "step_callback": self._on_plan_step,
             }
         )
 
@@ -203,6 +205,8 @@ class Cortex:
             self.conversation.history[0]["content"] = system_prompt
             
         self.conversation._on_truncation = self._on_context_truncation
+        if hasattr(self.conversation, "_on_summarization"):
+            self.conversation._on_summarization = self._on_context_summarization
 
         # Track tools used in session (for metrics)
         self._tools_used: List[str] = []
@@ -234,6 +238,14 @@ class Cortex:
         if self._is_text_output():
             console.print(
                 f"[yellow]Context truncated:[/yellow] Removed {messages_removed} old messages "
+                f"({remaining} remaining)"
+            )
+
+    def _on_context_summarization(self, messages_removed: int, remaining: int) -> None:
+        """Callback when context is summarized."""
+        if self._is_text_output():
+            console.print(
+                f"[green]Context summarized:[/green] Compressed {messages_removed} old messages into a summary "
                 f"({remaining} remaining)"
             )
 
@@ -502,7 +514,11 @@ class Cortex:
         memory_bank_context = self.memory_bank.get_summary() if hasattr(self, "memory_bank") else None
         
         # Get all tool schemas (includes base + orchestration tools)
-        tool_schemas = get_registry().get_all_schemas()
+        exclude = []
+        if not self.enable_planning:
+            exclude = ["create_plan", "execute_plan", "monitor_plan", "update_plan", "create_and_execute_plan"]
+            
+        tool_schemas = get_registry().get_all_schemas(exclude_names=exclude)
         
         # Build using PromptBuilder
         return self.prompt_builder.build_system_prompt(
@@ -550,8 +566,9 @@ class Cortex:
             return
 
         if self._is_text_output():
+            processed_content = process_model_output(content)
             # Always use simple markdown output (no Panel boxes)
-            console.print(Markdown(content))
+            console.print(Markdown(processed_content))
         else:
             formatted = self.formatter.format_response(response)
             self.formatter.write(formatted)
@@ -653,7 +670,7 @@ class Cortex:
                         ]
 
                         # Truncate remaining tool results
-                        max_tool_content_length = 8000
+                        max_tool_content_length = self.conversation._get_max_tool_result_length()
                         for msg in self.conversation.history:
                             if msg.get("role") == "tool":
                                 content = msg.get("content", "")
@@ -904,7 +921,11 @@ class Cortex:
                     # Refresh system prompt with latest state/memory
                     self.conversation.system_prompt = self._get_system_prompt()
                     messages = self.conversation.get_history()
-                    tools = get_registry().get_all_schemas()
+                    
+                    exclude = []
+                    if not self.enable_planning:
+                        exclude = ["create_plan", "execute_plan", "monitor_plan", "update_plan", "create_and_execute_plan"]
+                    tools = get_registry().get_all_schemas(exclude_names=exclude)
 
                     with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
                         if use_streaming and stream_model_response and self.provider.supports_streaming():
@@ -972,12 +993,20 @@ class Cortex:
                             # Delegation
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
                                 if self._handle_delegation_action(result):
-                                    result = truncate_tool_result(tool_name, result)
+                                    result = truncate_tool_result(
+                                        tool_name, 
+                                        result, 
+                                        max_length=self.conversation._get_max_tool_result_length()
+                                    )
                                     self.conversation.add_tool_result(tool_result.id, result)
                                     continue
 
                             # Truncate and add to conversation
-                            result = truncate_tool_result(tool_name, result)
+                            result = truncate_tool_result(
+                                tool_name, 
+                                result, 
+                                max_length=self.conversation._get_max_tool_result_length()
+                            )
                             self.conversation.add_tool_result(tool_result.id, result)
 
                             # Loop guard checks
@@ -1055,6 +1084,48 @@ class Cortex:
         if self.enable_layered_memory:
             self.state_manager.record_insight(f"Plan reflection: {reflection}")
 
+    def _on_plan_step(self, step: PlanStep, result: Dict[str, Any]) -> None:
+        """
+        Callback triggered when a plan step completes.
+        
+        This records the step execution in history and memory so the agent
+        stays informed of what happened during planning execution.
+        """
+        if self.enable_layered_memory and isinstance(self.memory_bank, EnhancedMemoryBank):
+            self.memory_bank.extract_learnings_from_tool_results([result])
+            
+        # Record the tool execution in conversation history if it was a tool call
+        if step.step_type == PlanStepType.TOOL_CALL and step.tool_name:
+            # We don't have the original tool_call_id from the model here,
+            # so we use the step ID as a reference.
+            tool_call_id = f"plan_{step.id}"
+            
+            # Add a synthetic assistant message showing the tool call that was executed
+            # This helps the model maintain context of the conversation flow
+            self.conversation.add_assistant_message(
+                content=f"Executing plan step: {step.description}",
+                tool_calls=[{
+                    "id": tool_call_id,
+                    "type": "function",
+                    "function": {
+                        "name": step.tool_name,
+                        "arguments": json.dumps(step.tool_arguments or {})
+                    }
+                }]
+            )
+            
+            # Add the result
+            truncated_result = truncate_tool_result(
+                step.tool_name, 
+                result, 
+                max_length=self.conversation._get_max_tool_result_length()
+            )
+            self.conversation.add_tool_result(tool_call_id, truncated_result)
+            
+            if self._is_text_output():
+                status = "success" if result.get("success", False) else "failed"
+                console.print(f"[dim]Plan Step {step.id}: {step.tool_name} -> {status}[/dim]")
+
     def get_conversation_history(self) -> List[Dict[str, Any]]:
         return self.conversation.get_history()
 
@@ -1063,18 +1134,28 @@ class Cortex:
         self.conversation.history[0]["content"] = self._get_system_prompt()
 
     def _validate_messages_for_api(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Validate messages for API compliance, checking for missing content keys."""
         issues = []
         for i, msg in enumerate(messages):
-            if msg.get("role") == "assistant" and not msg.get("content") and not msg.get("tool_calls"):
-                issues.append({"index": i, "type": "invalid_assistant_message", "severity": "critical"})
+            if msg.get("role") == "assistant":
+                # Check for missing content key entirely
+                if "content" not in msg:
+                    issues.append({"index": i, "type": "missing_content_key", "severity": "critical"})
+                # Check for both empty content and empty tool calls
+                elif not msg.get("content") and not msg.get("tool_calls"):
+                    issues.append({"index": i, "type": "invalid_assistant_message", "severity": "critical"})
         return {"valid": len(issues) == 0, "issues": issues}
 
     def _repair_messages_for_api(self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Attempt to repair critical message validation issues."""
         repaired = messages.copy()
         for issue in issues:
             idx = issue["index"]
-            if repaired[idx].get("reasoning_content"):
-                repaired[idx]["content"] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
-            else:
-                repaired[idx]["content"] = "[Repaired empty response]"
+            if issue["type"] == "missing_content_key":
+                repaired[idx]["content"] = ""
+            elif issue["type"] == "invalid_assistant_message":
+                if repaired[idx].get("reasoning_content"):
+                    repaired[idx]["content"] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
+                else:
+                    repaired[idx]["content"] = "[Repaired empty response]"
         return repaired

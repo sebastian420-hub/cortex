@@ -76,6 +76,7 @@ class ToolFormatter:
             "bash",
             "execute_command",
             # Planning
+            "create_and_execute_plan",
             "create_plan",
             "execute_plan",
             "monitor_plan",
@@ -511,7 +512,7 @@ Tips: Read before edit. Search before assuming paths."""
 | Search code | `grep` | Find patterns, functions, classes |
 | Find files | `glob` | Locate files by name patterns |
 | Run command | `execute_command` | Execute system commands, tests |
-| Create plan | `create_plan` | For complex multi-step tasks (4+ steps) |
+| Plan workflow | `create_and_execute_plan` | (PREFERRED) For complex tasks (4+ steps) |
 | Find symbols | `ast_search` | Structural code search by definition |
 | Extract code | `ast_extract` | Get functions/classes with metadata |
 
@@ -525,7 +526,7 @@ Need to understand code?
 
 Need to modify code?
 ├── Small change? → edit
-└── Multiple files? → create_plan first
+└── Multiple files? → create_and_execute_plan first
 ```
 
 ## grep vs ast_search
@@ -580,22 +581,36 @@ Skip planning for simple, single-step tasks."""
         else:  # DETAILED
             return """# Planning System
 
-You have access to planning tools for managing complex, multi-step tasks systematically.
+You have access to a powerful structured planning engine for managing complex, multi-step engineering tasks systematically.
 
 ## When to Use Planning
 
-**USE planning when:**
+**USE `create_and_execute_plan` when:**
 - Task involves 4+ sequential steps
-- Multiple files need coordinated changes
-- Task has dependencies between steps
+- Multiple files need coordinated changes (e.g., refactoring, new feature implementation)
+- You want to maintain high autonomy and ensure all results are reported back turn-by-turn.
+
+**RULES FOR COMPLEX TASKS:**
+1. **NO MANUAL TOOL CALLS**: For tasks with 4+ steps, do NOT call `glob`, `grep`, or `read_file` manually in parallel. Instead, define them as steps in a plan.
+2. **ACTIVE PLAN CONSTRAINT**: If a plan is currently ACTIVE (in_progress), you are FORBIDDEN from using manual tools. You MUST use `execute_plan` to continue the workflow or `update_plan` to adjust it.
+3. **USE ATOMIC EXECUTION**: Prefer `create_and_execute_plan` over manual `create_plan` + `execute_plan` sequences.
+4. **MAINTAIN CONTEXT**: The engine will report results back to your history after each step executes.
 
 **Planning Tools:**
-- `create_plan`: Create a structured plan with goals and constraints.
-- `execute_plan`: Execute steps one by one.
-- `monitor_plan`: Check progress and status.
-- `update_plan`: Modify plan if approach needs adjustment.
+- `create_and_execute_plan`: (PREFERRED) Atomic creation and execution. Use this to start a multi-step workflow immediately.
+- `create_plan`: Create a structured plan for manual review (Advanced use only).
+- `execute_plan`: Run a previously created plan.
+- `monitor_plan`: Check status of an active plan.
+- `update_plan`: Modify or add steps if the plan needs adjustment.
 
-**Note on todo_write:** Use `todo_write` for simple tracking of 2-3 steps. For everything else, use `create_plan`."""
+**How to Create a Plan:**
+When calling `create_and_execute_plan`, ALWAYS provide a concrete `steps` list. Each step should include:
+- `description`: Clear action (e.g., 'Extract auth logic from agent.py')
+- `tool_name`: The specific tool for the step (e.g., 'read_file', 'edit')
+- `tool_arguments`: The arguments for that tool.
+- `dependencies`: (Optional) List of step IDs that must complete first.
+
+**Note on todo_write:** Use `todo_write` ONLY for simple progress tracking of 2-3 basic manual steps. For anything involving coordinated codebase changes, you MUST use `create_and_execute_plan`."""
 
     def _build_memory_section(self, memory_bank_context: Optional[str]) -> str:
         """Build memory system guidance section."""
@@ -618,34 +633,31 @@ Use this to avoid repeating mistakes and reuse proven patterns."""
         """Add JSON schema enforcement for models that support it."""
         return """## Output Format
 
-ALL responses MUST be valid JSON matching this schema:
+For complex operations (planning, commands, multiple edits), you MUST use this JSON schema:
 
 ```json
 {
-  "mode": "plan" | "run_command" | "edit_file" | "answer" | "reasoning",
+  "mode": "plan" | "run_command" | "edit_file" | "reasoning",
   "reasoning": "brief chain-of-thought (< 150 words)",
   "commands": [
     {
+      "id": "cmd_1",
       "cmd": "shell command",
-      "cwd": "working directory",
-      "explanation": "why this is needed"
+      "explanation": "why"
     }
   ],
   "edits": [
     {
-      "file": "relative/path/to/file",
-      "action": "create" | "modify" | "delete",
-      "content": "file content or patch"
+      "file": "path/to/file",
+      "action": "modify",
+      "content": "new content"
     }
   ],
-  "answer": "natural language response"
+  "answer": "natural language response or summary"
 }
 ```
 
-**Security Constraints**:
-- NEVER run destructive commands without explicit approval.
-- ALWAYS validate file paths.
-- Always output valid JSON.
+**Note**: For simple questions or direct information where no tools are needed, you may respond with plain Markdown text.
 """
 
     def _build_model_adaptation(self) -> str:

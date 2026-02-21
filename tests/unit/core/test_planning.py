@@ -297,6 +297,34 @@ class TestPlanningEngine:
         assert plan.id in planning_engine.plans
         assert planning_engine.active_plan == plan
     
+    def test_create_plan_with_steps(self, planning_engine):
+        """Test creating a new plan with provided steps."""
+        goal = "Custom goal with steps"
+        steps = [
+            {
+                "description": "Custom step 1",
+                "tool_name": "read_file",
+                "tool_arguments": {"path": "test.py"}
+            },
+            {
+                "description": "Custom step 2",
+                "dependencies": ["step_1"],
+                "expected_outcome": "Done"
+            }
+        ]
+        
+        plan = planning_engine.create_plan(goal, steps=steps)
+        
+        assert plan is not None
+        assert plan.goal == goal
+        assert len(plan.steps) == 2
+        assert plan.steps[0].description == "Custom step 1"
+        assert plan.steps[0].tool_name == "read_file"
+        assert plan.steps[0].tool_arguments == {"path": "test.py"}
+        assert plan.steps[1].description == "Custom step 2"
+        assert plan.steps[1].dependencies == ["step_1"]
+        assert plan.steps[1].expected_outcome == "Done"
+    
     def test_add_step_to_plan(self):
         """Test adding a step to a plan."""
         planning_engine = PlanningEngine()
@@ -319,9 +347,9 @@ class TestPlanningEngine:
         assert step.tool_name == "read_file"
         assert step.tool_arguments == {"path": "config.yaml"}
         
-        # Verify step is in plan (plan already has analysis step from create_plan)
-        assert len(plan) == 2  # Analysis step + added step
-        assert plan[1].id == step.id  # Added step is at index 1
+        # Verify step is in plan (plan already has 3 auto-skeleton steps from create_plan)
+        assert len(plan) == 4  # 3 skeleton steps + added step
+        assert plan[3].id == step.id  # Added step is at index 3
     
     def test_get_plan(self, planning_engine):
         """Test retrieving a plan by ID."""
@@ -442,14 +470,38 @@ class TestPlanningEngine:
         
         # Execute plan
         results = planning_engine.execute_plan(plan)
-        
-        # Verify both steps were executed (plus analysis step)
-        assert mock_tool_executor.call_count == 2  # Only tool calls, not subtasks
+
+        # Verify steps were executed (3 skeleton steps [2 tool calls] + 2 tool steps)
+        assert mock_tool_executor.call_count == 4  # 2 from skeleton + 2 added
         assert step1.status == PlanStepStatus.COMPLETED
         assert step2.status == PlanStepStatus.COMPLETED
         assert plan.status == "completed"
-        assert len(results["data"]["step_results"]) == 3  # Analysis step + 2 tool steps
+        assert len(results["data"]["step_results"]) == 5  # 3 skeleton steps + 2 added tool steps
         assert all(r["success"] for r in results["data"]["step_results"])
+
+    def test_execute_plan_with_step_callback(self, mock_tool_executor):
+        """Test that step_callback is triggered during execute_plan."""
+        step_callback = Mock()
+        engine = PlanningEngine(
+            tool_executor=mock_tool_executor,
+            step_callback=step_callback
+        )
+        mock_tool_executor.return_value = {"success": True}
+        
+        steps = [
+            {"description": "Step 1", "tool_name": "tool1"},
+            {"description": "Step 2", "tool_name": "tool2"}
+        ]
+        plan = engine.create_plan("Test goal", steps=steps)
+        
+        engine.execute_plan(plan)
+        
+        # Verify callback was called for each step
+        assert step_callback.call_count == 2
+        # Check first call arguments
+        call_args = step_callback.call_args_list[0]
+        assert call_args[0][0].description == "Step 1"
+        assert call_args[0][1]["success"] is True
     
     def test_save_and_load_plan(self, tmp_path):
         """Test saving and loading a plan to/from file."""
@@ -469,8 +521,8 @@ class TestPlanningEngine:
         assert loaded_plan is not None
         assert loaded_plan.id == plan.id
         assert loaded_plan.goal == plan.goal
-        assert len(loaded_plan) == 2  # Analysis step + added step
-        assert loaded_plan[1].description == "Step 1"  # Added step is at index 1
+        assert len(loaded_plan) == 4  # 3 skeleton steps + added step
+        assert loaded_plan[3].description == "Step 1"  # Added step is at index 3
     
     @pytest.mark.skip("Test is disabled")
     def test_DISABLED_generate_plan_from_goal(self, planning_engine):

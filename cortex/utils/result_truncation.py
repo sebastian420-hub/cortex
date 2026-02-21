@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +26,16 @@ def estimate_token_count(text: str) -> int:
     return len(text) // 4
 
 
-def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+def truncate_tool_result(
+    tool_name: str, result: Dict[str, Any], max_length: Optional[int] = None
+) -> Dict[str, Any]:
     """
     Intelligently truncate tool results to prevent context overflow.
 
     Args:
         tool_name: Name of the tool that produced the result
         result: Tool result dictionary
+        max_length: Optional override for maximum character length
 
     Returns:
         Truncated result dictionary with metadata about truncation
@@ -44,6 +47,20 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
     if not result.get("success", True):
         return result
 
+    # NEVER truncate planning or memory tools as they contain critical state
+    if tool_name in (
+        "create_plan",
+        "execute_plan",
+        "monitor_plan",
+        "update_plan",
+        "create_and_execute_plan",
+        "todo_write",
+        "todo_read",
+        "save_insight",
+        "get_insights",
+    ):
+        return result
+
     result_copy = result.copy()
     data = result_copy.get("data", {})
 
@@ -53,15 +70,26 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
     truncated = False
     truncation_info = {}
 
+    # Use provided max_length if available
+    file_list_limit = max_length or MAX_FILE_LIST_LENGTH
+    search_limit = max_length or MAX_SEARCH_RESULTS_LENGTH
+    single_file_limit = max_length or MAX_SINGLE_FILE_LENGTH
+    generic_limit = max_length or MAX_GENERIC_RESULT_LENGTH
+
     # Handle file listing tools (glob, list_files)
     if tool_name in ("glob", "list_files"):
         files = data.get("files", [])
         if isinstance(files, list) and len(files) > 0:
             # Calculate size
             files_json = json.dumps(files, ensure_ascii=False)
-            if len(files_json) > MAX_FILE_LIST_LENGTH:
+            if len(files_json) > file_list_limit:
                 # Truncate to reasonable number
-                max_files = 100  # Show at most 100 files
+                # If max_length provided, we might need even fewer files
+                max_files = 100
+                if max_length:
+                    # Very rough approximation: 100 chars per file path
+                    max_files = max(10, max_length // 100)
+
                 original_count = len(files)
                 truncated_files = files[:max_files]
 
@@ -91,9 +119,13 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
         if isinstance(results, list) and len(results) > 0:
             # Calculate size
             results_json = json.dumps(results, ensure_ascii=False)
-            if len(results_json) > MAX_SEARCH_RESULTS_LENGTH:
+            if len(results_json) > search_limit:
                 # Truncate to reasonable number
-                max_results = 200  # Show at most 200 matches
+                max_results = 200
+                if max_length:
+                    # Approx 250 chars per search result
+                    max_results = max(5, max_length // 250)
+
                 original_count = len(results)
                 truncated_results = results[:max_results]
 
@@ -120,10 +152,10 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
     # Handle file reading tools
     elif tool_name in ("read_file",):
         content = data.get("content", "")
-        if isinstance(content, str) and len(content) > MAX_SINGLE_FILE_LENGTH:
+        if isinstance(content, str) and len(content) > single_file_limit:
             original_length = len(content)
             # Keep first portion and add truncation message
-            truncated_content = content[:MAX_SINGLE_FILE_LENGTH]
+            truncated_content = content[:single_file_limit]
             # Find last complete line
             last_newline = truncated_content.rfind("\n")
             if last_newline > 0:
@@ -156,7 +188,7 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
             extracted_json = json.dumps(extracted, ensure_ascii=False)
             max_structures = 50  # Limit to 50 structures - reduced to prevent overflow
 
-            if len(extracted_json) > MAX_SEARCH_RESULTS_LENGTH or len(extracted) > max_structures:
+            if len(extracted_json) > search_limit or len(extracted) > max_structures:
                 original_count = len(extracted)
                 truncated_extracted = extracted[:max_structures]
 
@@ -187,7 +219,7 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
         # Convert to JSON to check total size
         try:
             result_json = json.dumps(result_copy, ensure_ascii=False)
-            if len(result_json) > MAX_GENERIC_RESULT_LENGTH:
+            if len(result_json) > generic_limit:
                 logger.warning(
                     f"Large result from {tool_name}: {len(result_json)} chars "
                     f"(~{estimate_token_count(result_json) // 1000}K tokens). "
@@ -195,12 +227,19 @@ def truncate_tool_result(tool_name: str, result: Dict[str, Any]) -> Dict[str, An
                 )
 
                 # Generic truncation: limit string fields
-                truncated = _truncate_dict_strings(data, MAX_GENERIC_RESULT_LENGTH // 2)
+                truncated = _truncate_dict_strings(data, generic_limit // 2)
                 if truncated:
                     data["truncated"] = True
                     data["truncation_reason"] = "Result truncated due to large size."
         except (TypeError, ValueError) as e:
             logger.debug(f"Could not estimate result size: {e}")
+
+    # Add truncation metadata if truncated
+    if truncated and truncation_info:
+        result_copy["truncation_info"] = truncation_info
+
+    result_copy["data"] = data
+    return result_copy
 
     # Add truncation metadata if truncated
     if truncated and truncation_info:

@@ -241,10 +241,14 @@ class SimpleSummarizer(ConversationSummarizer):
 
         # Look for decision patterns
         patterns = [
-            r"I(?:'ll| will) ([^.!?]{10,50})[.!?]",
-            r"Let(?:'s| me) ([^.!?]{10,50})[.!?]",
-            r"I decided to ([^.!?]{10,50})[.!?]",
-            r"The solution is to ([^.!?]{10,50})[.!?]",
+            r"I(?:'ll| will) ([^.!?]{10,100})[.!?]",
+            r"Let(?:'s| me) ([^.!?]{10,100})[.!?]",
+            r"I decided to ([^.!?]{10,100})[.!?]",
+            r"The solution is to ([^.!?]{10,100})[.!?]",
+            r"Found that ([^.!?]{10,100})[.!?]",
+            r"The code shows ([^.!?]{10,100})[.!?]",
+            r"Verified that ([^.!?]{10,100})[.!?]",
+            r"Discovered ([^.!?]{10,100})[.!?]",
         ]
 
         for pattern in patterns:
@@ -252,7 +256,7 @@ class SimpleSummarizer(ConversationSummarizer):
             for match in matches[:2]:  # Max 2 per pattern
                 decisions.append(match.strip())
 
-        return decisions[:3]  # Max 3 total
+        return decisions[:5]  # Max 5 total
 
 
 class LLMSummarizer(ConversationSummarizer):

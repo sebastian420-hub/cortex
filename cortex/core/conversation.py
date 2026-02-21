@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Maximum content length for tool results to prevent context overflow
-MAX_TOOL_RESULT_LENGTH = 8000  # ~2000 tokens, applied before adding to history
+# Minimum tokens to reserve for the model's response to prevent cut-offs
+RESPONSE_RESERVE_TOKENS = 4000
 
 
 class ConversationManager:
@@ -27,6 +27,7 @@ class ConversationManager:
         model: str = "gpt-4",
         warn_on_truncation: bool = True,
         on_truncation: Optional[Callable[[int, int], None]] = None,
+        on_summarization: Optional[Callable[[int, int], None]] = None,
         summarizer: Optional["ConversationSummarizer"] = None,
         enable_summarization: bool = True,
         summarization_threshold: float = 0.75,
@@ -41,6 +42,7 @@ class ConversationManager:
             model: Model name for token counting
             warn_on_truncation: Whether to log warnings on truncation
             on_truncation: Optional callback(messages_removed, new_count) on truncation
+            on_summarization: Optional callback(messages_removed, new_count) on summarization
             summarizer: Optional summarizer for intelligent context management
             enable_summarization: Whether to use summarization (vs pure truncation)
             summarization_threshold: Token threshold (0-1) to trigger summarization
@@ -51,18 +53,23 @@ class ConversationManager:
         # Auto-configure max_tokens based on model if not specified
         if max_tokens is None:
             self.max_tokens = auto_configure_context(model)
-            context_info = get_model_context_info(model)
-            logger.info(
-                f"Auto-configured context window for {model}: {self.max_tokens:,} tokens "
-                f"(model limit: {context_info['full_context_limit']:,})"
-            )
         else:
             # User-specified max_tokens - validate against model limits
             self.max_tokens = auto_configure_context(model, max_tokens)
 
+        # Ensure we reserve room for the response
+        self.max_tokens = max(2000, self.max_tokens - RESPONSE_RESERVE_TOKENS)
+
+        context_info = get_model_context_info(model)
+        logger.info(
+            f"Initialized ConversationManager for {model}: {self.max_tokens:,} history tokens "
+            f"(reserved {RESPONSE_RESERVE_TOKENS} for response, model limit: {context_info['full_context_limit']:,})"
+        )
+
         self.keep_recent = keep_recent
         self.warn_on_truncation = warn_on_truncation
         self._on_truncation = on_truncation
+        self._on_summarization = on_summarization
         self.summarizer = summarizer
         self.enable_summarization = enable_summarization
         self.summarization_threshold = summarization_threshold
@@ -71,6 +78,12 @@ class ConversationManager:
         self.truncation_count = 0
         self.total_messages_removed = 0
         self.summaries: List["SummaryChunk"] = []  # Track all summaries created
+
+    def _get_max_tool_result_length(self) -> int:
+        """Calculate maximum tool result length based on current context window."""
+        # Aim for tool results to take at most 1/4 of the history window
+        # Conversion: ~4 chars per token
+        return (self.max_tokens // 4) * 4  # Keep it simple for now, but scaled
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to the conversation"""
@@ -127,8 +140,10 @@ class ConversationManager:
                 content = "[Empty assistant response]"
 
         msg: Dict[str, Any] = {"role": "assistant"}
-        if content:
-            msg["content"] = content
+        # ALWAYS include content key for assistant messages.
+        # Some providers (like Arcee AI on OpenRouter) strictly require it even with tool_calls.
+        msg["content"] = content if content is not None else ""
+        
         if tool_calls:
             msg["tool_calls"] = tool_calls
         if reasoning_content:
@@ -153,12 +168,13 @@ class ConversationManager:
 
         # Proactive truncation: limit tool result size before adding to history
         original_length = len(result_json)
-        if original_length > MAX_TOOL_RESULT_LENGTH:
+        max_length = self._get_max_tool_result_length()
+        if original_length > max_length:
             # Truncate the result content
             truncated_result = result.copy()
             truncated_result["data"] = {"truncated": True, "original_size": original_length}
             truncated_result["truncation_reason"] = (
-                f"Tool result truncated from {original_length} to {MAX_TOOL_RESULT_LENGTH} chars "
+                f"Tool result truncated from {original_length} to {max_length} chars "
                 "to prevent context overflow"
             )
             result_json = json.dumps(sanitize_object(truncated_result), ensure_ascii=False)
@@ -254,17 +270,17 @@ class ConversationManager:
                         messages_removed = old_count - new_count
 
                         if self.warn_on_truncation:
-                            logger.info(
+                            logger.warning(
                                 f"Context summarized: {messages_removed} messages -> summary "
                                 f"(summarization #{len(self.summaries)}, {new_count} messages remaining)"
                             )
 
                         # Call callback
-                        if self._on_truncation:
+                        if self._on_summarization:
                             try:
-                                self._on_truncation(messages_removed, new_count)
+                                self._on_summarization(messages_removed, new_count)
                             except Exception as e:
-                                logger.error(f"Truncation callback error: {e}")
+                                logger.error(f"Summarization callback error: {e}")
 
                         return  # Done with summarization
 
@@ -320,6 +336,9 @@ class ConversationManager:
         # Update max_tokens to match new model's capabilities
         old_max_tokens = self.max_tokens
         self.max_tokens = auto_configure_context(new_model)
+        
+        # Ensure we reserve room for the response
+        self.max_tokens = max(2000, self.max_tokens - RESPONSE_RESERVE_TOKENS)
 
         if old_max_tokens != self.max_tokens:
             context_info = get_model_context_info(new_model)
@@ -386,7 +405,18 @@ class ConversationManager:
 
             # Validate assistant messages
             if role == "assistant":
-                if not content and not tool_calls:
+                # Check for missing content key entirely
+                if "content" not in msg:
+                    issues.append(
+                        {
+                            "index": i,
+                            "type": "missing_content_key",
+                            "message": f"Assistant message at index {i} is missing 'content' key (strictly required by some providers)",
+                            "severity": "critical",
+                        }
+                    )
+                # Check for both empty content and empty tool calls
+                elif not content and not tool_calls:
                     issues.append(
                         {
                             "index": i,

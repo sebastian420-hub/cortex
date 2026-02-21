@@ -112,6 +112,7 @@ class AgentInitializer:
         self.history_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize all components
+        self.provider = self._init_provider()
         self.memory_bank = self._init_memory_bank()
         self.state_manager = self._init_state_manager()
         self.conversation = self._init_conversation()
@@ -122,7 +123,6 @@ class AgentInitializer:
         self.parallel_executor = None  # Will be set by agent
         self.rate_limiter = self._init_rate_limiter()
         self.file_cache = self._init_file_cache()
-        self.provider = self._init_provider()
         self.router = self._init_routing()
         self.tool_registry = get_registry()
         self.formatter = create_formatter(output_format, console=console)
@@ -161,6 +161,7 @@ class AgentInitializer:
             skill_loader=self.planning_callbacks.get("skill_loader"),
             tool_executor=self.planning_callbacks.get("tool_executor"),
             reflection_callback=self.planning_callbacks.get("reflection_callback"),
+            step_callback=self.planning_callbacks.get("step_callback"),
         )
 
     def _init_conversation(self) -> ConversationManager:
@@ -184,7 +185,7 @@ class AgentInitializer:
         else:
             strategy = SummarizationStrategy.SIMPLE
 
-        summarizer = create_summarizer(strategy) if enable_summarization else None
+        summarizer = create_summarizer(strategy, self.provider, self.model) if enable_summarization else None
 
         # Note: system_prompt will be set by agent after PromptGenerator is initialized
         return ConversationManager(

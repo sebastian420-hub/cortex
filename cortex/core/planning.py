@@ -288,6 +288,7 @@ class PlanningEngine:
         skill_loader: Optional[Callable[[str], Dict[str, Any]]] = None,
         tool_executor: Optional[Callable[[str, Dict[str, Any]], Dict[str, Any]]] = None,
         reflection_callback: Optional[Callable[[Plan, str], None]] = None,
+        step_callback: Optional[Callable[[PlanStep, Dict[str, Any]], None]] = None,
         max_plan_steps: int = 100,
     ):
         """
@@ -298,12 +299,14 @@ class PlanningEngine:
             skill_loader: Function to load skills by name
             tool_executor: Function to execute tools by name and arguments
             reflection_callback: Callback for reflection events
+            step_callback: Callback for individual step completion
             max_plan_steps: Maximum number of steps in a plan
         """
         self.project_dir = Path(project_dir).resolve()
         self.skill_loader = skill_loader
         self.tool_executor = tool_executor
         self.reflection_callback = reflection_callback
+        self.step_callback = step_callback
         self.max_plan_steps = max_plan_steps
         self.active_plan: Optional[Plan] = None
         self.plans: Dict[str, Plan] = {}
@@ -316,6 +319,7 @@ class PlanningEngine:
         constraints: Optional[List[str]] = None,
         assumptions: Optional[List[str]] = None,
         skill_hints: Optional[List[str]] = None,
+        steps: Optional[List[Dict[str, Any]]] = None,
     ) -> Plan:
         """
         Generate a plan for achieving a goal.
@@ -326,6 +330,7 @@ class PlanningEngine:
             constraints: Constraints to consider
             assumptions: Assumptions to document
             skill_hints: Suggested skills to apply
+            steps: Optional pre-defined steps for the plan
 
         Returns:
             A Plan object with steps to achieve the goal
@@ -341,26 +346,79 @@ class PlanningEngine:
             assumptions=assumptions or [],
         )
 
-        # Add an initial analysis step
-        analysis_step = PlanStep(
-            id=f"{plan_id}_step_1",
-            description=f"Analyze requirements for: {goal}",
-            step_type=PlanStepType.SUBTASK,
-            expected_outcome="Clear understanding of requirements and approach",
-        )
-        plan.add_step(analysis_step)
-
-        # If skill hints provided, add skill application steps
-        if skill_hints:
-            for i, skill in enumerate(skill_hints[:3]):  # Limit to 3 skills
-                skill_step = PlanStep(
-                    id=f"{plan_id}_skill_{i+2}",
-                    description=f"Apply {skill} skill to achieve goal",
-                    step_type=PlanStepType.SKILL_APPLICATION,
-                    skill_name=skill,
-                    dependencies=[analysis_step.id],
+        if steps:
+            # Add provided steps
+            for i, step_data in enumerate(steps):
+                step_id = step_data.get("id") or f"{plan_id}_step_{i+1}"
+                
+                # Convert dict to PlanStep
+                step = PlanStep(
+                    id=step_id,
+                    description=step_data.get("description", "No description"),
+                    step_type=PlanStepType(step_data.get("step_type", "tool_call")),
+                    dependencies=step_data.get("dependencies", []),
+                    expected_outcome=step_data.get("expected_outcome"),
+                    tool_name=step_data.get("tool_name"),
+                    tool_arguments=step_data.get("tool_arguments"),
+                    skill_name=step_data.get("skill_name"),
+                    skill_params=step_data.get("skill_params"),
+                    metadata=step_data.get("metadata", {}),
                 )
-                plan.add_step(skill_step)
+                plan.add_step(step)
+        else:
+            # Generate a more robust auto-skeleton based on common patterns in the goal
+            goal_lower = goal.lower()
+            
+            # Step 1: Initial Research/Discovery (Always needed)
+            discovery_desc = f"Discover relevant files and structures for: {goal}"
+            if "research" in goal_lower or "understand" in goal_lower:
+                discovery_desc = "Map codebase structure and identify key entry points"
+            elif "fix" in goal_lower or "bug" in goal_lower:
+                discovery_desc = "Locate bug origin and identify related components"
+            
+            step1 = PlanStep(
+                id=f"{plan_id}_step_1",
+                description=discovery_desc,
+                step_type=PlanStepType.TOOL_CALL,
+                tool_name="glob",
+                tool_arguments={"pattern": "**/*.py"},
+                expected_outcome="List of relevant files identified"
+            )
+            plan.add_step(step1)
+
+            # Step 2: Context Gathering
+            step2 = PlanStep(
+                id=f"{plan_id}_step_2",
+                description=f"Identify core classes and functions related to the goal",
+                step_type=PlanStepType.TOOL_CALL,
+                tool_name="grep",
+                tool_arguments={"pattern": "class |def ", "include": "*.py"},
+                dependencies=[step1.id],
+                expected_outcome="Architecture and entry points identified"
+            )
+            plan.add_step(step2)
+
+            # Step 3: Deep Dive
+            step3 = PlanStep(
+                id=f"{plan_id}_step_3",
+                description="Read entry point files to understand data flow",
+                step_type=PlanStepType.SUBTASK,
+                dependencies=[step2.id],
+                expected_outcome="Detailed understanding of logic"
+            )
+            plan.add_step(step3)
+
+            # If skill hints provided, add skill application steps
+            if skill_hints:
+                for i, skill in enumerate(skill_hints[:2]):
+                    skill_step = PlanStep(
+                        id=f"{plan_id}_skill_{i+1}",
+                        description=f"Apply {skill} skill to verify results",
+                        step_type=PlanStepType.SKILL_APPLICATION,
+                        skill_name=skill,
+                        dependencies=[step3.id],
+                    )
+                    plan.add_step(skill_step)
 
         self.active_plan = plan
         self.plans[plan.id] = plan
@@ -549,19 +607,23 @@ class PlanningEngine:
                     error_msg = result.get("error", "Unknown error")
                     self.progress_display.show_step_failed(step, error_msg)
 
-                    if stop_on_failure:
-                        plan.mark_failed()
-                        self.progress_display.stop_progress_bar()
-                        self.progress_display.show_plan_failed(plan, error_msg)
-                        return create_error_response(
-                            f"Step {step.id} failed: {result.get('error')}",
-                            ErrorType.EXECUTION,
-                            context={
-                                "plan_id": plan.id,
-                                "failed_step": step.id,
-                                "progress": plan.get_progress(),
-                            },
-                        )
+                # Report back individual step result if callback exists
+                if self.step_callback:
+                    self.step_callback(step, result)
+
+                if not result["success"] and stop_on_failure:
+                    plan.mark_failed()
+                    self.progress_display.stop_progress_bar()
+                    self.progress_display.show_plan_failed(plan, error_msg)
+                    return create_error_response(
+                        f"Step {step.id} failed: {result.get('error')}",
+                        ErrorType.EXECUTION,
+                        context={
+                            "plan_id": plan.id,
+                            "failed_step": step.id,
+                            "progress": plan.get_progress(),
+                        },
+                    )
 
             except Exception as e:
                 step.mark_failed(str(e))

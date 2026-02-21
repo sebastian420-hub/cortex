@@ -40,6 +40,7 @@ class CreatePlanTool(Tool):
         assumptions: Optional[List[str]] = None,
         skill_hints: Optional[List[str]] = None,
         context: Optional[Dict[str, Any]] = None,
+        steps: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Create a structured plan for achieving a goal.
@@ -50,6 +51,7 @@ class CreatePlanTool(Tool):
             assumptions: Assumptions to document
             skill_hints: Suggested skills to apply
             context: Additional context for planning
+            steps: Optional pre-defined steps for the plan
             
         Returns:
             Dictionary with plan details
@@ -66,11 +68,11 @@ class CreatePlanTool(Tool):
             )
         
         # Check if planning engine is available
-        if not hasattr(self.parent_agent, 'planning_engine') or not self.parent_agent.planning_engine:
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
-                "Planning engine not available",
+                "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Planning must be enabled in enhanced agent"}
+                {"hint": "Use --enhanced flag when starting Cortex"}
             )
         
         try:
@@ -82,6 +84,7 @@ class CreatePlanTool(Tool):
                 constraints=constraints,
                 assumptions=assumptions,
                 skill_hints=skill_hints,
+                steps=steps,
             )
             
             # Get plan summary
@@ -155,11 +158,11 @@ class ExecutePlanTool(Tool):
             )
         
         # Check if planning engine is available
-        if not hasattr(self.parent_agent, 'planning_engine') or not self.parent_agent.planning_engine:
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
-                "Planning engine not available",
+                "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Planning must be enabled in enhanced agent"}
+                {"hint": "Use --enhanced flag when starting Cortex"}
             )
         
         try:
@@ -266,11 +269,11 @@ class MonitorPlanTool(Tool):
             )
         
         # Check if planning engine is available
-        if not hasattr(self.parent_agent, 'planning_engine') or not self.parent_agent.planning_engine:
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
-                "Planning engine not available",
+                "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Planning must be enabled in enhanced agent"}
+                {"hint": "Use --enhanced flag when starting Cortex"}
             )
         
         try:
@@ -397,11 +400,11 @@ class UpdatePlanTool(Tool):
             )
         
         # Check if planning engine is available
-        if not hasattr(self.parent_agent, 'planning_engine') or not self.parent_agent.planning_engine:
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
-                "Planning engine not available",
+                "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Planning must be enabled in enhanced agent"}
+                {"hint": "Use --enhanced flag when starting Cortex"}
             )
         
         try:
@@ -522,6 +525,103 @@ class UpdatePlanTool(Tool):
             )
 
 
+class CreateAndExecutePlanTool(Tool):
+    """Tool for creating and immediately executing a structured plan."""
+    
+    def __init__(
+        self,
+        project_dir,
+        permission_mode="normal",
+        console=None,
+        timeout_config=None,
+        transaction_manager=None,
+        parent_agent=None,
+    ):
+        super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
+        self.parent_agent = parent_agent
+    
+    def execute(
+        self,
+        goal: str,
+        constraints: Optional[List[str]] = None,
+        assumptions: Optional[List[str]] = None,
+        skill_hints: Optional[List[str]] = None,
+        context: Optional[Dict[str, Any]] = None,
+        steps: Optional[List[Dict[str, Any]]] = None,
+        max_steps: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create and immediately execute a structured plan.
+        
+        Args:
+            goal: The goal to achieve
+            constraints: Constraints to consider
+            assumptions: Assumptions to document
+            skill_hints: Suggested skills to apply
+            context: Additional context for planning
+            steps: Concrete steps for the plan
+            max_steps: Maximum number of steps to execute in this turn
+            
+        Returns:
+            Dictionary with creation and execution results
+        """
+        if self.console:
+            self.console.print(f"[cyan]🚀 Creating and executing plan for goal:[/cyan] {goal}")
+        
+        # Check if we have access to planning engine
+        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
+            return create_error_response(
+                "Planning engine not available. Please restart with --enhanced flag.",
+                ErrorType.CONFIGURATION,
+                {"hint": "Use --enhanced flag to enable planning features"}
+            )
+        
+        try:
+            planning_engine = self.parent_agent.planning_engine
+            
+            # 1. Create the plan
+            plan = planning_engine.create_plan(
+                goal=goal,
+                context=context,
+                constraints=constraints,
+                assumptions=assumptions,
+                skill_hints=skill_hints,
+                steps=steps,
+            )
+            
+            # 2. Execute the plan
+            execution_result = planning_engine.execute_plan(
+                plan=plan,
+                max_steps=max_steps,
+                stop_on_failure=True,
+            )
+            
+            # Get plan summary
+            plan_summary = planning_engine.get_plan_summary(plan)
+            
+            result_data = {
+                "plan_id": plan.id,
+                "goal": plan.goal,
+                "status": plan.status.value,
+                "plan_summary": plan_summary,
+                "execution_success": execution_result.get("success", False),
+                "message": execution_result.get("message", ""),
+                "steps_executed": len(execution_result.get("step_results", [])),
+            }
+            
+            if "progress" in execution_result:
+                result_data["progress"] = execution_result["progress"]
+                
+            return create_success_response(result_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to create and execute plan: {e}", exc_info=True)
+            return create_error_response(
+                f"Failed to create and execute plan: {str(e)}",
+                ErrorType.EXECUTION
+            )
+
+
 # Tool schemas for registration
 CREATE_PLAN_SCHEMA = {
     "type": "function",
@@ -559,8 +659,116 @@ CREATE_PLAN_SCHEMA = {
                     "description": "Additional context for planning",
                     "additionalProperties": True,
                 },
+                "steps": {
+                    "type": "array",
+                    "description": "List of concrete steps for the plan. Each step should be actionable.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string",
+                                "description": "What this step involves (e.g., 'Read auth.py')",
+                            },
+                            "step_type": {
+                                "type": "string",
+                                "enum": ["tool_call", "subtask", "decision", "checkpoint", "reflection", "skill_application"],
+                                "description": "The type of step (default: 'tool_call')",
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "List of IDs for steps that must complete first",
+                            },
+                            "expected_outcome": {
+                                "type": "string",
+                                "description": "What success looks like for this step",
+                            },
+                            "tool_name": {
+                                "type": "string",
+                                "description": "The tool to use for 'tool_call' steps (e.g., 'read_file')",
+                            },
+                            "tool_arguments": {
+                                "type": "object",
+                                "description": "Arguments for the tool (e.g., {'path': 'auth.py'})",
+                                "additionalProperties": True,
+                            },
+                            "skill_name": {
+                                "type": "string",
+                                "description": "The skill to use for 'skill_application' steps",
+                            },
+                            "id": {
+                                "type": "string",
+                                "description": "Unique ID for this step (e.g., 'step_1')",
+                            },
+                        },
+                        "required": ["description"],
+                    },
+                },
             },
-            "required": ["goal"],
+            "required": ["goal", "steps"],
+        },
+    },
+}
+
+CREATE_AND_EXECUTE_PLAN_SCHEMA = {
+    "type": "function",
+    "function": {
+        "name": "create_and_execute_plan",
+        "description": (
+            "The MOST POWERFUL planning tool. Atomic: Creates a plan AND starts execution immediately. "
+            "Use this for complex tasks (4+ steps) to maintain autonomy and ensure all results are reported back. "
+            "Provide a concrete list of `steps` for maximum effectiveness."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "goal": {
+                    "type": "string",
+                    "description": "The goal to achieve",
+                },
+                "steps": {
+                    "type": "array",
+                    "description": "Concrete steps for the plan",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string",
+                                "description": "Clear action (e.g., 'Read agent.py')",
+                            },
+                            "tool_name": {
+                                "type": "string",
+                                "description": "The tool to use (e.g., 'read_file')",
+                            },
+                            "tool_arguments": {
+                                "type": "object",
+                                "description": "Arguments for the tool",
+                                "additionalProperties": True,
+                            },
+                            "dependencies": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": "Step IDs that must finish first",
+                            },
+                            "id": {
+                                "type": "string",
+                                "description": "ID for this step (e.g., 'step_1')",
+                            },
+                        },
+                        "required": ["description"],
+                    },
+                },
+                "max_steps": {
+                    "type": "integer",
+                    "description": "Maximum steps to run in this turn",
+                },
+                "constraints": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Constraints to consider",
+                },
+            },
+            "required": ["goal", "steps"],
         },
     },
 }

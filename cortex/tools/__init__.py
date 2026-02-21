@@ -54,10 +54,16 @@ from ..subagent import TaskTool, TASK_TOOL_SCHEMA
 
 # Planning tools
 from .planning_tools import (
+    CreatePlanTool,
+    ExecutePlanTool,
+    MonitorPlanTool,
+    UpdatePlanTool,
+    CreateAndExecutePlanTool,
     CREATE_PLAN_SCHEMA,
     EXECUTE_PLAN_SCHEMA,
     MONITOR_PLAN_SCHEMA,
     UPDATE_PLAN_SCHEMA,
+    CREATE_AND_EXECUTE_PLAN_SCHEMA,
 )
 
 # Delegation tools for model orchestration

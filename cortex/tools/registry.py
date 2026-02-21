@@ -112,14 +112,22 @@ class ToolRegistry:
             return tool_info["schema"]
         return None
 
-    def get_all_schemas(self) -> List[Dict[str, Any]]:
+    def get_all_schemas(self, exclude_names: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Get all enabled tool schemas.
+
+        Args:
+            exclude_names: Optional list of tool names to exclude
 
         Returns:
             List of tool schemas for enabled tools
         """
-        return [tool["schema"] for tool in self._tools.values() if tool["enabled"]]
+        schemas = []
+        exclude = exclude_names or []
+        for name, tool_info in self._tools.items():
+            if tool_info["enabled"] and name not in exclude and tool_info["short_name"] not in exclude:
+                schemas.append(tool_info["schema"])
+        return schemas
 
     def enable(self, name: str) -> bool:
         """
@@ -253,10 +261,12 @@ class ToolRegistry:
             ExecutePlanTool,
             MonitorPlanTool,
             UpdatePlanTool,
+            CreateAndExecutePlanTool,
             CREATE_PLAN_SCHEMA,
             EXECUTE_PLAN_SCHEMA,
             MONITOR_PLAN_SCHEMA,
             UPDATE_PLAN_SCHEMA,
+            CREATE_AND_EXECUTE_PLAN_SCHEMA,
         )
 
         # Delegation tools (for model orchestration)
@@ -314,6 +324,7 @@ class ToolRegistry:
             "execute_plan": ExecutePlanTool,
             "monitor_plan": MonitorPlanTool,
             "update_plan": UpdatePlanTool,
+            "create_and_execute_plan": CreateAndExecutePlanTool,
             # Delegation tools (model orchestration)
             "delegate_to_model": DelegateToModelTool,
             "return_to_coordinator": ReturnToCoordinatorTool,
@@ -872,6 +883,7 @@ class ToolRegistry:
             "execute_plan": EXECUTE_PLAN_SCHEMA,
             "monitor_plan": MONITOR_PLAN_SCHEMA,
             "update_plan": UPDATE_PLAN_SCHEMA,
+            "create_and_execute_plan": CREATE_AND_EXECUTE_PLAN_SCHEMA,
             # Delegation tools (model orchestration)
             "delegate_to_model": DELEGATE_TO_MODEL_SCHEMA,
             "return_to_coordinator": RETURN_TO_COORDINATOR_SCHEMA,

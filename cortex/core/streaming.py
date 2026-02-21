@@ -217,7 +217,11 @@ def display_streaming_response(
         full_message["content"] = ""
 
     # Display final content if any (simple markdown, no Panel)
-    if full_message.get("content"):
-        console.print(Markdown(full_message["content"]))
+    # ONLY if we have tool calls, otherwise let the agent handle the final response
+    # to avoid double-printing in the main loop.
+    if full_message.get("content") and full_message.get("tool_calls"):
+        from ..utils.output_processing import process_model_output
+        processed_content = process_model_output(full_message["content"])
+        console.print(Markdown(processed_content))
 
     return full_message
