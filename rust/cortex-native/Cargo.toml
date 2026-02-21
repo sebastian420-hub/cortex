@@ -7,7 +7,7 @@ license = "MIT"
 
 [lib]
 name = "cortex_native"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # Python bindings

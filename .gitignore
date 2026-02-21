@@ -79,3 +79,42 @@ replicate_test.py
 run_single_test.py
 nul
 
+# Rust
+target/
+rust/cortex-native/target/
+debug/
+release/
+*.pdb
+*.dll
+*.so
+*.dylib
+*.exe
+Cargo.lock
+
+# Go
+go/bin/
+go/pkg/
+go/out/
+bin/
+pkg/
+out/
+go.sum.old
+go.work.sum
+
+# Native Build Artifacts
+*.pyd
+*.lib
+*.exp
+*.obj
+*.o
+*.a
+*.pdb
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+lerna-debug.log*
+

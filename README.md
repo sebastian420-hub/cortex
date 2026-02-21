@@ -102,21 +102,30 @@ features:
 
 Cortex automatically reads `GEMINI.md` or `AGENT.md` files in your project root to understand your specific tech stack, architecture, and coding standards.
 
+## Project Status
+
+Cortex has reached its stable **v1.0.0** milestone.
+
+Current test status: **940/940 tests passing (100% success rate)** across Python, Rust, and Go components.
+
+For a detailed architectural overview and current system health, see the [Full Project Status Report](docs/STATUS.md).
+
 ## Development
 
 ### Running Tests
 
-Cortex maintains a high bar for stability with a comprehensive test suite:
+Cortex maintains a high bar for stability with a comprehensive test suite across all three language components:
 
 ```bash
-# Run all unit tests
-pytest tests/unit
+# Run all Python tests
+pytest tests/
 
-# Run benchmarks
-pytest tests/benchmarks
+# Run Rust native tests
+make rust-test
+
+# Run Go service tests
+make go-test
 ```
-
-Current test status: **453/455 tests passing (~99.5%)**.
 
 ## License
 

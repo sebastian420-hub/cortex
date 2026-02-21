@@ -52,8 +52,7 @@ def test_file_tools_coverage(tmp_path):
     # Read
     read_tool = ReadFileTool(tmp_path, "normal", console)
     test_file = tmp_path / "read.txt"
-    test_file.write_text("line1
-line2")
+    test_file.write_text("line1\nline2")
     read_tool.execute(path="read.txt")
     
     # Write

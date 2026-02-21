@@ -7,9 +7,9 @@
 
 use pyo3::prelude::*;
 
-mod search;
-mod ast;
-mod tokenizer;
+pub mod search;
+pub mod ast;
+pub mod tokenizer;
 
 /// Cortex Native Python module.
 ///
