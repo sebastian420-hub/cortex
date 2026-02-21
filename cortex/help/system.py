@@ -1,4 +1,4 @@
-﻿"""Interactive help system for Cortex."""
+"""Interactive help system for Cortex."""
 
 from pathlib import Path
 from typing import Optional, List

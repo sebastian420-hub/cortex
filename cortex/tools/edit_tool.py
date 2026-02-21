@@ -1,4 +1,4 @@
-﻿"""Surgical file editing tool"""
+"""Surgical file editing tool"""
 
 import difflib
 from pathlib import Path

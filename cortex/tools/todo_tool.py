@@ -1,4 +1,4 @@
-﻿"""Todo tracking tool for task management during sessions."""
+"""Todo tracking tool for task management during sessions."""
 
 import logging
 from typing import List, Dict, Any, Optional, Callable
@@ -277,9 +277,9 @@ def display_todos(todos: List[TodoItem], console) -> None:
     table.add_column("Task")
 
     status_icons = {
-        TodoStatus.PENDING: "[dim]\u25cb[/dim]",  # ○
-        TodoStatus.IN_PROGRESS: "[cyan]\u25d0[/cyan]",  # ◐
-        TodoStatus.COMPLETED: "[green]\u25cf[/green]",  # ●
+        TodoStatus.PENDING: "[dim]\u25cb[/dim]",  # ?
+        TodoStatus.IN_PROGRESS: "[cyan]\u25d0[/cyan]",  # ?
+        TodoStatus.COMPLETED: "[green]\u25cf[/green]",  # ?
     }
 
     for todo in todos:

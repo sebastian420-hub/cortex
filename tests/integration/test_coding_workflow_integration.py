@@ -37,7 +37,7 @@ def mock_tools():
     mock_edit_tool_instance = MagicMock()
     mock_edit_tool_instance.execute.return_value = {"success": True, "message": "File edited.", "diff": "mock diff"}
     tools.edit_tool_instance = mock_edit_tool_instance
-    
+
     mock_glob_tool_instance = MagicMock()
     mock_glob_tool_instance.execute.return_value = {"success": True, "paths": []}
     tools.glob_tool_instance = mock_glob_tool_instance

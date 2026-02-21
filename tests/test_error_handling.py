@@ -1,4 +1,4 @@
-﻿"""Comprehensive error handling tests for Cortex tools"""
+"""Comprehensive error handling tests for Cortex tools"""
 
 import pytest
 from pathlib import Path

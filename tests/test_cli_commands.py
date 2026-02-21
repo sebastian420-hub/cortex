@@ -49,7 +49,7 @@ def test_handle_model_switch_success(mock_agent, mock_repl):
 
         mock_agent.switch_model.assert_called_once_with(new_model_name, mock_agent.config.provider)
         mock_console_print.assert_any_call(f"[green]✓[/green] Model switched to: {new_model_name}")
-        
+
         # Verify system prompt was updated
         mock_agent._get_system_prompt.assert_called_once()
         assert mock_agent.conversation.history[0]["content"] == mock_agent._get_system_prompt.return_value
@@ -59,12 +59,12 @@ def test_handle_model_switch_success(mock_agent, mock_repl):
 def test_handle_model_switch_no_model_name(mock_agent, mock_repl):
     """Test /model command without providing a model name."""
     # Ensure the mock_agent.model is accessed correctly before the patch
-    initial_model = mock_agent.model 
+    initial_model = mock_agent.model
     with patch.object(console, 'print') as mock_console_print:
         handle_command("/model", mock_agent, MagicMock(), mock_repl)
 
         mock_agent.switch_model.assert_not_called()
-        mock_console_print.assert_any_call(f"Current model: {initial_model}") 
+        mock_console_print.assert_any_call(f"Current model: {initial_model}")
         mock_console_print.assert_any_call("[dim]Usage: /model <model_name>[/dim]")
         # System prompt should not be updated
         mock_agent._get_system_prompt.assert_not_called()

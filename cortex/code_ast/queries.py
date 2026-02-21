@@ -69,7 +69,7 @@ class ASTQueries:
                     parameters: (formal_parameters) @params
                     body: (statement_block) @body
                 ) @function
-                
+
                 (arrow_function
                     parameters: (formal_parameters) @params
                     body: (_) @body

@@ -1,4 +1,4 @@
-﻿"""Ask User Questions tool for structured user input during tasks."""
+"""Ask User Questions tool for structured user input during tasks."""
 
 import logging
 from typing import List, Dict, Any, Optional

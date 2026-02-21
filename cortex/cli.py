@@ -1,13 +1,30 @@
 """Command-line interface for Cortex"""
 
-import sys
-import os
 import argparse
-import signal
 import asyncio
+import logging
+import os
+import signal
+import sys
 from pathlib import Path
 from typing import Optional
-import logging
+
+from rich.panel import Panel
+from rich.table import Table
+
+from .agent import Cortex
+from .cli_commands.commands import CommandContext, CommandRegistry
+from .config import AgentConfig
+from .core.feature_flags import FeatureManager
+from .core.providers import ProviderError, ProviderFactory
+from .hooks import HookManager
+from .models import PermissionMode
+from .output import OutputFormat
+from .storage.history import get_history_file
+from .storage.sessions import SessionManager
+from .ui.console import console
+from .ui.modes import UIMode, set_ui_mode
+from .ui.repl import REPL
 
 # Configure logging - only show WARNING and above by default
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s:%(name)s:%(message)s")
@@ -18,23 +35,6 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("cortex.tools.registry").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-
-from rich.panel import Panel
-from rich.table import Table
-
-from .agent import Cortex
-from .models import PermissionMode
-from .config import AgentConfig
-from .core.providers import ProviderFactory, ProviderError
-from .ui.console import console
-from .ui.repl import REPL
-from .ui.modes import UIMode, set_ui_mode
-from .storage.history import get_history_file
-from .storage.sessions import SessionManager
-from .output import OutputFormat
-from .hooks import HookManager
-from .cli_commands.commands import CommandRegistry, CommandContext
-from .core.feature_flags import FeatureManager
 
 __version__ = "1.0.0"
 
@@ -181,7 +181,10 @@ Examples:
         "--model",
         "-m",
         default=None,
-        help="Model to use (default: moonshotai/kimi-k2.5). Auto-detects provider from model name.",
+        help=(
+            "Model to use (default: moonshotai/kimi-k2.5). "
+            "Auto-detects provider from model name."
+        ),
     )
 
     parser.add_argument(
@@ -259,7 +262,10 @@ Examples:
         "--ui-mode",
         choices=["minimal", "normal", "debug"],
         default=None,
-        help="UI display mode: minimal (Claude Code style), normal (rich panels), debug (development details)",
+        help=(
+            "UI display mode: minimal (Claude Code style), "
+            "normal (rich panels), debug (development details)"
+        ),
     )
 
     args = parser.parse_args()
@@ -312,7 +318,8 @@ Examples:
             config.model = "xiaomi/mimo-v2-flash:free"
             config.provider = "openrouter"
             console.print(
-                "[cyan]Model orchestration enabled - using xiaomi/mimo-v2-flash:free as coordinator[/cyan]"
+                "[cyan]Model orchestration enabled - using "
+                "xiaomi/mimo-v2-flash:free as coordinator[/cyan]"
             )
         else:
             console.print("[cyan]Model orchestration enabled (self-switching models)[/cyan]")
@@ -397,10 +404,10 @@ Examples:
 
     # Create unified agent
     is_enhanced = args.enhanced or (args.config and config.enable_planning)
-    
+
     if is_enhanced:
         console.print("[cyan]Using enhanced features: planning and layered memory[/cyan]")
-        
+
     agent = Cortex(
         model=config.model,
         project_dir=project_dir,
@@ -446,7 +453,8 @@ Examples:
                         agent.switch_model(session_model, config.provider)
                     except ProviderError as e:
                         console.print(
-                            f"[yellow]Warning:[/yellow] Could not switch to session's model ({session_model}): {e}"
+                            f"[yellow]Warning:[/yellow] Could not switch to "
+                            f"session's model ({session_model}): {e}"
                         )
                         console.print(
                             f"[yellow]Continuing with current model:[/yellow] {agent.model}"
@@ -508,7 +516,9 @@ def run_interactive(
     def on_max_iterations_reached(current: int, max_iter: int) -> Optional[int]:
         from rich.prompt import Confirm, IntPrompt
 
-        console.print(f"\n[yellow]⚠️  Reached maximum iterations ({current}/{max_iter})[/yellow]")
+        console.print(
+            f"\n[yellow]⚠️  Reached maximum iterations " f"({current}/{max_iter})[/yellow]"
+        )
 
         if Confirm.ask("[cyan]Continue processing?[/cyan]", default=False):
             # Ask how many additional iterations
@@ -577,9 +587,7 @@ def run_interactive(
             # Process with agent
             if use_async:
                 # Async mode
-                asyncio.run(
-                    agent._process_message_async(user_input, use_streaming=use_streaming)
-                )
+                asyncio.run(agent._process_message_async(user_input, use_streaming=use_streaming))
             else:
                 # Sync mode
                 agent._process_message(user_input, use_streaming=use_streaming)

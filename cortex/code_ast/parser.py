@@ -148,7 +148,9 @@ class ASTParser:
             if root_node.has_error:
                 # Tree-sitter is error-tolerant and minor parsing issues are common
                 # Only log at debug level to avoid spam - tree-sitter recovers well
-                logger.debug(f"Parsing recovered from errors in {language} code (tree-sitter error-tolerant)")
+                logger.debug(
+                    f"Parsing recovered from errors in {language} code (tree-sitter error-tolerant)"
+                )
                 # We still return the tree as tree-sitter handles errors gracefully
 
             return tree

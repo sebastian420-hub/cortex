@@ -125,7 +125,11 @@ class ToolRegistry:
         schemas = []
         exclude = exclude_names or []
         for name, tool_info in self._tools.items():
-            if tool_info["enabled"] and name not in exclude and tool_info["short_name"] not in exclude:
+            if (
+                tool_info["enabled"]
+                and name not in exclude
+                and tool_info["short_name"] not in exclude
+            ):
                 schemas.append(tool_info["schema"])
         return schemas
 

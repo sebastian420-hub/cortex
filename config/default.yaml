@@ -48,8 +48,8 @@ tools:
 
 # Feature flags for hybrid (Rust/Go) components
 features:
-  rust_search: true
-  rust_ast: true
-  rust_tokenizer: true
-  go_cache: true
-  go_model_manager: true
+  rust_search: false
+  rust_ast: false
+  rust_tokenizer: false
+  go_cache: false
+  go_model_manager: false

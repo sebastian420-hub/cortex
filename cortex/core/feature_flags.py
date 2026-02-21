@@ -32,11 +32,11 @@ class FeatureFlag(Enum):
 
 # Default states for all flags
 _DEFAULT_FLAGS: Dict[FeatureFlag, bool] = {
-    FeatureFlag.RUST_SEARCH: True,
-    FeatureFlag.RUST_AST: True,
-    FeatureFlag.RUST_TOKENIZER: True,
-    FeatureFlag.GO_CACHE: True,
-    FeatureFlag.GO_MODEL_MANAGER: True,
+    FeatureFlag.RUST_SEARCH: False,
+    FeatureFlag.RUST_AST: False,
+    FeatureFlag.RUST_TOKENIZER: False,
+    FeatureFlag.GO_CACHE: False,
+    FeatureFlag.GO_MODEL_MANAGER: False,
     FeatureFlag.PROFILING: False,
 }
 
@@ -175,8 +175,7 @@ class FeatureManager:
                 return result
             except (ImportError, OSError, RuntimeError) as e:
                 logger.warning(
-                    f"Native implementation for {flag_name} failed, "
-                    f"falling back to Python: {e}"
+                    f"Native implementation for {flag_name} failed, " f"falling back to Python: {e}"
                 )
                 self._record_stat(flag_name, "native_fallback")
 

@@ -1,4 +1,4 @@
-﻿"""File I/O tools"""
+"""File I/O tools"""
 
 from pathlib import Path
 from typing import Dict, Any
@@ -475,7 +475,7 @@ class WriteFileTool(Tool):
             if is_minimal_mode():
                 self.console.print(f"[yellow][FILE] {path}[/yellow]")
             else:
-                self.console.print(f"[yellow]📝 Writing:[/yellow] {path}")
+                self.console.print(f"[yellow]?? Writing:[/yellow] {path}")
 
         try:
             full_path = validate_path(self.project_dir, path)
@@ -486,7 +486,7 @@ class WriteFileTool(Tool):
                 if self.console:
                     if is_minimal_mode():
                         self.console.print(
-                            f"[yellow][DIFF] {path} ({len(old_content)} → {len(content)} bytes)[/yellow]"
+                            f"[yellow][DIFF] {path} ({len(old_content)} ? {len(content)} bytes)[/yellow]"
                         )
                     else:
                         self.console.print(
@@ -533,7 +533,7 @@ class WriteFileTool(Tool):
                         if is_minimal_mode():
                             self.console.print("[red][X] Cancelled by user[/red]")
                         else:
-                            self.console.print("[red]✗[/red] Cancelled by user")
+                            self.console.print("[red]?[/red] Cancelled by user")
                     return create_permission_denial(
                         "Cancelled by user", "write_file", {"path": path}
                     )
@@ -573,7 +573,7 @@ class WriteFileTool(Tool):
                 if is_minimal_mode():
                     self.console.print(f"[green][OK] Wrote {len(content)} bytes to {path}[/green]")
                 else:
-                    self.console.print(f"[green]✓[/green] Wrote {len(content)} bytes to {path}")
+                    self.console.print(f"[green]?[/green] Wrote {len(content)} bytes to {path}")
 
             return create_success_response({"bytes_written": len(content)})
 

@@ -215,16 +215,16 @@ QUICK REFERENCE: MODEL ASSIGNMENTS
 
 1. SECURITY → dolphin-24b (MANDATORY)
    Keywords: security, vulnerability, authentication, authorization, audit
-   
+
 2. COMPLEX → deepseek-reasoner (RECOMMENDED)
    Keywords: architecture, design, system, complex, critical
-   
+
 3. REVIEW → gpt-5.1-codex-mini (RECOMMENDED)
    Keywords: review, audit, check, quality, best practice
-   
+
 4. CODE → grok-code-fast-1 (RECOMMENDED)
    Keywords: implement, code, write, build, debug
-   
+
 5. SIMPLE → [NO DELEGATION]
    Keywords: simple, quick, clarify, explain, document
 """
@@ -238,24 +238,24 @@ STEP DATA TEMPLATE FOR MODEL-AWARE PLANNING:
 ```python
 step_data = {
     "description": "Clear description of what to do",
-    
+
     # Model assignment (optional but recommended)
     "required_model": "dolphin-24b",  # or "deepseek-reasoner", "grok-code-fast-1", etc.
     "model_assignment_reason": "Why this model is needed",
-    
+
     # Risk and security
     "risk_level": "medium",  # "low", "medium", "high", "critical"
     "security_related": False,  # True for security tasks
-    
+
     # Review requirements
     "review_required": False,  # True for high-risk/quality-critical steps
     "review_model": "gpt-5.1-codex-mini",  # Default review model
-    
+
     # Step type and tool (if applicable)
     "step_type": "tool_call",  # or "subtask", "decision", etc.
     "tool_name": "write_file",  # if step_type is "tool_call"
     "tool_arguments": {"path": "file.py", "content": "..."},
-    
+
     # Dependencies (optional)
     "dependencies": ["step_1_id", "step_2_id"],
 }

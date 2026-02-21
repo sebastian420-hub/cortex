@@ -1,4 +1,4 @@
-﻿"""Git integration tools"""
+"""Git integration tools"""
 
 import subprocess
 from typing import Dict, Any, Optional
@@ -48,7 +48,7 @@ class GitStatusTool(Tool):
                 self.console.print(
                     Panel(
                         output or "[dim]No changes[/dim]",
-                        title="📊 Git Status",
+                        title="?? Git Status",
                         border_style="cyan",
                     )
                 )
@@ -98,7 +98,7 @@ class GitDiffTool(Tool):
                     self.console.print(
                         Panel(
                             output,
-                            title=f"📊 Git Diff{' - ' + path if path else ''}",
+                            title=f"?? Git Diff{' - ' + path if path else ''}",
                             border_style="yellow",
                         )
                     )
@@ -138,7 +138,7 @@ class GitCommitTool(Tool):
             )
 
         if self.console:
-            self.console.print(f"[blue]🔧 Git Commit:[/blue] {message}")
+            self.console.print(f"[blue]?? Git Commit:[/blue] {message}")
 
         # Ask for approval
         if (
@@ -148,7 +148,7 @@ class GitCommitTool(Tool):
         ):
             if not Confirm.ask(f"[bold]Commit with message: '{message}'?[/bold]"):
                 if self.console:
-                    self.console.print("[red]✗[/red] Cancelled by user")
+                    self.console.print("[red]?[/red] Cancelled by user")
                 return create_permission_denial(
                     "Cancelled by user", "git_commit", {"message": message}
                 )
@@ -173,7 +173,7 @@ class GitCommitTool(Tool):
 
             if self.console:
                 self.console.print(
-                    Panel(result.stdout, title="✓ Commit Successful", border_style="green")
+                    Panel(result.stdout, title="? Commit Successful", border_style="green")
                 )
 
             return create_success_response({"output": result.stdout})
@@ -222,7 +222,7 @@ class GitLogTool(Tool):
                 self.console.print(
                     Panel(
                         output or "[dim]No commits[/dim]",
-                        title=f"📜 Git Log (last {limit})",
+                        title=f"?? Git Log (last {limit})",
                         border_style="cyan",
                     )
                 )
@@ -285,7 +285,7 @@ class GitAddTool(Tool):
         ):
             if not Confirm.ask(f"[bold]Stage {action_desc} for commit?[/bold]"):
                 if self.console:
-                    self.console.print("[red]✗[/red] Cancelled by user")
+                    self.console.print("[red]?[/red] Cancelled by user")
                 return create_permission_denial(
                     "Cancelled by user", "git_add", {"files": files, "add_all": add_all}
                 )
@@ -312,7 +312,7 @@ class GitAddTool(Tool):
                 self.console.print(
                     Panel(
                         f"Staged {action_desc}",
-                        title="✓ Git Add Successful",
+                        title="? Git Add Successful",
                         border_style="green",
                     )
                 )
@@ -379,7 +379,7 @@ class GitBranchTool(Tool):
 
             output = result.stdout
             if self.console:
-                self.console.print(Panel(output, title="🌳 Git Branches", border_style="cyan"))
+                self.console.print(Panel(output, title="?? Git Branches", border_style="cyan"))
 
             branches = [line.strip() for line in output.split("\n") if line.strip()]
             return create_success_response({"branches": branches})
@@ -426,7 +426,7 @@ class GitBranchTool(Tool):
                 self.console.print(
                     Panel(
                         f"Branch '{branch_name}' created.",
-                        title="✓ Branch Created",
+                        title="? Branch Created",
                         border_style="green",
                     )
                 )
@@ -479,7 +479,7 @@ class GitBranchTool(Tool):
 
             if self.console:
                 self.console.print(
-                    Panel(result.stdout, title="✓ Branch Deleted", border_style="green")
+                    Panel(result.stdout, title="? Branch Deleted", border_style="green")
                 )
             return create_success_response({"branch_name": branch_name, "action": "delete"})
         except Exception as e:
@@ -508,7 +508,7 @@ class GitPushTool(Tool):
             warning_panel = Panel(
                 f"[bold]You are about to push changes to the remote repository '{remote}'.[/bold]\n"
                 "This action can affect other collaborators and cannot be easily undone.",
-                title="🚨 [bold red]High-Risk Action[/bold red] 🚨",
+                title="?? [bold red]High-Risk Action[/bold red] ??",
                 border_style="red",
                 expand=False,
             )
@@ -551,7 +551,7 @@ class GitPushTool(Tool):
                 self.console.print(
                     Panel(
                         result.stderr or result.stdout,
-                        title="✓ Push Successful",
+                        title="? Push Successful",
                         border_style="green",
                     )
                 )
@@ -599,7 +599,7 @@ class GitRemoteTool(Tool):
                 self.console.print(
                     Panel(
                         output or "[dim]No remotes configured.[/dim]",
-                        title="📡 Git Remotes",
+                        title="?? Git Remotes",
                         border_style="cyan",
                     )
                 )
@@ -640,7 +640,7 @@ class GitShowTool(Tool):
 
             output = result.stdout
             if self.console:
-                self.console.print(Panel(output, title=f"📄 Git Show: {ref}", border_style="cyan"))
+                self.console.print(Panel(output, title=f"?? Git Show: {ref}", border_style="cyan"))
             return create_success_response({"output": output})
 
         except Exception as e:
@@ -695,7 +695,7 @@ class GitCheckoutTool(Tool):
             output = result.stderr or result.stdout
             if self.console:
                 self.console.print(
-                    Panel(output, title=f"✓ Git Checkout Successful", border_style="green")
+                    Panel(output, title=f"? Git Checkout Successful", border_style="green")
                 )
 
             return create_success_response(
@@ -757,7 +757,7 @@ class GitResetTool(Tool):
                 self.console.print(
                     Panel(
                         f"Unstaged {', '.join(files)}",
-                        title=f"✓ Git Reset Successful",
+                        title=f"? Git Reset Successful",
                         border_style="green",
                     )
                 )
@@ -815,7 +815,7 @@ class GitFetchTool(Tool):
             output = result.stderr or result.stdout
             if self.console:
                 self.console.print(
-                    Panel(output, title="✓ Git Fetch Successful", border_style="green")
+                    Panel(output, title="? Git Fetch Successful", border_style="green")
                 )
 
             return create_success_response({"output": output})
@@ -881,7 +881,7 @@ class GitPullTool(Tool):
             output = result.stderr or result.stdout
             if self.console:
                 self.console.print(
-                    Panel(output, title="✓ Git Pull Successful", border_style="green")
+                    Panel(output, title="? Git Pull Successful", border_style="green")
                 )
 
             return create_success_response({"output": output})

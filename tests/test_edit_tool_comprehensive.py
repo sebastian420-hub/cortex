@@ -31,25 +31,25 @@ def temp_edit_project():
 
     # File with different line endings and encodings
     (temp_dir / "unix_endings.txt").write_text("Line 1\nLine 2\nLine 3\n", encoding="utf-8")
-    
+
     # File with multi-line content
     (temp_dir / "multiline.py").write_text(
         "def function():\n    '''Docstring\n    with multiple lines'''\n    pass\n",
         encoding="utf-8"
     )
-    
+
     # File with special characters
     (temp_dir / "special.txt").write_text(
         "Hello\tWorld\nWith\ttabs\nAnd unicode: café ñ 日本語\n",
         encoding="utf-8"
     )
-    
+
     # File with UTF-8 BOM
     (temp_dir / "bom.txt").write_text("\ufeffContent with BOM", encoding="utf-8-sig")
-    
+
     # File with repeated patterns
     (temp_dir / "repeated.txt").write_text("foo bar foo baz foo qux")
-    
+
     # Large file (for performance testing)
     large_content = "\n".join([f"Line {i}" for i in range(1000)])
     (temp_dir / "large.txt").write_text(large_content, encoding="utf-8")
@@ -93,7 +93,7 @@ class TestEditToolMultiLine:
 
         assert result["success"] is True
         assert result["data"]["replacements"] == 1
-        
+
         # Verify content
         content = (temp_edit_project / "multiline.py").read_text()
         assert "Updated docstring" in content
@@ -427,7 +427,7 @@ class TestEditToolStringMatching:
 
         # First check what's actually in the file
         content = (temp_edit_project / "special.txt").read_text()
-        
+
         result = tool.execute(
             file_path="special.txt",
             old_string="And unicode: café ñ 日本語",
@@ -485,7 +485,7 @@ class TestEditToolFileSystem:
 
     def test_utf8_bom_handling(self, temp_edit_project, mock_console):
         """Test editing files with UTF-8 BOM.
-        
+
         NOTE: This test documents a known limitation - EditTool reads with utf-8-sig
         but writes with default encoding, which may fail on Windows. This should be
         addressed in a future improvement to EditTool.
@@ -494,13 +494,13 @@ class TestEditToolFileSystem:
         (temp_edit_project / "utf8_test.txt").write_text(
             "Content to edit", encoding="utf-8"
         )
-        
+
         tool = EditTool(
             project_dir=temp_edit_project,
             permission_mode=PermissionMode.AUTO_APPROVE,
             console=mock_console
         )
-        
+
         result = tool.execute(
             file_path="utf8_test.txt",
             old_string="Content to edit",
@@ -813,7 +813,7 @@ class TestEditToolEdgeCases:
         assert result["error_type"] == ErrorType.VALIDATION
         assert "occurrence_count" in result.get("error_context", {})
         assert result["error_context"]["occurrence_count"] == 2
-        
+
         # Now test with replace_all=True
         result = tool.execute(
             file_path="overlap.txt",
@@ -821,7 +821,7 @@ class TestEditToolEdgeCases:
             new_string="bb",
             replace_all=True
         )
-        
+
         assert result["success"] is True
         content = (temp_edit_project / "overlap.txt").read_text()
         # With replace_all, it replaces all non-overlapping occurrences

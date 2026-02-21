@@ -1,4 +1,4 @@
-﻿"""Base class for tools"""
+"""Base class for tools"""
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, TYPE_CHECKING

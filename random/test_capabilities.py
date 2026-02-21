@@ -8,11 +8,11 @@ def demonstrate_features():
     """Showcase various Python features."""
     print("Cortex Agent Capabilities Demo")
     print("=" * 40)
-    
+
     # List comprehension
     squares = [x**2 for x in range(1, 6)]
     print(f"Squares: {squares}")
-    
+
     # Dictionary
     features = {
         "File Operations": "read/write files",
@@ -21,11 +21,11 @@ def demonstrate_features():
         "Search": "find text across files",
         "Testing": "run test suites",
     }
-    
+
     print("\nAvailable Features:")
     for feature, description in features.items():
         print(f"  • {feature}: {description}")
-    
+
     return True
 
 if __name__ == "__main__":

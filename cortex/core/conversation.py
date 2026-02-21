@@ -62,8 +62,9 @@ class ConversationManager:
 
         context_info = get_model_context_info(model)
         logger.info(
-            f"Initialized ConversationManager for {model}: {self.max_tokens:,} history tokens "
-            f"(reserved {RESPONSE_RESERVE_TOKENS} for response, model limit: {context_info['full_context_limit']:,})"
+            f"Initialized ConversationManager for {model}: {self.max_tokens:,} "
+            f"history tokens (reserved {RESPONSE_RESERVE_TOKENS} for response, "
+            f"model limit: {context_info['full_context_limit']:,})"
         )
 
         self.keep_recent = keep_recent
@@ -130,7 +131,10 @@ class ConversationManager:
                     )
 
                 # Convert reasoning to content for valid message structure
-                content = f"[Reasoning: {reasoning_content[:200]}{'...' if len(reasoning_content) > 200 else ''}]"
+                content = (
+                    f"[Reasoning: {reasoning_content[:200]}"
+                    f"{'...' if len(reasoning_content) > 200 else ''}]"
+                )
             else:
                 # Truly empty response - this shouldn't happen but handle gracefully
                 # Log at debug level instead of warning to reduce noise
@@ -143,7 +147,7 @@ class ConversationManager:
         # ALWAYS include content key for assistant messages.
         # Some providers (like Arcee AI on OpenRouter) strictly require it even with tool_calls.
         msg["content"] = content if content is not None else ""
-        
+
         if tool_calls:
             msg["tool_calls"] = tool_calls
         if reasoning_content:
@@ -272,7 +276,8 @@ class ConversationManager:
                         if self.warn_on_truncation:
                             logger.warning(
                                 f"Context summarized: {messages_removed} messages -> summary "
-                                f"(summarization #{len(self.summaries)}, {new_count} messages remaining)"
+                                f"(summarization #{len(self.summaries)}, "
+                                f"{new_count} messages remaining)"
                             )
 
                         # Call callback
@@ -336,7 +341,7 @@ class ConversationManager:
         # Update max_tokens to match new model's capabilities
         old_max_tokens = self.max_tokens
         self.max_tokens = auto_configure_context(new_model)
-        
+
         # Ensure we reserve room for the response
         self.max_tokens = max(2000, self.max_tokens - RESPONSE_RESERVE_TOKENS)
 
@@ -411,7 +416,10 @@ class ConversationManager:
                         {
                             "index": i,
                             "type": "missing_content_key",
-                            "message": f"Assistant message at index {i} is missing 'content' key (strictly required by some providers)",
+                            "message": (
+                                f"Assistant message at index {i} is missing 'content' key "
+                                f"(strictly required by some providers)"
+                            ),
                             "severity": "critical",
                         }
                     )
@@ -421,7 +429,9 @@ class ConversationManager:
                         {
                             "index": i,
                             "type": "invalid_assistant_message",
-                            "message": f"Assistant message at index {i} has no content or tool_calls",
+                            "message": (
+                                f"Assistant message at index {i} has no content or tool_calls"
+                            ),
                             "severity": "critical",  # Will cause API errors
                         }
                     )

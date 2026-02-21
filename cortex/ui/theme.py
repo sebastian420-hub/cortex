@@ -5,7 +5,7 @@ Eliminates hardcoded values and ensures visual consistency.
 
 Usage:
     from cortex.ui.theme import UITheme, get_theme
-    
+
     theme = get_theme()
     console.print(f"[{theme.colors.PRIMARY}]Hello[/]")
     console.print(f"{theme.icons.FILE} Reading file...")
@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 
 class ColorScheme(Enum):
     """Available color schemes"""
+
     DEFAULT = "default"
     HIGH_CONTRAST = "high_contrast"
     NO_COLOR = "no_color"
@@ -26,22 +27,22 @@ class ColorScheme(Enum):
 @dataclass(frozen=True)
 class Colors:
     """Color palette - 5 core colors for consistency"""
-    
+
     # Primary colors
     PRIMARY: str = "bright_cyan"
     SUCCESS: str = "bright_green"
     WARNING: str = "bright_yellow"
     ERROR: str = "bright_red"
-    
+
     # Neutral colors
     MUTED: str = "dim"
     WHITE: str = "white"
     BLACK: str = "black"
-    
+
     # Semantic aliases
     INFO: str = "bright_cyan"  # Same as PRIMARY
     DEBUG: str = "dim"
-    
+
     # Border colors
     BORDER_PRIMARY: str = "cyan"
     BORDER_SUCCESS: str = "green"
@@ -53,7 +54,7 @@ class Colors:
 @dataclass(frozen=True)
 class Icons:
     """Text-based icons for Windows compatibility (no emojis)"""
-    
+
     # File operations
     FILE: str = "[FILE]"
     FOLDER: str = "[DIR]"
@@ -61,31 +62,31 @@ class Icons:
     EDIT: str = "[EDIT]"
     WRITE: str = "[WRITE]"
     READ: str = "[READ]"
-    
+
     # Thinking/Processing
     THINK: str = "[THINK]"
     REASONING: str = "[REASON]"
     PROCESSING: str = "[...]"
-    
+
     # Status
     OK: str = "[OK]"
     ERROR: str = "[X]"
     WARNING: str = "[!]"
     INFO: str = "[i]"
-    
+
     # Search
     SEARCH: str = "[FIND]"
     MATCH: str = "[MATCH]"
-    
+
     # Plan/Steps
     PLAN: str = "[PLAN]"
     STEP: str = "[STEP]"
     SUMMARY: str = "[SUM]"
-    
+
     # Security
     LOCK: str = "[LOCK]"
     SHIELD: str = "[SECURE]"
-    
+
     # Navigation
     ARROW_RIGHT: str = "->"
     ARROW_LEFT: str = "<-"
@@ -96,13 +97,13 @@ class Icons:
 @dataclass(frozen=True)
 class StatusIndicators:
     """Status indicator characters"""
-    
+
     PENDING: str = "○"
     IN_PROGRESS: str = "◐"
     COMPLETED: str = "●"
     FAILED: str = "✗"
     SKIPPED: str = "⊘"
-    
+
     # Alternative ASCII-only for strict compatibility
     PENDING_ASCII: str = "[ ]"
     IN_PROGRESS_ASCII: str = "[~]"
@@ -114,7 +115,7 @@ class StatusIndicators:
 @dataclass
 class PanelStyle:
     """Panel styling configuration"""
-    
+
     border_style: str = "cyan"
     title_align: str = "left"
     padding: tuple = (0, 1)
@@ -124,17 +125,17 @@ class PanelStyle:
 @dataclass
 class UITheme:
     """Complete UI theme configuration"""
-    
+
     colors: Colors = field(default_factory=Colors)
     icons: Icons = field(default_factory=Icons)
     status: StatusIndicators = field(default_factory=StatusIndicators)
     panel: PanelStyle = field(default_factory=PanelStyle)
-    
+
     # Configuration
     color_scheme: ColorScheme = ColorScheme.DEFAULT
     use_ascii_only: bool = False  # For strict Windows compatibility
     animations_enabled: bool = True
-    
+
     def get_status_icon(self, status: str) -> str:
         """Get status icon, respecting ASCII-only setting"""
         if self.use_ascii_only:
@@ -181,16 +182,16 @@ def configure_theme(
 ) -> UITheme:
     """Configure theme with settings"""
     theme = get_theme()
-    
+
     if color_scheme:
         theme.color_scheme = ColorScheme(color_scheme)
-    
+
     if use_ascii_only is not None:
         theme.use_ascii_only = use_ascii_only
-    
+
     if animations_enabled is not None:
         theme.animations_enabled = animations_enabled
-    
+
     return theme
 
 

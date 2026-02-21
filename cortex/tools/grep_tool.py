@@ -111,15 +111,23 @@ class GrepTool(Tool):
             fm = FeatureManager.get_instance()
             if fm.is_enabled(FeatureFlag.RUST_SEARCH):
                 result = self._search_with_rust(
-                    pattern, full_path, glob, file_type, output_mode,
-                    case_insensitive, context_before, context_after,
-                    multiline, head_limit, offset,
+                    pattern,
+                    full_path,
+                    glob,
+                    file_type,
+                    output_mode,
+                    case_insensitive,
+                    context_before,
+                    context_after,
+                    multiline,
+                    head_limit,
+                    offset,
                 )
                 if result and not result.get("success"):
                     rust_failed = True
                     if self.console:
                         self.console.print("[dim]Rust search failed, falling back...[/dim]")
-                    result = None # Reset result to trigger fallback
+                    result = None  # Reset result to trigger fallback
         except (ImportError, Exception):
             pass
 
@@ -162,9 +170,18 @@ class GrepTool(Tool):
         return result
 
     def _search_with_rust(
-        self, pattern, path, glob_filter, file_type, output_mode,
-        case_insensitive, context_before, context_after, multiline,
-        head_limit, offset,
+        self,
+        pattern,
+        path,
+        glob_filter,
+        file_type,
+        output_mode,
+        case_insensitive,
+        context_before,
+        context_after,
+        multiline,
+        head_limit,
+        offset,
     ) -> Optional[Dict[str, Any]]:
         """Search using native Rust extension (cortex_native)."""
         try:

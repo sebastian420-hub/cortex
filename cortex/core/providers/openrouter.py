@@ -92,8 +92,7 @@ class OpenRouterProvider(ModelProvider):
                         f"for model {model}"
                     )
                     result["message"]["tool_calls"] = [
-                        validate_tool_call_data(tc, index=i)
-                        for i, tc in enumerate(kimi_tools)
+                        validate_tool_call_data(tc, index=i) for i, tc in enumerate(kimi_tools)
                     ]
                     # Remove tool syntax from content
                     result["message"]["content"] = self._clean_kimi_tool_content(
@@ -180,7 +179,9 @@ class OpenRouterProvider(ModelProvider):
                             # Extract tool calls from buffered content
                             kimi_tools = self._extract_kimi_native_tool_calls(content_buffer)
                             if kimi_tools:
-                                from cortex.utils.tool_call_validation import validate_tool_call_data
+                                from cortex.utils.tool_call_validation import (
+                                    validate_tool_call_data,
+                                )
 
                                 logger.info(
                                     f"Parsed {len(kimi_tools)} tool calls from Kimi native format "
@@ -320,14 +321,16 @@ class OpenRouterProvider(ModelProvider):
                         logger.warning(f"Could not parse function name from tool_id: {tool_id}")
                         continue
 
-                tool_calls.append({
-                    "id": tool_id,
-                    "type": "function",
-                    "function": {
-                        "name": func_name,
-                        "arguments": args_str.strip(),
-                    },
-                })
+                tool_calls.append(
+                    {
+                        "id": tool_id,
+                        "type": "function",
+                        "function": {
+                            "name": func_name,
+                            "arguments": args_str.strip(),
+                        },
+                    }
+                )
 
         if tool_calls:
             logger.debug(f"Extracted {len(tool_calls)} tool calls from Kimi native format")

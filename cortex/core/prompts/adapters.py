@@ -127,7 +127,7 @@ class MiMoAdapter(BaseAdapter):
     @classmethod
     def get_tool_format_hint(cls) -> str:
         return """## Tool Format (MiMo)
-        
+
 ALL tool calls MUST be valid JSON with this structure:
 {
   "mode": "plan" | "run_command" | "edit_file" | "answer" | "reasoning",

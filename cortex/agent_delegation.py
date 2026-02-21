@@ -101,12 +101,13 @@ class PlanningDelegationCortex(Cortex):
 
         # Get model profile for adaptive guidance
         profile = get_model_profile(self.model)
-        
+
         # Get delegation guidance based on remaining quota
         delegation_guidance = self._get_delegation_guidance(profile.prompt_style)
 
         # Combine and adapt
         from .core.prompts import adapt_prompt_for_model
+
         return adapt_prompt_for_model(base_prompt + delegation_guidance, self.model)
 
     def _get_delegation_guidance(self, style: PromptStyle) -> str:
@@ -175,13 +176,15 @@ You coordinate a team of specialist models. Delegate strategically.
             return {"delegation_enabled": False, "message": "Planning not enabled"}
 
         stats = self.planning_engine.get_execution_stats()
-        stats.update({
-            "agent_model": self.model,
-            "coordinator_model": self.current_model,
-            "max_delegations": self.max_delegations,
-            "delegation_enabled": True,
-            "planning_enabled": self.enable_planning,
-        })
+        stats.update(
+            {
+                "agent_model": self.model,
+                "coordinator_model": self.current_model,
+                "max_delegations": self.max_delegations,
+                "delegation_enabled": True,
+                "planning_enabled": self.enable_planning,
+            }
+        )
         return stats
 
     def create_model_aware_plan(

@@ -50,27 +50,27 @@ try:
     # Parse file
     ast = service.parse_file(temp_file, 'python')
     print(f"   Parse successful: {ast is not None}")
-    
+
     # Extract functions
     functions = service.extract_functions(temp_file, 'python')
     print(f"   Functions: {len(functions)}")
-    
+
     # Extract classes (none in test code)
     classes = service.extract_classes(temp_file, 'python')
     print(f"   Classes: {len(classes)}")
-    
+
     # Extract imports
     imports = service.extract_imports(temp_file, 'python')
     print(f"   Imports: {len(imports)}")
     for i in imports:
         print(f"     - {i.module}: {i.imports}")
-    
+
     # Cache stats after operations
     stats = service.get_cache_stats()
     print(f"   Cache stats after: size={stats.get('size', 0)}, hits={stats.get('hits', 0)}")
-    
+
     print("\n=== All tests completed successfully! ===")
-    
+
 except Exception as e:
     print(f"   ERROR: {e}")
     import traceback

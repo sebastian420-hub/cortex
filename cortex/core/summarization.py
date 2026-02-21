@@ -130,8 +130,6 @@ class SimpleSummarizer(ConversationSummarizer):
         self, messages: List[Dict[str, Any]], max_summary_tokens: int = 500
     ) -> SummaryChunk:
         """Extract key information from messages."""
-        from .context import estimate_tokens
-
         files_modified = set()
         files_read = set()
         commands_executed = []
@@ -274,8 +272,6 @@ class LLMSummarizer(ConversationSummarizer):
         self, messages: List[Dict[str, Any]], max_summary_tokens: int = 500
     ) -> SummaryChunk:
         """Use LLM to summarize messages."""
-        from .context import estimate_tokens
-
         # Calculate original tokens using accurate message counting
         original_token_count = sum(count_message_tokens(msg, model="gpt-4") for msg in messages)
 
@@ -302,7 +298,10 @@ Summary:"""
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a helpful assistant that creates concise conversation summaries.",
+                        "content": (
+                            "You are a helpful assistant that creates "
+                            "concise conversation summaries."
+                        ),
                     },
                     {"role": "user", "content": prompt},
                 ],

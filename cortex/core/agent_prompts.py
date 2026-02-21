@@ -5,13 +5,11 @@ backward compatibility while utilizing the unified prompt system.
 """
 
 import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Optional, List, Dict, Any
+from typing import TYPE_CHECKING
 
-from ..models import PermissionMode
+from ..tools.registry import get_registry
 from ..ui.console import console
 from .prompts.builder import PromptBuilder
-from ..tools.registry import get_registry
 
 if TYPE_CHECKING:
     from ..agent import Cortex
@@ -22,7 +20,7 @@ logger = logging.getLogger(__name__)
 class PromptGenerator:
     """
     Legacy wrapper for generating system prompts.
-    
+
     Now delegates most work to PromptBuilder while maintaining
     the original interface for the base Cortex agent.
     """
@@ -45,12 +43,18 @@ class PromptGenerator:
             Complete system prompt string
         """
         # Get dynamic context from agent
-        state_context = self.agent.state_manager.get_llm_context() if hasattr(self.agent, "state_manager") else None
-        memory_bank_context = self.agent.memory_bank.get_summary() if hasattr(self.agent, "memory_bank") else None
-        
+        state_context = (
+            self.agent.state_manager.get_llm_context()
+            if hasattr(self.agent, "state_manager")
+            else None
+        )
+        memory_bank_context = (
+            self.agent.memory_bank.get_summary() if hasattr(self.agent, "memory_bank") else None
+        )
+
         # Get all tool schemas
         tool_schemas = get_registry().get_all_schemas()
-        
+
         # Delegate to the unified builder
         return self.builder.build_system_prompt(
             tools=tool_schemas,
@@ -59,7 +63,7 @@ class PromptGenerator:
             state_context=state_context,
             project_context=getattr(self.agent, "project_context", None),
             memory_bank_context=memory_bank_context,
-            permission_mode=self.agent.permission_mode
+            permission_mode=self.agent.permission_mode,
         )
 
     def load_project_context(self) -> str:

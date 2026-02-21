@@ -3,16 +3,17 @@
 import json
 import logging
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
 
 def process_model_output(content: Any) -> str:
     """
     Process model output to handle common formatting issues.
-    
+
     1. Unescapes literal \\n strings.
-    2. Unwraps JSON-wrapped responses if they match the expected schema 
+    2. Unwraps JSON-wrapped responses if they match the expected schema
        (e.g. {"answer": "..."} or {"content": "..."}).
     3. Handles JSON inside Markdown code blocks.
     4. Converts non-string content to string.
@@ -25,7 +26,7 @@ def process_model_output(content: Any) -> str:
     """
     if content is None:
         return ""
-        
+
     if not isinstance(content, str):
         # If it's already a dict, try to extract common answer keys
         if isinstance(content, dict):
@@ -33,10 +34,10 @@ def process_model_output(content: Any) -> str:
                 if key in content and content[key]:
                     return process_model_output(content[key])
         return str(content)
-        
+
     # Unescape literal \\n strings (common with some model APIs)
     processed = content.replace("\\n", "\n")
-    
+
     stripped = processed.strip()
     if not stripped:
         return ""
@@ -68,5 +69,5 @@ def process_model_output(content: Any) -> str:
         except (json.JSONDecodeError, TypeError, ValueError):
             # Not valid JSON or other error, return as is (but with \\n fixed)
             pass
-            
+
     return processed

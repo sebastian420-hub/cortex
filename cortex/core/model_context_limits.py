@@ -24,7 +24,6 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "gpt-4o-mini": 128000,
     "gpt-3.5-turbo": 16000,
     "gpt-3.5-turbo-16k": 16000,
-
     # Anthropic Claude Models
     "claude-3-opus": 200000,
     "claude-3-sonnet": 200000,
@@ -34,23 +33,19 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "claude-2.1": 200000,
     "claude-2": 100000,
     "claude-instant": 100000,
-
     # DeepSeek Models
     "deepseek-chat": 64000,
     "deepseek-coder": 64000,
     "deepseek-reasoner": 64000,
-
     # Moonshot AI Models (Kimi)
     "moonshot-v1": 200000,
     "kimi-k1": 200000,
     "kimi-k2": 200000,
     "kimi-k2.5": 200000,
     "moonshotai/kimi-k2.5": 200000,
-
     # MiMo Models (OpenRouter)
     "mimo-v2": 200000,
     "mimo-v2-flash": 200000,
-
     # Ollama Models (local)
     "llama3.2": 128000,
     "llama3.1": 128000,
@@ -63,7 +58,6 @@ MODEL_CONTEXT_LIMITS: Dict[str, int] = {
     "qwen2": 32000,
     "phi3": 128000,
     "gemma2": 8000,
-
     # Google Models
     "gemini-pro": 32000,
     "gemini-1.5-pro": 1000000,  # 1M context!
@@ -77,38 +71,30 @@ MODEL_PATTERNS = [
     (re.compile(r"claude-3.*sonnet", re.I), 200000),
     (re.compile(r"claude-3.*haiku", re.I), 200000),
     (re.compile(r"claude-2", re.I), 100000),
-
     # GPT patterns
     (re.compile(r"gpt-4.*turbo", re.I), 128000),
     (re.compile(r"gpt-4o", re.I), 128000),
     (re.compile(r"gpt-4(?!o)", re.I), 8000),  # gpt-4 without 'o'
     (re.compile(r"gpt-3.5.*16k", re.I), 16000),
     (re.compile(r"gpt-3.5", re.I), 16000),
-
     # DeepSeek patterns
     (re.compile(r"deepseek", re.I), 64000),
-
     # Kimi/Moonshot patterns
     (re.compile(r"kimi", re.I), 200000),
     (re.compile(r"moonshot", re.I), 200000),
-
     # MiMo patterns
     (re.compile(r"mimo", re.I), 200000),
-
     # Llama patterns
     (re.compile(r"llama3\.2", re.I), 128000),
     (re.compile(r"llama3\.1", re.I), 128000),
     (re.compile(r"llama3", re.I), 8000),
     (re.compile(r"llama2", re.I), 4096),
-
     # Gemini patterns
     (re.compile(r"gemini-1\.5", re.I), 1000000),
     (re.compile(r"gemini", re.I), 32000),
-
     # Mistral patterns
     (re.compile(r"mixtral", re.I), 32000),
     (re.compile(r"mistral", re.I), 8000),
-
     # Qwen patterns
     (re.compile(r"qwen", re.I), 32000),
 ]
@@ -205,7 +191,7 @@ def get_model_context_info(model_name: str) -> Dict[str, Any]:
         "recommended_max_tokens_80": recommended_80,  # Conservative (80%)
         "recommended_max_tokens_90": recommended_90,  # Aggressive (90%)
         "is_large_context": full_limit >= 100000,  # 100K+ tokens
-        "is_mega_context": full_limit >= 500000,   # 500K+ tokens (like Gemini 1.5)
+        "is_mega_context": full_limit >= 500000,  # 500K+ tokens (like Gemini 1.5)
     }
 
 

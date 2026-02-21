@@ -56,12 +56,8 @@ class CortexServiceClient:
             return False
 
         try:
-            self._cache_channel = grpc.insecure_channel(
-                f"{self._cache_host}:{self._cache_port}"
-            )
-            self._model_channel = grpc.insecure_channel(
-                f"{self._model_host}:{self._model_port}"
-            )
+            self._cache_channel = grpc.insecure_channel(f"{self._cache_host}:{self._cache_port}")
+            self._model_channel = grpc.insecure_channel(f"{self._model_host}:{self._model_port}")
             self._connected = True
 
             # NOTE: Once protobuf code is generated, stubs would be created here:

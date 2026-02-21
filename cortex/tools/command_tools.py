@@ -1,4 +1,4 @@
-﻿"""Command execution tools"""
+"""Command execution tools"""
 
 import subprocess
 from typing import Dict, Any, Tuple
@@ -98,7 +98,7 @@ class ExecuteCommandTool(Tool):
         if self.permission_mode == PermissionMode.NORMAL and self.console:
             if not Confirm.ask(f"[bold]Execute: {command}?[/bold]"):
                 if self.console:
-                    self.console.print("[red]✗[/red] Cancelled by user")
+                    self.console.print("[red]?[/red] Cancelled by user")
                 return create_permission_denial(
                     "Cancelled by user", "execute_command", {"command": command}
                 )
@@ -122,28 +122,30 @@ class ExecuteCommandTool(Tool):
                         self.console.print(
                             Panel(
                                 output or "[dim]Command completed successfully[/dim]",
-                                title="✓ Output",
+                                title="? Output",
                                 border_style="green",
                             )
                         )
                     else:
                         # Minimal mode - simple but clear output
                         if output:
-                            self.console.print(f"[green]✓ Output:[/green]\n{output.strip()}")
+                            self.console.print(f"[green]? Output:[/green]\n{output.strip()}")
                         else:
-                            self.console.print("[green]✓ Command completed successfully[/green]")
+                            self.console.print("[green]? Command completed successfully[/green]")
                 else:
                     if should_show_panels():
                         self.console.print(
                             Panel(
                                 output,
-                                title=f"✗ Failed (exit code {result.returncode})",
+                                title=f"? Failed (exit code {result.returncode})",
                                 border_style="red",
                             )
                         )
                     else:
                         # Minimal mode - simple but clear output
-                        self.console.print(f"[red]✗ Failed (exit code {result.returncode}):[/red]\n{output.strip()}")
+                        self.console.print(
+                            f"[red]? Failed (exit code {result.returncode}):[/red]\n{output.strip()}"
+                        )
 
             if result.returncode == 0:
                 return create_success_response({"output": output, "exit_code": result.returncode})

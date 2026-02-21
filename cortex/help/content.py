@@ -1,4 +1,4 @@
-﻿"""Help content definitions for Cortex."""
+"""Help content definitions for Cortex."""
 
 from dataclasses import dataclass, field
 from typing import List, Optional

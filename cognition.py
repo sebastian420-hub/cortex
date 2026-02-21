@@ -71,10 +71,11 @@ class Goal:
 @dataclass
 class Milestone:
     """Concrete, measurable goal with progress tracking."""
+
     description: str
     target: int  # Target value (e.g., 100 food, 25% map coverage)
     current: int = 0  # Current progress state (e.g., inventory amount)
-    total_achieved: int = 0 # Cumulative progress (never decreases)
+    total_achieved: int = 0  # Cumulative progress (never decreases)
     completed: bool = False
     metric_type: str = "count"  # "count", "percentage", "boolean"
 
@@ -119,6 +120,7 @@ class Milestone:
 @dataclass
 class Task:
     """Concrete actionable task with dependencies and progress tracking."""
+
     description: str
     status: str = "pending"  # "pending", "in_progress", "completed", "blocked"
     priority: int = 3  # 1-5, higher = more urgent
@@ -211,6 +213,7 @@ class Belief:
 @dataclass
 class AgentModel:
     """Theory of Mind: what this agent believes about another agent."""
+
     agent_name: str
     perceived_role: str = ""
     perceived_goals: list[str] = field(default_factory=list)
@@ -299,6 +302,7 @@ _TRAIT_KEYWORDS = {
 @dataclass
 class CognitiveState:
     """The agent's persistent mind between ticks."""
+
     drives: dict[str, Drive] = field(default_factory=dict)
     goals: list[Goal] = field(default_factory=list)
     current_intention: str = ""
@@ -331,14 +335,16 @@ class CognitiveState:
         goal_desc, source_drive = ROLE_STARTING_GOALS.get(
             role, ("Survive and find my purpose", DriveType.PURPOSE)
         )
-        self.goals.append(Goal(
-            description=goal_desc,
-            priority=0.7,
-            source_drive=source_drive,
-            status=GoalStatus.ACTIVE,
-            created_tick=0,
-            progress_tick=0,
-        ))
+        self.goals.append(
+            Goal(
+                description=goal_desc,
+                priority=0.7,
+                source_drive=source_drive,
+                status=GoalStatus.ACTIVE,
+                created_tick=0,
+                progress_tick=0,
+            )
+        )
 
         # Initialize role-specific milestones
         self.milestones = self._init_milestones_for_role(role)
@@ -383,17 +389,13 @@ class CognitiveState:
         # SURVIVAL: based on food and energy
         food_urgency = max(0.0, 1.0 - food / 8.0)
         energy_urgency = max(0.0, 1.0 - energy / 80.0)
-        self.drives[DriveType.SURVIVAL.value].urgency = _clamp(
-            max(food_urgency, energy_urgency)
-        )
+        self.drives[DriveType.SURVIVAL.value].urgency = _clamp(max(food_urgency, energy_urgency))
 
         # SAFETY: reserves check (dampened to 60%)
         food_safe = min(1.0, food / 12.0)
         materials_safe = min(1.0, materials / 6.0)
         safety_met = (food_safe + materials_safe) / 2.0
-        self.drives[DriveType.SAFETY.value].urgency = _clamp(
-            (1.0 - safety_met) * 0.6
-        )
+        self.drives[DriveType.SAFETY.value].urgency = _clamp((1.0 - safety_met) * 0.6)
 
         # SOCIAL: based on trust and relationship breadth
         if relationships:
@@ -422,17 +424,13 @@ class CognitiveState:
             esteem_met = min(1.0, knowledge / 10.0)
         else:
             esteem_met = 0.3
-        self.drives[DriveType.ESTEEM.value].urgency = _clamp(
-            (1.0 - esteem_met) * 0.5
-        )
+        self.drives[DriveType.ESTEEM.value].urgency = _clamp((1.0 - esteem_met) * 0.5)
 
         # PURPOSE: grows over time, dampened
         purpose_base = min(1.0, tick / 100.0)
         active_goals = sum(1 for g in self.goals if g.status == GoalStatus.ACTIVE)
         purpose_met = min(1.0, active_goals / 3.0) * 0.5 + purpose_base * 0.5
-        self.drives[DriveType.PURPOSE.value].urgency = _clamp(
-            (1.0 - purpose_met) * 0.4
-        )
+        self.drives[DriveType.PURPOSE.value].urgency = _clamp((1.0 - purpose_met) * 0.4)
 
     def compute_drives_from_fs(self, perception: "Perception") -> None:
         """Recompute all drive urgencies from filesystem state. Called every tick."""
@@ -451,7 +449,9 @@ class CognitiveState:
 
         # EXPLORATION
         # Urgency is high if the agent has not visited many files
-        num_visited_files = len(self.visited_coordinates) # Using visited_coordinates as a proxy for visited files
+        num_visited_files = len(
+            self.visited_coordinates
+        )  # Using visited_coordinates as a proxy for visited files
         total_files = len(perception.data.get("files", []))
         exploration_urgency = 1.0 - (num_visited_files / (total_files + 1e-5))
         self.drives[DriveType.EXPLORATION.value].urgency = _clamp(exploration_urgency)
@@ -486,9 +486,7 @@ class CognitiveState:
         if not active:
             return "- No specific goals right now"
         active.sort(key=lambda g: g.priority, reverse=True)
-        return "\n".join(
-            f"- [{g.priority:.1f}] {g.description}" for g in active[:5]
-        )
+        return "\n".join(f"- [{g.priority:.1f}] {g.description}" for g in active[:5])
 
     def beliefs_text(self) -> str:
         """Format beliefs for prompt injection."""
@@ -519,14 +517,14 @@ class CognitiveState:
 
     # --- Phase 2: Theory of Mind and Belief Updating ---
 
-    def update_beliefs_from_observation(
-        self, perception: dict, tick: int
-    ) -> None:
+    def update_beliefs_from_observation(self, perception: dict, tick: int) -> None:
         """Create/update beliefs from what the agent perceives. No LLM call."""
         MAX_BELIEFS = 20
 
         # Resources visible -> beliefs about resource locations
-        for res in perception.get("reachable_resources", []) + perception.get("aware_resources", []):
+        for res in perception.get("reachable_resources", []) + perception.get(
+            "aware_resources", []
+        ):
             content = f"{res['type']} available near ({res.get('x', '?')}, {res.get('y', '?')})"
 
             # Phase 3: Check if this belief recently failed before recreating
@@ -554,9 +552,7 @@ class CognitiveState:
             self.beliefs.sort(key=lambda b: b.last_confirmed_tick)
             self.beliefs = self.beliefs[-MAX_BELIEFS:]
 
-    def _upsert_belief(
-        self, content: str, source: str, tick: int, confidence: float = 0.7
-    ) -> None:
+    def _upsert_belief(self, content: str, source: str, tick: int, confidence: float = 0.7) -> None:
         """Add or update an existing belief."""
         # Check for similar existing belief (simple substring match)
         for b in self.beliefs:
@@ -566,17 +562,17 @@ class CognitiveState:
                 b.last_confirmed_tick = tick
                 return
         # New belief
-        self.beliefs.append(Belief(
-            content=content,
-            confidence=confidence,
-            source=source,
-            created_tick=tick,
-            last_confirmed_tick=tick,
-        ))
+        self.beliefs.append(
+            Belief(
+                content=content,
+                confidence=confidence,
+                source=source,
+                created_tick=tick,
+                last_confirmed_tick=tick,
+            )
+        )
 
-    def update_agent_model_from_observation(
-        self, agent_name: str, agent_role: str
-    ) -> None:
+    def update_agent_model_from_observation(self, agent_name: str, agent_role: str) -> None:
         """Create/update a model of another agent from seeing them. No LLM."""
         if agent_name not in self.agent_models:
             self.agent_models[agent_name] = AgentModel(
@@ -586,9 +582,7 @@ class CognitiveState:
         else:
             self.agent_models[agent_name].perceived_role = agent_role
 
-    def update_agent_model_from_conversation(
-        self, agent_name: str, conversation_text: str
-    ) -> None:
+    def update_agent_model_from_conversation(self, agent_name: str, conversation_text: str) -> None:
         """Infer goals and traits from conversation text. No LLM call."""
         if agent_name not in self.agent_models:
             self.agent_models[agent_name] = AgentModel(agent_name=agent_name)
@@ -630,9 +624,7 @@ class CognitiveState:
             return
 
         # Identify dominant action patterns
-        sorted_actions = sorted(
-            self.action_history.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_actions = sorted(self.action_history.items(), key=lambda x: x[1], reverse=True)
         top_action, top_count = sorted_actions[0]
         top_ratio = top_count / total_actions
 
@@ -700,17 +692,22 @@ class CognitiveState:
         if not active_goals:
             drive_name, _ = self.dominant_drive()
             drive_type = DriveType(drive_name)
-            templates = DRIVE_GOAL_TEMPLATES.get(drive_type, DRIVE_GOAL_TEMPLATES[DriveType.PURPOSE])
+            templates = DRIVE_GOAL_TEMPLATES.get(
+                drive_type, DRIVE_GOAL_TEMPLATES[DriveType.PURPOSE]
+            )
             import random
+
             desc = random.choice(templates)
-            self.goals.append(Goal(
-                description=desc,
-                priority=0.6,
-                source_drive=drive_type,
-                status=GoalStatus.ACTIVE,
-                created_tick=tick,
-                progress_tick=tick,
-            ))
+            self.goals.append(
+                Goal(
+                    description=desc,
+                    priority=0.6,
+                    source_drive=drive_type,
+                    status=GoalStatus.ACTIVE,
+                    created_tick=tick,
+                    progress_tick=tick,
+                )
+            )
 
         # Cap total goals (keep most recent active ones + completed/abandoned for history)
         active = [g for g in self.goals if g.status == GoalStatus.ACTIVE]
@@ -737,7 +734,9 @@ class CognitiveState:
                 b.failed_attempts += 1
                 b.last_failed_tick = tick
                 b.confidence = max(0.1, b.confidence - 0.3)  # Sharp penalty (-0.3)
-                logger.debug(f"Belief failed: '{content}' (attempts: {b.failed_attempts}, confidence: {b.confidence:.2f})")
+                logger.debug(
+                    f"Belief failed: '{content}' (attempts: {b.failed_attempts}, confidence: {b.confidence:.2f})"
+                )
                 return
 
     def get_belief_failure_count(self, content: str) -> int:
@@ -773,7 +772,9 @@ class CognitiveState:
         expires = self.conversation_cooldowns.get(other_agent_id, 0)
         return current_tick < expires
 
-    def set_conversation_cooldown(self, other_agent_id: str, current_tick: int, duration: int = 5) -> None:
+    def set_conversation_cooldown(
+        self, other_agent_id: str, current_tick: int, duration: int = 5
+    ) -> None:
         """Set cooldown for conversation with a specific agent."""
         self.conversation_cooldowns[other_agent_id] = current_tick + duration
 
@@ -866,15 +867,11 @@ class CognitiveState:
     @staticmethod
     def from_dict(d: dict) -> CognitiveState:
         cs = CognitiveState()
-        cs.drives = {
-            k: Drive.from_dict(v) for k, v in d.get("drives", {}).items()
-        }
+        cs.drives = {k: Drive.from_dict(v) for k, v in d.get("drives", {}).items()}
         cs.goals = [Goal.from_dict(g) for g in d.get("goals", [])]
         cs.current_intention = d.get("current_intention", "")
         cs.beliefs = [Belief.from_dict(b) for b in d.get("beliefs", [])]
-        cs.agent_models = {
-            k: AgentModel.from_dict(v) for k, v in d.get("agent_models", {}).items()
-        }
+        cs.agent_models = {k: AgentModel.from_dict(v) for k, v in d.get("agent_models", {}).items()}
         cs.self_concept = d.get("self_concept", "")
         cs.strengths = d.get("strengths", [])
         cs.weaknesses = d.get("weaknesses", [])
@@ -893,6 +890,7 @@ class CognitiveState:
 
 
 # --- Helpers ---
+
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 1.0) -> float:
     return max(lo, min(hi, value))

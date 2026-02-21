@@ -5,31 +5,56 @@ import json
 import logging
 import sys
 import time
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Callable, Union
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 from rich.markdown import Markdown
 
-logger = logging.getLogger(__name__)
-
-# Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
-SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
-
-from .models import PermissionMode
 from .config import AgentConfig
+from .core.agent_init import AgentInitializer
+from .core.agent_messaging import MessageProcessor
+from .core.agent_permissions import PermissionManager
+from .core.agent_prompts import PromptGenerator
+from .core.agent_tools import ToolExecutor
+from .core.memory_layers import AgentFocus, EnhancedMemoryBank
 from .core.parallel import ParallelToolExecutor, ToolCall
-from .core.streaming import stream_model_response, display_streaming_response
-from .core.providers import ProviderFactory, ProviderError
-from .core.planning import PlanningEngine, Plan, PlanStep, PlanStepType
+from .core.planning import Plan, PlanStep, PlanStepType
+from .core.prompts.builder import PromptBuilder
+from .core.providers import ProviderError, ProviderFactory
+from .core.security import SecurityError
+from .core.streaming import display_streaming_response, stream_model_response
+from .hooks import (
+    HookAction,
+    HookManager,
+    PostToolUseEvent,
+    PreToolUseEvent,
+    SessionEndEvent,
+    SessionStartEvent,
+    UserPromptSubmitEvent,
+)
+from .models import PermissionMode
+from .output import OutputFormat
+from .tools import create_tool_instance, get_registry
+from .ui.console import console
+from .ui.consolidated_display import get_consolidated_display
+from .utils.errors import (
+    ErrorType,
+    ModelError,
+    create_error_response,
+    create_permission_denial,
+    create_success_response,
+)
+from .utils.output_processing import process_model_output
+from .utils.result_truncation import truncate_tool_result
 
 # Import routing system (optional, gracefully handle if not available)
 try:
     from .core.routing import (
-        RoutingOrchestrator,
         RoutingConfig,
         RoutingContext,
         RoutingDecision,
+        RoutingOrchestrator,
     )
 
     ROUTING_AVAILABLE = True
@@ -39,47 +64,16 @@ except ImportError:
     RoutingConfig = None
     RoutingContext = None
     RoutingDecision = None
-from .core.security import SecurityError
 
-# New modular components
-from .core.agent_init import AgentInitializer
-from .core.agent_prompts import PromptGenerator
-from .core.prompts.builder import PromptBuilder
-from .core.agent_permissions import PermissionManager
-from .core.agent_tools import ToolExecutor
-from .core.agent_messaging import MessageProcessor
-from .core.memory_layers import AgentFocus, EnhancedMemoryBank
-from .tools import create_tool_instance, get_registry
-from .ui.console import console
-from .ui.consolidated_display import get_consolidated_display, OperationStatus
-from .utils.errors import (
-    ModelError,
-    create_error_response,
-    create_success_response,
-    create_permission_denial,
-    ErrorType,
-)
+logger = logging.getLogger(__name__)
 
-# Hook system imports
-from .hooks import (
-    HookManager,
-    HookAction,
-    PreToolUseEvent,
-    PostToolUseEvent,
-    UserPromptSubmitEvent,
-    SessionStartEvent,
-    SessionEndEvent,
-)
-from .output import OutputFormat
-from .utils.result_truncation import truncate_tool_result
-from .utils.output_processing import process_model_output
-
-# stream_model_response and display_streaming_response already imported above
+# Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
+SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
 
 
 class Cortex:
     """
-    Main Cortex class - handles conversation loop, tool execution, 
+    Main Cortex class - handles conversation loop, tool execution,
     planning, and layered memory.
     """
 
@@ -97,7 +91,7 @@ class Cortex:
     ):
         """
         Initialize Cortex agent with all components.
-        
+
         Args:
             model: LLM model to use
             project_dir: Project directory path
@@ -117,7 +111,7 @@ class Cortex:
         self.session_start = datetime.now()
         self.hook_manager = hook_manager or HookManager()
         self.output_format = output_format
-        
+
         # Enhanced features configuration
         self.enable_planning = enable_planning
         self.enable_layered_memory = enable_layered_memory
@@ -137,7 +131,7 @@ class Cortex:
                 "tool_executor": self._execute_tool_for_planning,
                 "reflection_callback": self._on_plan_reflection,
                 "step_callback": self._on_plan_step,
-            }
+            },
         )
 
         # Copy initialized components from initializer
@@ -172,8 +166,9 @@ class Cortex:
         max_workers = parallel_config.get("max_workers", 0)
         if max_workers == 0 or max_workers == "auto":
             import os
+
             max_workers = min(4, os.cpu_count() or 2)
-            
+
         self.parallel_executor = ParallelToolExecutor(
             execute_fn=self.execute_tool,
             max_workers=max_workers,
@@ -195,7 +190,7 @@ class Cortex:
 
         # Initial context loading
         self.project_context = self.prompt_generator.load_project_context()
-        
+
         # Initialize conversation system prompt correctly from the start
         system_prompt = self._get_system_prompt()
         self.conversation.system_prompt = system_prompt
@@ -203,7 +198,7 @@ class Cortex:
             self.conversation.add_system_message(system_prompt)
         else:
             self.conversation.history[0]["content"] = system_prompt
-            
+
         self.conversation._on_truncation = self._on_context_truncation
         if hasattr(self.conversation, "_on_summarization"):
             self.conversation._on_summarization = self._on_context_summarization
@@ -224,8 +219,10 @@ class Cortex:
 
         # Set default callback if configured
         if on_max_iterations_reached is None and self.config.max_iterations_continue_default:
+
             def default_callback(current: int, max_iter: int) -> Optional[int]:
                 return self.config.max_iterations_continue_amount
+
             self._on_max_iterations_reached = default_callback
         else:
             self._on_max_iterations_reached = on_max_iterations_reached
@@ -245,8 +242,8 @@ class Cortex:
         """Callback when context is summarized."""
         if self._is_text_output():
             console.print(
-                f"[green]Context summarized:[/green] Compressed {messages_removed} old messages into a summary "
-                f"({remaining} remaining)"
+                f"[green]Context summarized:[/green] Compressed {messages_removed} "
+                f"old messages into a summary ({remaining} remaining)"
             )
 
     def _handle_delegation_action(self, result: Dict[str, Any]) -> bool:
@@ -362,7 +359,11 @@ class Cortex:
         }
 
     def switch_model(
-        self, new_model: str, provider_override: Optional[str] = None, silent: bool = False, reason: Optional[str] = None
+        self,
+        new_model: str,
+        provider_override: Optional[str] = None,
+        silent: bool = False,
+        reason: Optional[str] = None,
     ) -> None:
         """
         Switch to a different model while maintaining conversation history.
@@ -400,7 +401,7 @@ class Cortex:
             # Update model and provider
             self.model = new_model
             self.provider = new_provider
-            
+
             # Update prompt builder for new model
             self.prompt_builder = PromptBuilder(self.model, project_dir=self.project_dir)
 
@@ -417,7 +418,9 @@ class Cortex:
                         f"{new_model} ({new_provider_name}){reason_str}"
                     )
                 else:
-                    console.print(f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}{reason_str}")
+                    console.print(
+                        f"[cyan]Switched model:[/cyan] {old_model} -> {new_model}{reason_str}"
+                    )
 
         except ProviderError as e:
             # Keep old model on error
@@ -510,16 +513,26 @@ class Cortex:
     def _get_system_prompt(self) -> str:
         """Generate comprehensive system prompt using PromptBuilder"""
         # Get dynamic context
-        state_context = self.state_manager.get_llm_context() if hasattr(self, "state_manager") else None
-        memory_bank_context = self.memory_bank.get_summary() if hasattr(self, "memory_bank") else None
-        
+        state_context = (
+            self.state_manager.get_llm_context() if hasattr(self, "state_manager") else None
+        )
+        memory_bank_context = (
+            self.memory_bank.get_summary() if hasattr(self, "memory_bank") else None
+        )
+
         # Get all tool schemas (includes base + orchestration tools)
         exclude = []
         if not self.enable_planning:
-            exclude = ["create_plan", "execute_plan", "monitor_plan", "update_plan", "create_and_execute_plan"]
-            
+            exclude = [
+                "create_plan",
+                "execute_plan",
+                "monitor_plan",
+                "update_plan",
+                "create_and_execute_plan",
+            ]
+
         tool_schemas = get_registry().get_all_schemas(exclude_names=exclude)
-        
+
         # Build using PromptBuilder
         return self.prompt_builder.build_system_prompt(
             tools=tool_schemas,
@@ -528,7 +541,7 @@ class Cortex:
             state_context=state_context,
             project_context=self.project_context,
             memory_bank_context=memory_bank_context,
-            permission_mode=self.permission_mode
+            permission_mode=self.permission_mode,
         )
 
     def _dispatch_session_start(self) -> None:
@@ -642,10 +655,14 @@ class Cortex:
                 # Pre-flight validation
                 validation = self._validate_messages_for_api(messages)
                 if not validation["valid"]:
-                    critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
+                    critical_issues = [
+                        i for i in validation["issues"] if i["severity"] == "critical"
+                    ]
                     if critical_issues:
                         messages = self._repair_messages_for_api(messages, critical_issues)
-                        logger.warning(f"Repaired {len(critical_issues)} critical issues before API call")
+                        logger.warning(
+                            f"Repaired {len(critical_issues)} critical issues before API call"
+                        )
 
                 # Apply rate limiting
                 if self.rate_limiter:
@@ -659,8 +676,13 @@ class Cortex:
 
             except ProviderError as e:
                 error_str = str(e).lower()
-                if any(x in error_str for x in ["context length", "maximum context", "too many tokens", "tokens ("]):
-                    logger.warning(f"Context overflow detected on attempt {attempt + 1}/{max_retries}")
+                if any(
+                    x in error_str
+                    for x in ["context length", "maximum context", "too many tokens", "tokens ("]
+                ):
+                    logger.warning(
+                        f"Context overflow detected on attempt {attempt + 1}/{max_retries}"
+                    )
 
                     if attempt < max_retries - 1:
                         # Aggressive truncation
@@ -674,11 +696,19 @@ class Cortex:
                         for msg in self.conversation.history:
                             if msg.get("role") == "tool":
                                 content = msg.get("content", "")
-                                if isinstance(content, str) and len(content) > max_tool_content_length:
-                                    msg["content"] = content[:max_tool_content_length] + "... [truncated]"
+                                if (
+                                    isinstance(content, str)
+                                    and len(content) > max_tool_content_length
+                                ):
+                                    msg["content"] = (
+                                        content[:max_tool_content_length] + "... [truncated]"
+                                    )
 
                         if self._is_text_output():
-                            console.print("[yellow]Context overflow - aggressively reduced conversation history.[/yellow]")
+                            console.print(
+                                "[yellow]Context overflow - aggressively "
+                                "reduced conversation history.[/yellow]"
+                            )
 
                         messages = self.conversation.get_history()
                         continue
@@ -814,11 +844,16 @@ class Cortex:
         if len(operation_counts) == 1:
             op_type = list(operation_counts.keys())[0]
             count = list(operation_counts.values())[0]
-            if op_type == "read": return f"Reading {count} file{'s' if count > 1 else ''}"
-            elif op_type == "write": return f"Writing {count} file{'s' if count > 1 else ''}"
-            elif op_type == "search": return f"Searching for {count} pattern{'s' if count > 1 else ''}"
-            elif op_type == "execute": return f"Executing {count} command{'s' if count > 1 else ''}"
-            else: return f"Processing {count} operation{'s' if count > 1 else ''}"
+            if op_type == "read":
+                return f"Reading {count} file{'s' if count > 1 else ''}"
+            elif op_type == "write":
+                return f"Writing {count} file{'s' if count > 1 else ''}"
+            elif op_type == "search":
+                return f"Searching for {count} pattern{'s' if count > 1 else ''}"
+            elif op_type == "execute":
+                return f"Executing {count} command{'s' if count > 1 else ''}"
+            else:
+                return f"Processing {count} operation{'s' if count > 1 else ''}"
         else:
             total = sum(operation_counts.values())
             return f"Processing {total} operations"
@@ -881,7 +916,10 @@ class Cortex:
             try:
                 routing_decision = self.route_request(user_message)
                 if routing_decision and routing_decision.model_name != self.model:
-                    self.switch_model(routing_decision.model_name, reason=routing_decision.reasoning.primary_reason)
+                    self.switch_model(
+                        routing_decision.model_name,
+                        reason=routing_decision.reasoning.primary_reason,
+                    )
             except Exception as e:
                 logger.warning(f"Routing failed: {e}")
 
@@ -890,7 +928,7 @@ class Cortex:
             self._delegation_tracker = self._orchestration.start_request(self.model)
 
         self._is_processing = True
-        
+
         # Agent loop
         max_iterations = self.config.max_iterations
         iteration = 0
@@ -921,16 +959,28 @@ class Cortex:
                     # Refresh system prompt with latest state/memory
                     self.conversation.system_prompt = self._get_system_prompt()
                     messages = self.conversation.get_history()
-                    
+
                     exclude = []
                     if not self.enable_planning:
-                        exclude = ["create_plan", "execute_plan", "monitor_plan", "update_plan", "create_and_execute_plan"]
+                        exclude = [
+                            "create_plan",
+                            "execute_plan",
+                            "monitor_plan",
+                            "update_plan",
+                            "create_and_execute_plan",
+                        ]
                     tools = get_registry().get_all_schemas(exclude_names=exclude)
 
                     with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
-                        if use_streaming and stream_model_response and self.provider.supports_streaming():
+                        if (
+                            use_streaming
+                            and stream_model_response
+                            and self.provider.supports_streaming()
+                        ):
                             normalized_model = self.provider.normalize_model_name(self.model)
-                            stream = stream_model_response(self.provider, normalized_model, messages, tools)
+                            stream = stream_model_response(
+                                self.provider, normalized_model, messages, tools
+                            )
                             response_message = display_streaming_response(stream)
                         else:
                             response = self._call_model(messages, tools)
@@ -947,6 +997,7 @@ class Cortex:
                     reasoning_content = response_message.get("reasoning_content")
                     if reasoning_content and self._is_text_output():
                         from .ui.display import display_thinking
+
                         display_thinking(reasoning_content, expanded=self.show_thinking)
 
                     # Process Tool Calls
@@ -954,14 +1005,20 @@ class Cortex:
                         tool_calls_to_run = []
                         for i, tool_call_data in enumerate(response_message["tool_calls"]):
                             try:
-                                parsed_arguments = json.loads(tool_call_data["function"]["arguments"])
-                            except:
+                                parsed_arguments = json.loads(
+                                    tool_call_data["function"]["arguments"]
+                                )
+                            except Exception:
                                 parsed_arguments = {}
 
                             raw_id = tool_call_data.get("id", f"call_{iteration}_{i}")
                             tool_calls_to_run.append(
                                 ToolCall(
-                                    id=str(raw_id) if raw_id is not None else f"call_{iteration}_{i}",
+                                    id=(
+                                        str(raw_id)
+                                        if raw_id is not None
+                                        else f"call_{iteration}_{i}"
+                                    ),
                                     name=tool_call_data["function"]["name"],
                                     arguments=parsed_arguments,
                                     index=i,
@@ -971,51 +1028,68 @@ class Cortex:
                         # Batch execute
                         consolidated_display = get_consolidated_display()
                         agent_description = self._get_agent_description(tool_calls_to_run)
-                        
-                        with consolidated_display.track_operations(tool_calls_to_run, agent_description):
+
+                        with consolidated_display.track_operations(
+                            tool_calls_to_run, agent_description
+                        ):
                             batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
 
                         # Process results
                         for tool_result in batch_result.results:
-                            if self._shutdown_requested: return
-                            
+                            if self._shutdown_requested:
+                                return
+
                             tool_name = tool_result.name
                             result = tool_result.result
-                            arguments = next((tc.arguments for tc in tool_calls_to_run if tc.id == tool_result.id), {})
+                            arguments = next(
+                                (
+                                    tc.arguments
+                                    for tc in tool_calls_to_run
+                                    if tc.id == tool_result.id
+                                ),
+                                {},
+                            )
 
                             self._output_tool_result(tool_name, result)
-                            
+
                             # Update state and memory
                             self.state_manager.record_tool_execution(tool_name, arguments, result)
-                            if self.enable_layered_memory and isinstance(self.memory_bank, EnhancedMemoryBank):
+                            if self.enable_layered_memory and isinstance(
+                                self.memory_bank, EnhancedMemoryBank
+                            ):
                                 self.memory_bank.extract_learnings_from_tool_results([result])
 
                             # Delegation
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
                                 if self._handle_delegation_action(result):
                                     result = truncate_tool_result(
-                                        tool_name, 
-                                        result, 
-                                        max_length=self.conversation._get_max_tool_result_length()
+                                        tool_name,
+                                        result,
+                                        max_length=self.conversation._get_max_tool_result_length(),
                                     )
                                     self.conversation.add_tool_result(tool_result.id, result)
                                     continue
 
                             # Truncate and add to conversation
                             result = truncate_tool_result(
-                                tool_name, 
-                                result, 
-                                max_length=self.conversation._get_max_tool_result_length()
+                                tool_name,
+                                result,
+                                max_length=self.conversation._get_max_tool_result_length(),
                             )
                             self.conversation.add_tool_result(tool_result.id, result)
 
                             # Loop guard checks
                             if not self._is_tool_result_success(result):
                                 if self.loop_guard.check_repeated_error(result):
-                                    recovery_action = self.loop_guard.get_recovery_action(result, tool_name, arguments)
+                                    recovery_action = self.loop_guard.get_recovery_action(
+                                        result, tool_name, arguments
+                                    )
                                     if recovery_action and recovery_action.strategy != "ESCALATE":
                                         if recovery_action.suggested_prompt:
-                                            self.conversation.add_user_message(f"[Recovery Guidance] {recovery_action.suggested_prompt}")
+                                            self.conversation.add_user_message(
+                                                f"[Recovery Guidance] "
+                                                f"{recovery_action.suggested_prompt}"
+                                            )
                                         continue
                                     return
 
@@ -1031,6 +1105,7 @@ class Cortex:
 
                 except Exception as e:
                     import traceback
+
                     self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
                     return
         finally:
@@ -1077,7 +1152,9 @@ class Cortex:
     def _load_skill(self, skill_name: str) -> Dict[str, Any]:
         return {}
 
-    def _execute_tool_for_planning(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute_tool_for_planning(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
         return self.execute_tool(tool_name, arguments)
 
     def _on_plan_reflection(self, plan: Plan, reflection: str) -> None:
@@ -1087,41 +1164,41 @@ class Cortex:
     def _on_plan_step(self, step: PlanStep, result: Dict[str, Any]) -> None:
         """
         Callback triggered when a plan step completes.
-        
+
         This records the step execution in history and memory so the agent
         stays informed of what happened during planning execution.
         """
         if self.enable_layered_memory and isinstance(self.memory_bank, EnhancedMemoryBank):
             self.memory_bank.extract_learnings_from_tool_results([result])
-            
+
         # Record the tool execution in conversation history if it was a tool call
         if step.step_type == PlanStepType.TOOL_CALL and step.tool_name:
             # We don't have the original tool_call_id from the model here,
             # so we use the step ID as a reference.
             tool_call_id = f"plan_{step.id}"
-            
+
             # Add a synthetic assistant message showing the tool call that was executed
             # This helps the model maintain context of the conversation flow
             self.conversation.add_assistant_message(
                 content=f"Executing plan step: {step.description}",
-                tool_calls=[{
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": step.tool_name,
-                        "arguments": json.dumps(step.tool_arguments or {})
+                tool_calls=[
+                    {
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {
+                            "name": step.tool_name,
+                            "arguments": json.dumps(step.tool_arguments or {}),
+                        },
                     }
-                }]
+                ],
             )
-            
+
             # Add the result
             truncated_result = truncate_tool_result(
-                step.tool_name, 
-                result, 
-                max_length=self.conversation._get_max_tool_result_length()
+                step.tool_name, result, max_length=self.conversation._get_max_tool_result_length()
             )
             self.conversation.add_tool_result(tool_call_id, truncated_result)
-            
+
             if self._is_text_output():
                 status = "success" if result.get("success", False) else "failed"
                 console.print(f"[dim]Plan Step {step.id}: {step.tool_name} -> {status}[/dim]")
@@ -1140,13 +1217,19 @@ class Cortex:
             if msg.get("role") == "assistant":
                 # Check for missing content key entirely
                 if "content" not in msg:
-                    issues.append({"index": i, "type": "missing_content_key", "severity": "critical"})
+                    issues.append(
+                        {"index": i, "type": "missing_content_key", "severity": "critical"}
+                    )
                 # Check for both empty content and empty tool calls
                 elif not msg.get("content") and not msg.get("tool_calls"):
-                    issues.append({"index": i, "type": "invalid_assistant_message", "severity": "critical"})
+                    issues.append(
+                        {"index": i, "type": "invalid_assistant_message", "severity": "critical"}
+                    )
         return {"valid": len(issues) == 0, "issues": issues}
 
-    def _repair_messages_for_api(self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _repair_messages_for_api(
+        self, messages: List[Dict[str, Any]], issues: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Attempt to repair critical message validation issues."""
         repaired = messages.copy()
         for issue in issues:
@@ -1155,7 +1238,9 @@ class Cortex:
                 repaired[idx]["content"] = ""
             elif issue["type"] == "invalid_assistant_message":
                 if repaired[idx].get("reasoning_content"):
-                    repaired[idx]["content"] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
+                    repaired[idx][
+                        "content"
+                    ] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
                 else:
                     repaired[idx]["content"] = "[Repaired empty response]"
         return repaired

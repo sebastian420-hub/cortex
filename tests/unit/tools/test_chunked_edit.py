@@ -10,53 +10,53 @@ from cortex.tools.chunked_edit_tool import ChunkedEditTool, EditOperation
 
 class TestChunkedEditTool:
     """Test ChunkedEditTool functionality."""
-    
+
     def setup_method(self):
         """Set up test environment."""
         self.temp_dir = tempfile.mkdtemp()
         mock_agent = MagicMock()
         mock_agent.model = "gpt-4"
         self.tool = ChunkedEditTool(project_dir=Path(self.temp_dir), agent=mock_agent)
-    
+
     def teardown_method(self):
         """Clean up test environment."""
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
-    
+
     def test_create_chunked_edit_tool(self):
         """Test creating a ChunkedEditTool."""
         assert self.tool is not None
         assert self.tool.project_dir == Path(self.temp_dir)
         assert hasattr(self.tool, 'chunker')
-        assert hasattr(self.tool, 'context_window')        
+        assert hasattr(self.tool, 'context_window')
 
     def test_read_file_chunked_small_file(self):
-        """Test reading small file (should not chunk)."""  
-        test_file = Path(self.temp_dir) / "small.txt"      
-        test_file.write_text("This is a small file.")      
+        """Test reading small file (should not chunk)."""
+        test_file = Path(self.temp_dir) / "small.txt"
+        test_file.write_text("This is a small file.")
 
-        result = self.tool.read_file_chunked("small.txt")  
+        result = self.tool.read_file_chunked("small.txt")
 
         assert result["success"] is True
-        assert result["data"]["is_chunked"] is False       
+        assert result["data"]["is_chunked"] is False
 
     def test_read_file_chunked_large_file(self):
-        """Test reading large file (should chunk)."""      
-        test_file = Path(self.temp_dir) / "large.txt"      
+        """Test reading large file (should chunk)."""
+        test_file = Path(self.temp_dir) / "large.txt"
         # Create large content (>10KB)
         content = "line\n" * 5000
         test_file.write_text(content)
 
-        result = self.tool.read_file_chunked("large.txt")  
+        result = self.tool.read_file_chunked("large.txt")
 
         assert result["success"] is True
-        assert result["data"]["is_chunked"] is True        
+        assert result["data"]["is_chunked"] is True
         assert result["data"]["chunks"] > 0
         assert result["data"]["total_tokens"] > 0
 
     def test_read_file_chunked_python_file(self):
-        """Test chunking Python file by function."""       
-        test_file = Path(self.temp_dir) / "test.py"        
+        """Test chunking Python file by function."""
+        test_file = Path(self.temp_dir) / "test.py"
         content = """
 def func1():
     pass
@@ -69,15 +69,15 @@ def func3():
 """
         test_file.write_text(content)
 
-        result = self.tool.read_file_chunked("test.py")    
+        result = self.tool.read_file_chunked("test.py")
 
         assert result["success"] is True
-        # Python file with 3 functions should be chunked   
-        assert result["data"]["is_chunked"] is True        
+        # Python file with 3 functions should be chunked
+        assert result["data"]["is_chunked"] is True
 
     def test_get_file_chunks(self):
         """Test getting chunks for a file."""
-        test_file = Path(self.temp_dir) / "large.txt"      
+        test_file = Path(self.temp_dir) / "large.txt"
         content = "x" * 15000
         test_file.write_text(content)
 
@@ -85,15 +85,15 @@ def func3():
         self.tool.read_file_chunked("large.txt")
 
         # Now get chunks
-        result = self.tool.get_file_chunks("large.txt")    
+        result = self.tool.get_file_chunks("large.txt")
 
         assert result["success"] is True
         assert "chunks" in result["data"]
         assert result["data"]["total_chunks"] > 0
 
     def test_edit_file_standard(self):
-        """Test standard file edit (small file)."""        
-        test_file = Path(self.temp_dir) / "small.txt"      
+        """Test standard file edit (small file)."""
+        test_file = Path(self.temp_dir) / "small.txt"
         test_file.write_text("Hello World!")
 
         result = self.tool.execute(
@@ -112,7 +112,7 @@ def func3():
 
     def test_edit_file_chunked(self):
         """Test chunked file edit (large file)."""
-        test_file = Path(self.temp_dir) / "large.txt"      
+        test_file = Path(self.temp_dir) / "large.txt"
         content = "line1\n" * 3000 + "TARGET_TEXT" + "\nline2\n" * 3000
         test_file.write_text(content)
 
@@ -123,21 +123,21 @@ def func3():
         )
 
         assert result["success"] is True
-        assert result["data"]["chunks_modified"] == 1      
+        assert result["data"]["chunks_modified"] == 1
 
         # Verify file was modified
         modified_content = test_file.read_text()
         assert "REPLACED_TEXT" in modified_content
-        assert "TARGET_TEXT" not in modified_content       
+        assert "TARGET_TEXT" not in modified_content
 
     def test_edit_chunk_surgically(self):
-        """Test surgical edit on specific chunk."""        
-        test_file = Path(self.temp_dir) / "large.txt"      
+        """Test surgical edit on specific chunk."""
+        test_file = Path(self.temp_dir) / "large.txt"
         content = "x" * 15000 + "\nTARGET_TEXT" + "\n" + "y" * 15000
         test_file.write_text(content)
 
         # First chunk the file
-        result = self.tool.read_file_chunked("large.txt")  
+        result = self.tool.read_file_chunked("large.txt")
         assert result["success"] is True
 
         # Get chunk IDs
@@ -147,8 +147,8 @@ def func3():
         # Find chunk containing TARGET_TEXT
         target_chunk_id = None
         for chunk_id in chunk_ids:
-            chunk = self.tool.chunk_cache.get(chunk_id)    
-            if chunk and "TARGET_TEXT" in chunk.content:   
+            chunk = self.tool.chunk_cache.get(chunk_id)
+            if chunk and "TARGET_TEXT" in chunk.content:
                 target_chunk_id = chunk_id
                 break
 
@@ -171,7 +171,7 @@ def func3():
 
     def test_edit_not_found(self):
         """Test edit with text not found."""
-        test_file = Path(self.temp_dir) / "test.txt"       
+        test_file = Path(self.temp_dir) / "test.txt"
         test_file.write_text("Hello World!")
 
         result = self.tool.execute(
@@ -181,7 +181,7 @@ def func3():
         )
 
         assert result["success"] is False
-        assert "not found" in result["error"].lower()      
+        assert "not found" in result["error"].lower()
 
     def test_edit_file_not_found(self):
         """Test edit with non-existent file."""
@@ -192,11 +192,11 @@ def func3():
         )
 
         assert result["success"] is False
-        assert "not found" in result["error"].lower()      
+        assert "not found" in result["error"].lower()
 
     def test_rollback_last_edit(self):
         """Test rollback functionality."""
-        test_file = Path(self.temp_dir) / "test.txt"       
+        test_file = Path(self.temp_dir) / "test.txt"
         test_file.write_text("original")
 
         # Make an edit
@@ -210,7 +210,7 @@ def func3():
         result = self.tool.rollback_last_edit()
 
         assert result["success"] is True
-        assert result["data"]["remaining_operations"] == 0 
+        assert result["data"]["remaining_operations"] == 0
 
     def test_rollback_no_operations(self):
         """Test rollback with no operations."""
@@ -221,7 +221,7 @@ def func3():
 
     def test_edit_missing_parameters(self):
         """Test edit with missing old_string or new_string."""
-        test_file = Path(self.temp_dir) / "test.txt"       
+        test_file = Path(self.temp_dir) / "test.txt"
         test_file.write_text("content")
 
         # Missing old_string
@@ -233,8 +233,8 @@ def func3():
         assert result["success"] is False
 
     def test_edit_chunk_not_found(self):
-        """Test edit with non-existent chunk ID."""        
-        test_file = Path(self.temp_dir) / "large.txt"      
+        """Test edit with non-existent chunk ID."""
+        test_file = Path(self.temp_dir) / "large.txt"
         content = "x" * 15000
         test_file.write_text(content)
 
@@ -281,11 +281,11 @@ class TestIntegration:
     def teardown_method(self):
         """Clean up test environment."""
         import shutil
-        shutil.rmtree(self.temp_dir, ignore_errors=True)   
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_full_workflow_large_python_file(self):        
+    def test_full_workflow_large_python_file(self):
         """Test complete workflow with large Python file."""
-        test_file = Path(self.temp_dir) / "module.py"      
+        test_file = Path(self.temp_dir) / "module.py"
 
         # Create realistic Python file
         content = """
@@ -293,7 +293,7 @@ import os
 import sys
 from typing import List, Dict
 
-def process_data(data: List[str]) -> Dict[str, int]:       
+def process_data(data: List[str]) -> Dict[str, int]:
     '''Process data and return counts.'''
     result = {}
     for item in data:
@@ -323,22 +323,22 @@ if __name__ == "__main__":
         test_file.write_text(content)
 
         # Step 1: Chunk the file
-        result = self.tool.read_file_chunked("module.py")  
+        result = self.tool.read_file_chunked("module.py")
         assert result["success"] is True
-        assert result["data"]["is_chunked"] is True        
+        assert result["data"]["is_chunked"] is True
 
         # Step 2: Get chunks
         chunks_result = self.tool.get_file_chunks("module.py")
         assert chunks_result["success"] is True
-        assert chunks_result["data"]["total_chunks"] > 0   
+        assert chunks_result["data"]["total_chunks"] > 0
 
         # Step 3: Edit a specific chunk (replace "print" with "print_debug")
-        chunk_ids = chunks_result["data"]["chunks"]        
+        chunk_ids = chunks_result["data"]["chunks"]
         target_chunk_id = None
 
         for chunk_info in chunk_ids:
             chunk = self.tool.chunk_cache.get(chunk_info["id"])
-            if chunk and "print(result)" in chunk.content: 
+            if chunk and "print(result)" in chunk.content:
                 target_chunk_id = chunk_info["id"]
                 break
 
@@ -355,17 +355,17 @@ if __name__ == "__main__":
 
         # Step 4: Verify the change
         modified_content = test_file.read_text()
-        assert "print_debug(result)" in modified_content   
-        assert "print(result)" not in modified_content     
+        assert "print_debug(result)" in modified_content
+        assert "print(result)" not in modified_content
 
     def test_context_window_integration(self):
         """Test integration with context window management."""
-        test_file = Path(self.temp_dir) / "large_code.py"  
+        test_file = Path(self.temp_dir) / "large_code.py"
 
         # Create large file
         content = "# " + "x" * 10000 + "\n"
         for i in range(5):
-            content += f"\ndef func{i}():\n    pass\n"     
+            content += f"\ndef func{i}():\n    pass\n"
         test_file.write_text(content)
 
         # Chunk the file
@@ -378,8 +378,8 @@ if __name__ == "__main__":
         assert len(context.available_chunks) > 0
 
     def test_multiple_edits_same_file(self):
-        """Test making multiple edits to the same file.""" 
-        test_file = Path(self.temp_dir) / "multi_edit.txt" 
+        """Test making multiple edits to the same file."""
+        test_file = Path(self.temp_dir) / "multi_edit.txt"
         test_file.write_text("First line\nSecond line\nThird line\n")
 
         # First edit
@@ -406,8 +406,8 @@ if __name__ == "__main__":
         assert "Second" not in content or "Updated Second" in content
 
     def test_edit_operations_history(self):
-        """Test that edit operations are tracked."""       
-        test_file = Path(self.temp_dir) / "history.txt"    
+        """Test that edit operations are tracked."""
+        test_file = Path(self.temp_dir) / "history.txt"
         test_file.write_text("original content")
 
         # Make edits
@@ -423,7 +423,7 @@ if __name__ == "__main__":
         )
 
         # Check history
-        assert len(self.tool.operation_history) == 2       
+        assert len(self.tool.operation_history) == 2
         assert self.tool.operation_history[0].operation_type == "replace"
         assert self.tool.operation_history[1].operation_type == "replace"
 

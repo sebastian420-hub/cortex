@@ -24,7 +24,7 @@ class TestEnhancedCortexInitialization:
     """Test EnhancedCortex initialization and configuration."""
 
     def test_enhanced_agent_initialization(self, tmp_project_dir):
-        """Test basic initialization of enhanced agent.""" 
+        """Test basic initialization of enhanced agent."""
         agent = EnhancedCortex(
             model="llama3.2",
             project_dir=str(tmp_project_dir),
@@ -39,13 +39,13 @@ class TestEnhancedCortexInitialization:
         assert agent.enable_planning is True
         assert agent.enable_layered_memory is True
 
-        # Verify enhanced components are initialized       
+        # Verify enhanced components are initialized
         if agent.enable_layered_memory:
             assert isinstance(agent.memory_bank, EnhancedMemoryBank)
         assert isinstance(agent.state_manager, StateManager)
 
     def test_enhanced_agent_without_planning(self, tmp_project_dir):
-        """Test enhanced agent with planning disabled."""  
+        """Test enhanced agent with planning disabled."""
         agent = EnhancedCortex(
             model="llama3.2",
             project_dir=str(tmp_project_dir),
@@ -70,7 +70,7 @@ class TestEnhancedCortexInitialization:
         )
 
         assert agent.enable_planning is True
-        assert agent.enable_layered_memory is False        
+        assert agent.enable_layered_memory is False
         # Should use base memory bank, not EnhancedMemoryBank
         assert not isinstance(agent.memory_bank, EnhancedMemoryBank)
         assert agent.planning_engine is not None
@@ -104,15 +104,15 @@ class TestEnhancedCortexInitialization:
 
         # Verify base agent methods are available
         assert hasattr(agent, 'execute_tool')
-        assert hasattr(agent, 'clear_conversation')        
-        assert hasattr(agent, 'get_conversation_history')  
-        assert hasattr(agent, 'load_project_context')      
+        assert hasattr(agent, 'clear_conversation')
+        assert hasattr(agent, 'get_conversation_history')
+        assert hasattr(agent, 'load_project_context')
 
         # Verify enhanced methods are available
-        assert hasattr(agent, 'process_with_planning')     
+        assert hasattr(agent, 'process_with_planning')
         assert hasattr(agent, '_load_skill')
         assert hasattr(agent, '_execute_tool_for_planning')
-        assert hasattr(agent, '_on_plan_reflection')       
+        assert hasattr(agent, '_on_plan_reflection')
 
 
 class TestEnhancedCortexPlanningSystem:
@@ -131,26 +131,26 @@ class TestEnhancedCortexPlanningSystem:
 
     def test_planning_engine_initialization(self, planning_agent):
         """Test that planning engine is properly initialized."""
-        assert planning_agent.planning_engine is not None  
+        assert planning_agent.planning_engine is not None
         assert isinstance(planning_agent.planning_engine, PlanningEngine)
 
-        # Verify planning engine has required dependencies 
+        # Verify planning engine has required dependencies
         assert planning_agent.planning_engine.project_dir is not None
         assert planning_agent.planning_engine.skill_loader is not None
         assert planning_agent.planning_engine.tool_executor is not None
         assert planning_agent.planning_engine.reflection_callback is not None
 
-    def test_load_skill_method(self, planning_agent):      
+    def test_load_skill_method(self, planning_agent):
         """Test the _load_skill method."""
-        # Currently returns empty dict (placeholder)       
-        skill = planning_agent._load_skill("test_skill")   
+        # Currently returns empty dict (placeholder)
+        skill = planning_agent._load_skill("test_skill")
         assert isinstance(skill, dict)
         assert skill == {}
 
     def test_execute_tool_for_planning_method(self, planning_agent):
-        """Test the _execute_tool_for_planning method."""  
+        """Test the _execute_tool_for_planning method."""
         # Mock the execute_tool method
-        mock_result = {"success": True, "content": "test"} 
+        mock_result = {"success": True, "content": "test"}
         with patch.object(planning_agent, 'execute_tool', return_value=mock_result) as mock_execute:
             result = planning_agent._execute_tool_for_planning("read_file", {"path": "test.txt"})
 
@@ -158,7 +158,7 @@ class TestEnhancedCortexPlanningSystem:
             assert result == mock_result
 
     def test_plan_reflection_callback(self, planning_agent):
-        """Test the _on_plan_reflection callback."""       
+        """Test the _on_plan_reflection callback."""
         # Mock plan object
         mock_plan = Mock()
         mock_plan.id = "test_plan"
@@ -189,20 +189,20 @@ class TestEnhancedCortexLayeredMemory:
         )
 
     def test_enhanced_memory_bank_initialization(self, memory_agent):
-        """Test that enhanced memory bank is used."""      
+        """Test that enhanced memory bank is used."""
         assert isinstance(memory_agent.memory_bank, EnhancedMemoryBank)
-        assert memory_agent.memory_bank.max_items == 100   
+        assert memory_agent.memory_bank.max_items == 100
 
     def test_state_manager_initialization(self, memory_agent):
-        """Test that state manager is initialized."""      
+        """Test that state manager is initialized."""
         assert isinstance(memory_agent.state_manager, StateManager)
         assert memory_agent.state_manager.project_dir == memory_agent.project_dir.resolve()
 
     def test_state_manager_focus_transitions(self, memory_agent):
-        """Test state manager focus transitions."""        
+        """Test state manager focus transitions."""
         # Initial focus should be IDLE or similar
         # Let's check that we can set focus
-        memory_agent.state_manager.set_focus("EXPLORING")  
+        memory_agent.state_manager.set_focus("EXPLORING")
         # We'd need to check internal state; for now just ensure no error
         assert True
 
@@ -227,10 +227,10 @@ class TestEnhancedCortexProcessing:
         assert callable(enhanced_agent.process_with_planning)
 
     @patch('cortex.agent_enhanced.console')
-    @patch('cortex.agent_enhanced.stream_model_response')  
+    @patch('cortex.agent_enhanced.stream_model_response')
     @patch('cortex.agent_enhanced.display_streaming_response')
     def test_process_with_planning_basic_flow(self, mock_display, mock_stream, mock_console, enhanced_agent):
-        """Test basic flow of process_with_planning."""    
+        """Test basic flow of process_with_planning."""
         # Mock provider
         mock_provider = Mock()
         mock_provider.supports_streaming.return_value = False
@@ -239,7 +239,7 @@ class TestEnhancedCortexProcessing:
         # Mock model response without tool calls
         mock_response = {
             "message": {
-                "content": "I'll help you with that.",     
+                "content": "I'll help you with that.",
                 "tool_calls": None
             }
         }
@@ -253,25 +253,25 @@ class TestEnhancedCortexProcessing:
             enhanced_agent.process_with_planning("Help me with something")
 
             # Verify hooks were called
-            mock_hook_manager.dispatch.assert_called()     
+            mock_hook_manager.dispatch.assert_called()
 
             # Verify conversation was updated
             history = enhanced_agent.get_conversation_history()
             assert len(history) > 1  # Should have system + user + assistant messages
 
     def test_enhanced_context_generation(self, enhanced_agent):
-        """Test that enhanced context is generated."""     
-        # The method _get_enhanced_context should exist    
+        """Test that enhanced context is generated."""
+        # The method _get_enhanced_context should exist
         # It might be private; we can check if it's called during processing
-        # For now, just verify the agent has state manager 
-        assert enhanced_agent.state_manager is not None    
+        # For now, just verify the agent has state manager
+        assert enhanced_agent.state_manager is not None
 
 
 class TestEnhancedCortexMetrics:
     """Test enhanced agent metrics tracking."""
 
     def test_metrics_initialization(self, tmp_project_dir):
-        """Test that enhanced metrics are initialized."""  
+        """Test that enhanced metrics are initialized."""
         agent = EnhancedCortex(
             model="llama3.2",
             project_dir=str(tmp_project_dir),
@@ -297,15 +297,15 @@ class TestEnhancedCortexIntegration:
             agent = EnhancedCortex(
                 model="llama3.2",
                 project_dir=str(tmp_project_dir),
-                permission_mode=PermissionMode.NORMAL      
+                permission_mode=PermissionMode.NORMAL
             )
 
-            assert agent.provider == mock_ollama_provider  
+            assert agent.provider == mock_ollama_provider
             assert agent.model == "llama3.2"
 
-            # Verify enhanced components are present       
+            # Verify enhanced components are present
             assert agent.state_manager is not None
             if agent.enable_planning:
-                assert agent.planning_engine is not None   
+                assert agent.planning_engine is not None
             if agent.enable_layered_memory:
                 assert isinstance(agent.memory_bank, EnhancedMemoryBank)

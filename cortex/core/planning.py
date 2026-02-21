@@ -1,15 +1,14 @@
-﻿"""Planning engine for structured task planning and execution."""
+"""Planning engine for structured task planning and execution."""
 
 import json
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import List, Dict, Any, Optional, Union, Callable
 from pathlib import Path
 
 from ..utils.errors import create_error_response, create_success_response, ErrorType
-from ..ui.console import console
 from ..ui.plan_progress import PlanProgressDisplay
 
 logger = logging.getLogger(__name__)
@@ -350,7 +349,7 @@ class PlanningEngine:
             # Add provided steps
             for i, step_data in enumerate(steps):
                 step_id = step_data.get("id") or f"{plan_id}_step_{i+1}"
-                
+
                 # Convert dict to PlanStep
                 step = PlanStep(
                     id=step_id,
@@ -368,21 +367,21 @@ class PlanningEngine:
         else:
             # Generate a more robust auto-skeleton based on common patterns in the goal
             goal_lower = goal.lower()
-            
+
             # Step 1: Initial Research/Discovery (Always needed)
             discovery_desc = f"Discover relevant files and structures for: {goal}"
             if "research" in goal_lower or "understand" in goal_lower:
                 discovery_desc = "Map codebase structure and identify key entry points"
             elif "fix" in goal_lower or "bug" in goal_lower:
                 discovery_desc = "Locate bug origin and identify related components"
-            
+
             step1 = PlanStep(
                 id=f"{plan_id}_step_1",
                 description=discovery_desc,
                 step_type=PlanStepType.TOOL_CALL,
                 tool_name="glob",
                 tool_arguments={"pattern": "**/*.py"},
-                expected_outcome="List of relevant files identified"
+                expected_outcome="List of relevant files identified",
             )
             plan.add_step(step1)
 
@@ -394,7 +393,7 @@ class PlanningEngine:
                 tool_name="grep",
                 tool_arguments={"pattern": "class |def ", "include": "*.py"},
                 dependencies=[step1.id],
-                expected_outcome="Architecture and entry points identified"
+                expected_outcome="Architecture and entry points identified",
             )
             plan.add_step(step2)
 
@@ -404,7 +403,7 @@ class PlanningEngine:
                 description="Read entry point files to understand data flow",
                 step_type=PlanStepType.SUBTASK,
                 dependencies=[step2.id],
-                expected_outcome="Detailed understanding of logic"
+                expected_outcome="Detailed understanding of logic",
             )
             plan.add_step(step3)
 
@@ -786,7 +785,10 @@ class PlanningEngine:
         reflection_id = f"reflect_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         if self.reflection_callback:
-            reflection_message = f"Plan {plan.id} Reflection: Insights: {', '.join(insights)}. Suggestions: {', '.join(suggestions)}."
+            reflection_message = (
+                f"Plan {plan.id} Reflection: Insights: {', '.join(insights)}. "
+                f"Suggestions: {', '.join(suggestions)}."
+            )
             self.reflection_callback(plan, reflection_message)
 
         result = create_success_response(
@@ -848,7 +850,8 @@ class PlanningEngine:
             f"# Plan: {plan.id}",
             f"Goal: {plan.goal}",
             f"Status: {plan.status.value}",
-            f"Progress: {progress['completed']}/{progress['total']} steps ({progress['completion_percentage']:.1f}%)",
+            f"Progress: {progress['completed']}/{progress['total']} steps "
+            f"({progress['completion_percentage']:.1f}%)",
             "",
             "## Steps:",
         ]

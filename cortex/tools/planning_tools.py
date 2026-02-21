@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class CreatePlanTool(Tool):
     """Tool for creating structured plans from goal descriptions."""
-    
+
     def __init__(
         self,
         project_dir,
@@ -32,7 +32,7 @@ class CreatePlanTool(Tool):
     ):
         super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
         self.parent_agent = parent_agent
-    
+
     def execute(
         self,
         goal: str,
@@ -44,7 +44,7 @@ class CreatePlanTool(Tool):
     ) -> Dict[str, Any]:
         """
         Create a structured plan for achieving a goal.
-        
+
         Args:
             goal: The goal to achieve
             constraints: Constraints to consider in planning
@@ -52,13 +52,13 @@ class CreatePlanTool(Tool):
             skill_hints: Suggested skills to apply
             context: Additional context for planning
             steps: Optional pre-defined steps for the plan
-            
+
         Returns:
             Dictionary with plan details
         """
         if self.console:
             self.console.print(f"[cyan]Creating plan for goal:[/cyan] {goal}")
-        
+
         # Check if we have access to planning engine through parent agent
         if not hasattr(self, 'parent_agent') or not self.parent_agent:
             return create_error_response(
@@ -66,7 +66,7 @@ class CreatePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         # Check if planning engine is available
         if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
@@ -74,7 +74,7 @@ class CreatePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         try:
             # Create plan using planning engine
             planning_engine = self.parent_agent.planning_engine
@@ -86,14 +86,14 @@ class CreatePlanTool(Tool):
                 skill_hints=skill_hints,
                 steps=steps,
             )
-            
+
             # Get plan summary
             plan_summary = planning_engine.get_plan_summary(plan)
-            
+
             if self.console:
                 self.console.print(f"[green]Created plan:[/green] {plan.id}")
                 self.console.print(f"[dim]Steps generated:[/dim] {len(plan.steps)}")
-            
+
             return create_success_response({
                 "plan_id": plan.id,
                 "goal": plan.goal,
@@ -104,7 +104,7 @@ class CreatePlanTool(Tool):
                 "plan_summary": plan_summary,
                 "status": plan.status.value,
             })
-            
+
         except Exception as e:
             logger.error(f"Failed to create plan: {e}", exc_info=True)
             return create_error_response(
@@ -116,7 +116,7 @@ class CreatePlanTool(Tool):
 
 class ExecutePlanTool(Tool):
     """Tool for executing existing plans."""
-    
+
     def __init__(
         self,
         project_dir,
@@ -128,7 +128,7 @@ class ExecutePlanTool(Tool):
     ):
         super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
         self.parent_agent = parent_agent
-    
+
     def execute(
         self,
         plan_id: str,
@@ -137,18 +137,18 @@ class ExecutePlanTool(Tool):
     ) -> Dict[str, Any]:
         """
         Execute a plan by ID.
-        
+
         Args:
             plan_id: ID of the plan to execute
             max_steps: Maximum number of steps to execute (optional)
             stop_on_failure: Stop execution if a step fails (default: True)
-            
+
         Returns:
             Dictionary with execution results
         """
         if self.console:
             self.console.print(f"[cyan]Executing plan:[/cyan] {plan_id}")
-        
+
         # Check if we have access to planning engine through parent agent
         if not hasattr(self, 'parent_agent') or not self.parent_agent:
             return create_error_response(
@@ -156,7 +156,7 @@ class ExecutePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         # Check if planning engine is available
         if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
@@ -164,10 +164,10 @@ class ExecutePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         try:
             planning_engine = self.parent_agent.planning_engine
-            
+
             # Get plan by ID
             plan = planning_engine.get_plan(plan_id)
             if not plan:
@@ -176,48 +176,48 @@ class ExecutePlanTool(Tool):
                     ErrorType.NOT_FOUND,
                     {"plan_id": plan_id}
                 )
-            
+
             if self.console:
                 self.console.print(f"[dim]Plan goal:[/dim] {plan.goal}")
                 self.console.print(f"[dim]Steps to execute:[/dim] {len(plan.steps)}")
-            
+
             # Execute plan
             execution_result = planning_engine.execute_plan(
                 plan=plan,
                 max_steps=max_steps,
                 stop_on_failure=stop_on_failure,
             )
-            
+
             # Extract relevant information
             result_data = {
                 "plan_id": plan_id,
                 "execution_success": execution_result.get("success", False),
                 "message": execution_result.get("message", ""),
             }
-            
+
             # Add progress information if available
             if "progress" in execution_result:
                 result_data["progress"] = execution_result["progress"]
-            
+
             # Add step results if available
             if "step_results" in execution_result:
                 result_data["step_count_executed"] = len(execution_result["step_results"])
-                
+
                 # Count successful steps
                 successful_steps = sum(
-                    1 for r in execution_result["step_results"] 
+                    1 for r in execution_result["step_results"]
                     if r.get("success", False)
                 )
                 result_data["successful_steps"] = successful_steps
-            
+
             if self.console:
                 if execution_result.get("success", False):
                     self.console.print("[green]Plan execution completed successfully[/green]")
                 else:
                     self.console.print("[yellow]Plan execution completed with issues[/yellow]")
-            
+
             return create_success_response(result_data)
-            
+
         except Exception as e:
             logger.error(f"Failed to execute plan: {e}", exc_info=True)
             return create_error_response(
@@ -229,7 +229,7 @@ class ExecutePlanTool(Tool):
 
 class MonitorPlanTool(Tool):
     """Tool for monitoring plan progress and status."""
-    
+
     def __init__(
         self,
         project_dir,
@@ -241,7 +241,7 @@ class MonitorPlanTool(Tool):
     ):
         super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
         self.parent_agent = parent_agent
-    
+
     def execute(
         self,
         plan_id: str,
@@ -249,17 +249,17 @@ class MonitorPlanTool(Tool):
     ) -> Dict[str, Any]:
         """
         Monitor a plan's progress and status.
-        
+
         Args:
             plan_id: ID of the plan to monitor
             detail_level: Level of detail ("summary", "steps", "detailed")
-            
+
         Returns:
             Dictionary with plan status and progress
         """
         if self.console:
             self.console.print(f"[cyan]Monitoring plan:[/cyan] {plan_id}")
-        
+
         # Check if we have access to planning engine through parent agent
         if not hasattr(self, 'parent_agent') or not self.parent_agent:
             return create_error_response(
@@ -267,7 +267,7 @@ class MonitorPlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         # Check if planning engine is available
         if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
@@ -275,10 +275,10 @@ class MonitorPlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         try:
             planning_engine = self.parent_agent.planning_engine
-            
+
             # Get plan by ID
             plan = planning_engine.get_plan(plan_id)
             if not plan:
@@ -287,11 +287,11 @@ class MonitorPlanTool(Tool):
                     ErrorType.NOT_FOUND,
                     {"plan_id": plan_id}
                 )
-            
+
             # Get basic plan info
             progress = plan.get_progress()
             plan_summary = planning_engine.get_plan_summary(plan)
-            
+
             result = {
                 "plan_id": plan_id,
                 "goal": plan.goal,
@@ -301,13 +301,13 @@ class MonitorPlanTool(Tool):
                 "step_count": len(plan.steps),
                 "created_at": plan.created_at,
             }
-            
+
             # Add started/completed times if available
             if plan.started_at:
                 result["started_at"] = plan.started_at
             if plan.completed_at:
                 result["completed_at"] = plan.completed_at
-            
+
             # Add step details based on detail level
             if detail_level in ["steps", "detailed"]:
                 steps_data = []
@@ -319,7 +319,7 @@ class MonitorPlanTool(Tool):
                         "status": step.status.value,
                         "dependencies": step.dependencies,
                     }
-                    
+
                     if detail_level == "detailed":
                         step_info.update({
                             "expected_outcome": step.expected_outcome,
@@ -330,19 +330,19 @@ class MonitorPlanTool(Tool):
                             "completed_at": step.completed_at,
                             "error": step.error,
                         })
-                    
+
                     steps_data.append(step_info)
-                
+
                 result["steps"] = steps_data
-            
+
             if self.console:
                 completion_pct = progress.get("completion_percentage", 0)
                 status_color = "green" if plan.status == PlanStepStatus.COMPLETED else \
                               "yellow" if plan.status == PlanStepStatus.IN_PROGRESS else "dim"
                 self.console.print(f"[{status_color}]Plan status: {plan.status.value} ({completion_pct:.1f}%)[/{status_color}]")
-            
+
             return create_success_response(result)
-            
+
         except Exception as e:
             logger.error(f"Failed to monitor plan: {e}", exc_info=True)
             return create_error_response(
@@ -354,7 +354,7 @@ class MonitorPlanTool(Tool):
 
 class UpdatePlanTool(Tool):
     """Tool for updating existing plans."""
-    
+
     def __init__(
         self,
         project_dir,
@@ -366,7 +366,7 @@ class UpdatePlanTool(Tool):
     ):
         super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
         self.parent_agent = parent_agent
-    
+
     def execute(
         self,
         plan_id: str,
@@ -377,20 +377,20 @@ class UpdatePlanTool(Tool):
     ) -> Dict[str, Any]:
         """
         Update an existing plan.
-        
+
         Args:
             plan_id: ID of the plan to update
             action: Action to perform ("add_step", "update_step", "remove_step", "reorder_steps")
             step_data: Step data for add/update actions
             step_id: Step ID for update/remove actions
             new_order: New step order for reorder_steps action
-            
+
         Returns:
             Dictionary with update results
         """
         if self.console:
             self.console.print(f"[cyan]Updating plan:[/cyan] {plan_id}")
-        
+
         # Check if we have access to planning engine through parent agent
         if not hasattr(self, 'parent_agent') or not self.parent_agent:
             return create_error_response(
@@ -398,7 +398,7 @@ class UpdatePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         # Check if planning engine is available
         if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
@@ -406,10 +406,10 @@ class UpdatePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag when starting Cortex"}
             )
-        
+
         try:
             planning_engine = self.parent_agent.planning_engine
-            
+
             # Get plan by ID
             plan = planning_engine.get_plan(plan_id)
             if not plan:
@@ -418,7 +418,7 @@ class UpdatePlanTool(Tool):
                     ErrorType.NOT_FOUND,
                     {"plan_id": plan_id}
                 )
-            
+
             # Perform requested action
             if action == "add_step" and step_data:
                 # Add a new step to the plan
@@ -426,7 +426,7 @@ class UpdatePlanTool(Tool):
                 step_type = PlanStepType(step_data.get("step_type", "tool_call"))
                 tool_name = step_data.get("tool_name")
                 tool_arguments = step_data.get("tool_arguments")
-                
+
                 step = planning_engine.add_step(
                     plan_id=plan_id,
                     description=description,
@@ -434,21 +434,21 @@ class UpdatePlanTool(Tool):
                     tool_name=tool_name,
                     tool_arguments=tool_arguments,
                 )
-                
+
                 if not step:
                     return create_error_response(
                         "Failed to add step to plan",
                         ErrorType.EXECUTION,
                         {"plan_id": plan_id}
                     )
-                
+
                 result = {
                     "action": "add_step",
                     "plan_id": plan_id,
                     "step_id": step.id,
                     "new_step_count": len(plan.steps),
                 }
-                
+
             elif action == "update_step" and step_id and step_data:
                 # Update an existing step
                 # For now, we can only update step status through planning engine
@@ -456,21 +456,21 @@ class UpdatePlanTool(Tool):
                 if "status" in step_data:
                     status = PlanStepStatus(step_data["status"])
                     error = step_data.get("error")
-                    
+
                     success = planning_engine.update_step_status(
                         plan_id=plan_id,
                         step_id=step_id,
                         status=status,
                         error=error,
                     )
-                    
+
                     if not success:
                         return create_error_response(
                             f"Failed to update step {step_id}",
                             ErrorType.EXECUTION,
                             {"plan_id": plan_id, "step_id": step_id}
                         )
-                    
+
                     result = {
                         "action": "update_step",
                         "plan_id": plan_id,
@@ -483,7 +483,7 @@ class UpdatePlanTool(Tool):
                         ErrorType.VALIDATION,
                         {"supported_updates": ["status"]}
                     )
-                
+
             elif action == "remove_step" and step_id:
                 # Remove a step from the plan
                 # This would require additional functionality in PlanningEngine
@@ -493,7 +493,7 @@ class UpdatePlanTool(Tool):
                     ErrorType.NOT_IMPLEMENTED,
                     {"plan_id": plan_id, "step_id": step_id}
                 )
-                
+
             elif action == "reorder_steps" and new_order:
                 # Reorder steps in the plan
                 # This would require additional functionality in PlanningEngine
@@ -503,19 +503,19 @@ class UpdatePlanTool(Tool):
                     ErrorType.NOT_IMPLEMENTED,
                     {"plan_id": plan_id}
                 )
-                
+
             else:
                 return create_error_response(
                     f"Invalid action or missing parameters: {action}",
                     ErrorType.VALIDATION,
                     {"valid_actions": ["add_step", "update_step", "remove_step", "reorder_steps"]}
                 )
-            
+
             if self.console:
                 self.console.print(f"[green]Plan updated successfully[/green]")
-            
+
             return create_success_response(result)
-            
+
         except Exception as e:
             logger.error(f"Failed to update plan: {e}", exc_info=True)
             return create_error_response(
@@ -527,7 +527,7 @@ class UpdatePlanTool(Tool):
 
 class CreateAndExecutePlanTool(Tool):
     """Tool for creating and immediately executing a structured plan."""
-    
+
     def __init__(
         self,
         project_dir,
@@ -539,7 +539,7 @@ class CreateAndExecutePlanTool(Tool):
     ):
         super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
         self.parent_agent = parent_agent
-    
+
     def execute(
         self,
         goal: str,
@@ -552,7 +552,7 @@ class CreateAndExecutePlanTool(Tool):
     ) -> Dict[str, Any]:
         """
         Create and immediately execute a structured plan.
-        
+
         Args:
             goal: The goal to achieve
             constraints: Constraints to consider
@@ -561,13 +561,13 @@ class CreateAndExecutePlanTool(Tool):
             context: Additional context for planning
             steps: Concrete steps for the plan
             max_steps: Maximum number of steps to execute in this turn
-            
+
         Returns:
             Dictionary with creation and execution results
         """
         if self.console:
             self.console.print(f"[cyan]🚀 Creating and executing plan for goal:[/cyan] {goal}")
-        
+
         # Check if we have access to planning engine
         if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):
             return create_error_response(
@@ -575,10 +575,10 @@ class CreateAndExecutePlanTool(Tool):
                 ErrorType.CONFIGURATION,
                 {"hint": "Use --enhanced flag to enable planning features"}
             )
-        
+
         try:
             planning_engine = self.parent_agent.planning_engine
-            
+
             # 1. Create the plan
             plan = planning_engine.create_plan(
                 goal=goal,
@@ -588,17 +588,17 @@ class CreateAndExecutePlanTool(Tool):
                 skill_hints=skill_hints,
                 steps=steps,
             )
-            
+
             # 2. Execute the plan
             execution_result = planning_engine.execute_plan(
                 plan=plan,
                 max_steps=max_steps,
                 stop_on_failure=True,
             )
-            
+
             # Get plan summary
             plan_summary = planning_engine.get_plan_summary(plan)
-            
+
             result_data = {
                 "plan_id": plan.id,
                 "goal": plan.goal,
@@ -608,12 +608,12 @@ class CreateAndExecutePlanTool(Tool):
                 "message": execution_result.get("message", ""),
                 "steps_executed": len(execution_result.get("step_results", [])),
             }
-            
+
             if "progress" in execution_result:
                 result_data["progress"] = execution_result["progress"]
-                
+
             return create_success_response(result_data)
-            
+
         except Exception as e:
             logger.error(f"Failed to create and execute plan: {e}", exc_info=True)
             return create_error_response(

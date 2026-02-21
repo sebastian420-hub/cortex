@@ -342,7 +342,7 @@ class TestRateLimiterIntegration:
     def test_concurrent_requests(self):
         """Test rate limiter under concurrent access."""
         import threading
-        
+
         config = RateLimitConfig(requests_per_minute=100, tokens_per_minute=10000)
         limiter = RateLimiter(config)
 

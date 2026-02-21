@@ -28,6 +28,7 @@ class AgentOutputMixin:
 
         if self._is_text_output():
             from ..utils.output_processing import process_model_output
+
             processed_content = process_model_output(content)
             # Always use simple markdown output (no Panel boxes)
             console.print(Markdown(processed_content))
@@ -113,7 +114,10 @@ class AgentOutputMixin:
                         {
                             "index": i,
                             "type": "missing_content_key",
-                            "message": f"Assistant message at index {i} is missing 'content' key (strictly required by some providers)",
+                            "message": (
+                                f"Assistant message at index {i} is missing 'content' key "
+                                f"(strictly required by some providers)"
+                            ),
                             "severity": "critical",
                         }
                     )
@@ -123,7 +127,9 @@ class AgentOutputMixin:
                         {
                             "index": i,
                             "type": "invalid_assistant_message",
-                            "message": f"Assistant message at index {i} has no content or tool_calls",
+                            "message": (
+                                f"Assistant message at index {i} has no content or tool_calls"
+                            ),
                             "severity": "critical",  # Will cause API errors
                         }
                     )
@@ -174,10 +180,14 @@ class AgentOutputMixin:
             elif issue["type"] == "invalid_assistant_message":
                 # Try to fix by converting reasoning_content to content
                 if msg.get("reasoning_content"):
-                    content = f"[Reasoning: {msg['reasoning_content'][:200]}{'...' if len(msg['reasoning_content']) > 200 else ''}]"
+                    content = (
+                        f"[Reasoning: {msg['reasoning_content'][:200]}"
+                        f"{'...' if len(msg['reasoning_content']) > 200 else ''}]"
+                    )
                     repaired_messages[idx]["content"] = content
                     logger.debug(
-                        f"Repaired assistant message at index {idx} by converting reasoning to content"
+                        f"Repaired assistant message at index {idx} "
+                        f"by converting reasoning to content"
                     )
                 else:
                     # Fallback: add minimal content
@@ -207,7 +217,10 @@ class AgentOutputMixin:
             issues.append(
                 {
                     "type": "high_message_count",
-                    "message": f"Session has {history_validation['message_count']} messages, which may impact performance",
+                    "message": (
+                        f"Session has {history_validation['message_count']} messages, "
+                        f"which may impact performance"
+                    ),
                     "severity": "warning",
                 }
             )
@@ -230,7 +243,10 @@ class AgentOutputMixin:
             issues.append(
                 {
                     "type": "frequent_errors",
-                    "message": f"{error_count} errors in recent messages, indicating potential issues",
+                    "message": (
+                        f"{error_count} errors in recent messages, "
+                        f"indicating potential issues"
+                    ),
                     "severity": "warning",
                 }
             )
@@ -342,6 +358,6 @@ class AgentOutputMixin:
         """Callback when context is summarized."""
         if self._is_text_output():
             console.print(
-                f"[green]Context summarized:[/green] Compressed {messages_removed} old messages into a summary "
-                f"({remaining} remaining)"
+                f"[green]Context summarized:[/green] Compressed {messages_removed} "
+                f"old messages into a summary ({remaining} remaining)"
             )

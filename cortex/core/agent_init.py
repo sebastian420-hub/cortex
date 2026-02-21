@@ -1,15 +1,11 @@
 """Agent initialization module - handles complex agent setup"""
 
 import logging
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any, Callable
-from datetime import datetime
+from typing import Optional, Dict, Callable
 
 from ..config import AgentConfig
-from ..models import PermissionMode
 from .conversation import ConversationManager
-from .parallel import ParallelToolExecutor
 from .providers import ProviderFactory, ProviderError
 from .rate_limiter import get_rate_limiter, RateLimitConfig
 from ..cache.file_cache import get_file_cache
@@ -29,9 +25,8 @@ from .planning import PlanningEngine
 from .orchestration import (
     OrchestrationManager,
     DelegationContext,
-    get_orchestration_manager,
 )
-from .models import get_model_registry, ModelRegistry
+from .models import get_model_registry
 from ..tools import get_registry
 from ..hooks import HookManager
 from ..output import OutputFormat, create_formatter
@@ -126,7 +121,7 @@ class AgentInitializer:
         self.router = self._init_routing()
         self.tool_registry = get_registry()
         self.formatter = create_formatter(output_format, console=console)
-        
+
         # Initialize planning engine
         self.planning_engine = self._init_planning_engine()
 
@@ -155,7 +150,7 @@ class AgentInitializer:
         """Initialize planning engine if enabled"""
         if not self.enable_planning:
             return None
-            
+
         return PlanningEngine(
             project_dir=self.project_dir,
             skill_loader=self.planning_callbacks.get("skill_loader"),
@@ -185,7 +180,9 @@ class AgentInitializer:
         else:
             strategy = SummarizationStrategy.SIMPLE
 
-        summarizer = create_summarizer(strategy, self.provider, self.model) if enable_summarization else None
+        summarizer = (
+            create_summarizer(strategy, self.provider, self.model) if enable_summarization else None
+        )
 
         # Note: system_prompt will be set by agent after PromptGenerator is initialized
         return ConversationManager(
@@ -300,8 +297,8 @@ class AgentInitializer:
             # Validate API key for cloud providers
             if not provider.validate_api_key():
                 raise ProviderError(
-                    f"API key not set for {ProviderFactory.get_provider_name(self.model)} provider. "
-                    f"Please set the required environment variable."
+                    f"API key not set for {ProviderFactory.get_provider_name(self.model)} "
+                    f"provider. Please set the required environment variable."
                 )
             return provider
         except ProviderError as e:
@@ -310,7 +307,6 @@ class AgentInitializer:
     def _init_routing(self):
         """Initialize intelligent routing if enabled"""
         router = None
-        routing_enabled = False
         routing_config = self.config.get_routing_config()
 
         if ROUTING_AVAILABLE and routing_config.get("enabled", False):
@@ -331,7 +327,6 @@ class AgentInitializer:
                         log_file=routing_config.get("log_file"),
                     )
                 )
-                _routing_enabled = True
                 logger.info("Intelligent model routing enabled")
             except Exception as e:
                 logger.warning(f"Failed to initialize routing system: {e}")

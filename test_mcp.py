@@ -16,7 +16,7 @@ from cortex.mcp.protocol import MCPRequest
 def test_mcp_client():
     """Test MCP client with a mock server."""
     print("Testing MCP client...")
-    
+
     # Create a mock MCP server script
     mock_server_script = '''
 import sys
@@ -40,10 +40,10 @@ while True:
         request = read_request()
         if request is None:
             break
-            
+
         method = request.get('method')
         request_id = request.get('id')
-        
+
         if method == 'initialize':
             response = {
                 'jsonrpc': '2.0',
@@ -98,7 +98,7 @@ while True:
             params = request.get('params', {})
             name = params.get('name', '')
             arguments = params.get('arguments', {})
-            
+
             if name == 'get_time':
                 import datetime
                 format_type = arguments.get('format', 'iso')
@@ -108,7 +108,7 @@ while True:
                     result = str(time.time())
                 else:
                     result = str(datetime.datetime.now())
-                    
+
                 response = {
                     'jsonrpc': '2.0',
                     'id': request_id,
@@ -156,9 +156,9 @@ while True:
                     'message': f'Method not found: {method}'
                 }
             }
-        
+
         write_response(response)
-        
+
     except Exception as e:
         error_response = {
             'jsonrpc': '2.0',
@@ -174,11 +174,11 @@ while True:
     # Write mock server to a file
     mock_server_path = Path('mock_mcp_server.py')
     mock_server_path.write_text(mock_server_script, encoding='utf-8')
-    
+
     try:
         # Create MCP client
         client = MCPClient()
-        
+
         # Add mock server
         server_config = MCPServerConfig(
             name='mock',
@@ -186,38 +186,38 @@ while True:
             transport=TransportType.STDIO
         )
         client.add_server(server_config)
-        
+
         # Start client (this will start the server)
         print("Starting MCP client...")
         client.start()
-        
+
         # Check if tools were discovered
         tools = client.get_tools()
         print(f"Discovered {len(tools)} tools:")
         for tool in tools:
             print(f"  - {tool.server_name}.{tool.name}: {tool.description}")
-        
+
         # Test calling a tool
         print("\nTesting tool call...")
         result = client.call_tool('mock', 'get_time', {'format': 'iso'})
         print(f"Tool call result: {result}")
-        
+
         # Test another tool
         result = client.call_tool('mock', 'echo', {'text': 'Hello MCP!'})
         print(f"Echo result: {result}")
-        
+
         # Stop client
         client.stop()
         print("\nMCP test completed successfully!")
-        
+
         return True
-        
+
     except Exception as e:
         print(f"MCP test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
-        
+
     finally:
         # Cleanup
         if mock_server_path.exists():

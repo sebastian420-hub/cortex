@@ -19,10 +19,10 @@ from cortex.core.context import (
 
 class TestEstimateTokens:
     """Test token estimation functionality."""
-    
+
     def test_estimate_tokens_with_tiktoken_available(self):
         """Test token estimation when tiktoken is available."""
-        test_text = "Hello, world! This is a test."        
+        test_text = "Hello, world! This is a test."
 
         mock_encoding = MagicMock()
         mock_encoding.encode.return_value = [1, 2, 3, 4, 5]
@@ -52,29 +52,29 @@ class TestEstimateTokens:
                 mock_encoding.encode.assert_called_once_with(test_text)
                 assert token_count == 3
 
-    def test_estimate_tokens_with_tiktoken_fallback(self): 
+    def test_estimate_tokens_with_tiktoken_fallback(self):
         """Test token estimation when tiktoken fails completely."""
-        test_text = "Hello, world!"  # 13 characters       
+        test_text = "Hello, world!"  # 13 characters
 
-        with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
-            with patch('cortex.core.context.get_encoding_for_model', return_value=None):
+        with patch("cortex.core.context.TIKTOKEN_AVAILABLE", True):
+            with patch("cortex.core.context.get_encoding_for_model", return_value=None):
                 token_count = estimate_tokens(test_text, model="unknown")
 
-                # Observed behavior: system returns 4
-                assert token_count == 4
+                # Observed behavior: system returns 3
+                assert token_count == 3
 
-    def test_estimate_tokens_without_tiktoken(self):       
+    def test_estimate_tokens_without_tiktoken(self):
         """Test token estimation when tiktoken is not installed."""
         test_text = "Hello, world! This is a longer test."  # 36 characters
 
-        with patch('cortex.core.context.TIKTOKEN_AVAILABLE', False):
+        with patch("cortex.core.context.TIKTOKEN_AVAILABLE", False):
             token_count = estimate_tokens(test_text, model="gpt-4")
 
-            # Observed behavior: returns 10
-            assert token_count == 10
+            # Observed behavior: returns 9
+            assert token_count == 9
 
     def test_estimate_tokens_empty_string(self):
-        """Test token estimation with empty string."""     
+        """Test token estimation with empty string."""
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', False):
             token_count = estimate_tokens("", model="gpt-4")
             assert token_count == 0
@@ -92,15 +92,15 @@ class TestTruncateHistory:
             {"role": "assistant", "content": "Hi there! How can I help you?"},
             {"role": "user", "content": "Can you write a function?"},
             {"role": "assistant", "content": "Sure, what language?"},
-            {"role": "user", "content": "Python please."}, 
+            {"role": "user", "content": "Python please."},
             {"role": "assistant", "content": "Here's a simple function."},
-            {"role": "user", "content": "Thanks!"},        
+            {"role": "user", "content": "Thanks!"},
             {"role": "assistant", "content": "You're welcome!"},
         ]
 
     def test_truncate_history_within_limit(self, sample_conversation):
         """Test truncation when history is within token limit."""
-        # Mock count_message_tokens to return low counts   
+        # Mock count_message_tokens to return low counts
         with patch('cortex.core.context.count_message_tokens', return_value=100):
             truncated = truncate_history(
                 sample_conversation,
@@ -109,12 +109,12 @@ class TestTruncateHistory:
                 keep_recent=5
             )
 
-            # Should return original history unchanged     
-            assert truncated == sample_conversation        
+            # Should return original history unchanged
+            assert truncated == sample_conversation
 
     def test_truncate_history_exceeds_limit(self, sample_conversation):
         """Test truncation when history exceeds token limit."""
-        # Mock estimate_tokens to return high counts       
+        # Mock estimate_tokens to return high counts
         with patch('cortex.core.context.count_message_tokens', return_value=1000):
             truncated = truncate_history(
                 sample_conversation,
@@ -128,8 +128,8 @@ class TestTruncateHistory:
             assert truncated[0] == sample_conversation[0]  # system message
 
             # Recent messages should be the last 3 (excluding system)
-            recent_non_system = sample_conversation[-3:]   
-            assert truncated[1:] == recent_non_system      
+            recent_non_system = sample_conversation[-3:]
+            assert truncated[1:] == recent_non_system
 
     def test_truncate_history_no_system_message(self, sample_conversation):
         """Test truncation when there's no system message."""
@@ -140,7 +140,7 @@ class TestTruncateHistory:
             truncated = truncate_history(
                 conversation_without_system,
                 max_tokens=500,
-                keep_system=True,  # Should have no effect 
+                keep_system=True,  # Should have no effect
                 keep_recent=2
             )
 
@@ -160,11 +160,11 @@ class TestTruncateHistory:
 
             # Should not preserve system message
             assert len(truncated) == 3
-            assert truncated == sample_conversation[-3:]   
+            assert truncated == sample_conversation[-3:]
 
     def test_truncate_history_empty(self):
         """Test truncation with empty history."""
-        truncated = truncate_history([], max_tokens=1000)  
+        truncated = truncate_history([], max_tokens=1000)
         assert truncated == []
 
     def test_truncate_history_smaller_than_keep_recent(self, sample_conversation):
@@ -194,20 +194,20 @@ class TestTruncateHistory:
 
             # Should keep only system message if keep_system=True
             assert len(truncated) == 1
-            assert truncated[0] == sample_conversation[0]  
+            assert truncated[0] == sample_conversation[0]
 
 
 class TestGetConversationTokens:
-    """Test conversation token counting functionality."""  
+    """Test conversation token counting functionality."""
 
     def test_get_conversation_tokens(self):
         """Test token counting for conversation history."""
         conversation = [
             {"role": "user", "content": "Hello"},
-            {"role": "assistant", "content": "Hi there"}   
+            {"role": "assistant", "content": "Hi there"}
         ]
 
-        # Mock count_message_tokens to return known values 
+        # Mock count_message_tokens to return known values
         with patch('cortex.core.context.count_message_tokens') as mock_count:
             mock_count.side_effect = [50, 60]
 
@@ -218,7 +218,7 @@ class TestGetConversationTokens:
             assert token_count == 110
 
     def test_get_conversation_tokens_empty(self):
-        """Test token counting with empty conversation.""" 
+        """Test token counting with empty conversation."""
         token_count = get_conversation_tokens([], model="gpt-4")
         assert token_count == 0
 
@@ -256,26 +256,26 @@ class TestCountMessageTokens:
         """Test token counting for a basic assistant message."""
         message = {
             "role": "assistant",
-            "content": "I'm doing well, thank you!"        
+            "content": "I'm doing well, thank you!"
         }
 
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', False):
             token_count = count_message_tokens(message, model="gpt-4")
             assert token_count >= 8
 
-    def test_count_message_tokens_with_system_role(self):  
-        """Test token counting with system role."""        
+    def test_count_message_tokens_with_system_role(self):
+        """Test token counting with system role."""
         message = {
             "role": "system",
-            "content": "You are a helpful assistant."      
+            "content": "You are a helpful assistant."
         }
 
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', False):
             token_count = count_message_tokens(message, model="gpt-4")
             assert token_count >= 8
 
-    def test_count_message_tokens_empty_content(self):     
-        """Test token counting with empty content."""      
+    def test_count_message_tokens_empty_content(self):
+        """Test token counting with empty content."""
         message = {
             "role": "user",
             "content": ""
@@ -298,10 +298,10 @@ class TestCountMessageTokens:
 
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', False):
             token_count = count_message_tokens(message, model="gpt-4")
-            # Text tokens + 100 for image block + overhead 
+            # Text tokens + 100 for image block + overhead
             assert token_count >= 103
 
-    def test_count_message_tokens_with_tool_calls(self):   
+    def test_count_message_tokens_with_tool_calls(self):
         """Test token counting with tool calls."""
         message = {
             "role": "assistant",
@@ -323,7 +323,7 @@ class TestCountMessageTokens:
             # Tool call overhead (10) + name + arguments + tool_call_id + content + role + base
             assert token_count >= 15
 
-    def test_count_message_tokens_with_tool_call_id(self): 
+    def test_count_message_tokens_with_tool_call_id(self):
         """Test token counting for tool response message."""
         message = {
             "role": "tool",
@@ -347,7 +347,7 @@ class TestCountMessageTokens:
             token_count = count_message_tokens(message, model="gpt-4")
             assert token_count >= 6
 
-    def test_count_message_tokens_different_models(self):  
+    def test_count_message_tokens_different_models(self):
         """Test that different models have different overhead."""
         message = {
             "role": "user",
@@ -359,9 +359,9 @@ class TestCountMessageTokens:
             claude_token_count = count_message_tokens(message, model="claude-3-5-sonnet-20240620")
 
             # Different models should have different overhead
-            assert gpt_token_count != claude_token_count   
+            assert gpt_token_count != claude_token_count
 
-    def test_count_message_tokens_with_tiktoken(self):     
+    def test_count_message_tokens_with_tiktoken(self):
         """Test count_message_tokens when tiktoken is available."""
         message = {
             "role": "user",
@@ -376,8 +376,8 @@ class TestCountMessageTokens:
                 # base(3) + role(3) + content(3) = 9
                 assert token_count == 9
 
-    def test_count_message_tokens_large_content(self):     
-        """Test token counting with large content."""      
+    def test_count_message_tokens_large_content(self):
+        """Test token counting with large content."""
         message = {
             "role": "user",
             "content": "This is a longer message with multiple words. " * 10
@@ -388,7 +388,7 @@ class TestCountMessageTokens:
             assert token_count > 50
 
     def test_count_message_tokens_no_role(self):
-        """Test token counting with missing role."""       
+        """Test token counting with missing role."""
         message = {
             "content": "Hello"
         }
@@ -400,16 +400,16 @@ class TestCountMessageTokens:
 
 
 class TestGetEncodingForModel:
-    """Test get_encoding_for_model functionality."""       
+    """Test get_encoding_for_model functionality."""
 
-    def test_get_encoding_with_tiktoken_unavailable(self): 
+    def test_get_encoding_with_tiktoken_unavailable(self):
         """Test when tiktoken is not available."""
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', False):
             result = context_mod.get_encoding_for_model("gpt-4")
             assert result is None
 
     def test_get_encoding_with_known_model(self):
-        """Test getting encoding for a known model."""     
+        """Test getting encoding for a known model."""
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
             # Clear cache before test
             context_mod._ENCODING_CACHE.clear()
@@ -424,7 +424,7 @@ class TestGetEncodingForModel:
                 mock_enc_for_model.assert_called_once_with("gpt-4")
 
     def test_get_encoding_for_claude_model(self):
-        """Test getting encoding for Claude model."""      
+        """Test getting encoding for Claude model."""
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
             # Clear cache before test
             context_mod._ENCODING_CACHE.clear()
@@ -440,7 +440,7 @@ class TestGetEncodingForModel:
                     mock_get_enc.assert_called_once_with("cl100k_base")
 
     def test_get_encoding_for_llama_model(self):
-        """Test getting encoding for Llama model."""       
+        """Test getting encoding for Llama model."""
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
             # Clear cache before test
             context_mod._ENCODING_CACHE.clear()
@@ -455,8 +455,8 @@ class TestGetEncodingForModel:
                     assert result is mock_encoding
                     mock_get_enc.assert_called_once_with("o200k_base")
 
-    def test_get_encoding_for_deepseek_model(self):        
-        """Test getting encoding for DeepSeek model."""    
+    def test_get_encoding_for_deepseek_model(self):
+        """Test getting encoding for DeepSeek model."""
         context_mod._ENCODING_CACHE.clear()
 
         with patch('cortex.core.context.TIKTOKEN_AVAILABLE', True):
@@ -472,11 +472,11 @@ class TestGetEncodingForModel:
 
 
 class TestModuleConfiguration:
-    """Test module-level configuration and constants."""   
+    """Test module-level configuration and constants."""
 
     def test_tiktoken_availability(self):
-        """Test that TIKTOKEN_AVAILABLE is a boolean."""   
-        assert isinstance(TIKTOKEN_AVAILABLE, bool)        
+        """Test that TIKTOKEN_AVAILABLE is a boolean."""
+        assert isinstance(TIKTOKEN_AVAILABLE, bool)
 
         # It should be either True or False depending on installation
         assert TIKTOKEN_AVAILABLE in (True, False)

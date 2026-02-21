@@ -37,7 +37,7 @@ def cleanup_env_vars():
     else:
         if "OPENROUTER_API_KEY" in os.environ:
             del os.environ["OPENROUTER_API_KEY"]
-    
+
     if old_referer:
         os.environ["OPENROUTER_HTTP_REFERER"] = old_referer
     else:
@@ -190,7 +190,7 @@ class TestProviderFactoryOpenRouter:
         os.environ["OPENROUTER_API_KEY"] = "dummy_key"
         provider = ProviderFactory.get_provider("openrouter/another-model")
         assert isinstance(provider, OpenRouterProvider)
-    
+
     def test_get_provider_by_override(self):
         """Test ProviderFactory gets OpenRouterProvider by explicit override."""
         os.environ["OPENROUTER_API_KEY"] = "dummy_key"

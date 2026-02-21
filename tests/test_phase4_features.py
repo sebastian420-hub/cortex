@@ -426,8 +426,8 @@ class TestAgentMemoryIntegration:
         prompt = agent._get_system_prompt()
 
         assert "Mental Model" in prompt
-        assert "Self-Awareness" in prompt
-        assert "Efficiency" in prompt
+        assert "Codebase Understanding" in prompt
+        assert "Discovery" in prompt
 
     def test_system_prompt_contains_memory_section(self, temp_project):
         """Test that system prompt can include memory summary."""

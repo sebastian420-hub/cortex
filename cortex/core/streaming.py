@@ -53,14 +53,16 @@ def _extract_kimi_native_tool_calls_from_streaming(content: str) -> Optional[lis
                 except IndexError:
                     continue
 
-            tool_calls.append({
-                "id": tool_id,
-                "type": "function",
-                "function": {
-                    "name": func_name,
-                    "arguments": args_str.strip(),
-                },
-            })
+            tool_calls.append(
+                {
+                    "id": tool_id,
+                    "type": "function",
+                    "function": {
+                        "name": func_name,
+                        "arguments": args_str.strip(),
+                    },
+                }
+            )
 
     return tool_calls if tool_calls else None
 
@@ -181,8 +183,7 @@ def display_streaming_response(
             from cortex.utils.tool_call_validation import validate_tool_call_data
 
             full_message["tool_calls"] = [
-                validate_tool_call_data(tc, index=i)
-                for i, tc in enumerate(kimi_tools)
+                validate_tool_call_data(tc, index=i) for i, tc in enumerate(kimi_tools)
             ]
             # Clean content
             full_message["content"] = _clean_kimi_tool_content(full_content)
@@ -191,17 +192,23 @@ def display_streaming_response(
     # This prevents "empty assistant message" warnings downstream
     if not full_content and full_reasoning and not tool_calls:
         # Check if reasoning contains tool syntax - if so, try to extract tool calls
-        tool_syntax_patterns = ["<tool_call>", "</tool_call>", "function_call", "tool_use", "<function_call>"]
+        tool_syntax_patterns = [
+            "<tool_call>",
+            "</tool_call>",
+            "function_call",
+            "tool_use",
+            "<function_call>",
+        ]
         has_tool_syntax = any(pattern in full_reasoning.lower() for pattern in tool_syntax_patterns)
-        
+
         if has_tool_syntax:
             # Try to extract tools from reasoning content as fallback
             kimi_tools = _extract_kimi_native_tool_calls_from_streaming(full_reasoning)
             if kimi_tools:
                 from cortex.utils.tool_call_validation import validate_tool_call_data
+
                 full_message["tool_calls"] = [
-                    validate_tool_call_data(tc, index=i)
-                    for i, tc in enumerate(kimi_tools)
+                    validate_tool_call_data(tc, index=i) for i, tc in enumerate(kimi_tools)
                 ]
                 # Don't expose the raw tool syntax in reasoning
                 full_message["reasoning_content"] = "[Tool call extracted from reasoning]"
@@ -221,6 +228,7 @@ def display_streaming_response(
     # to avoid double-printing in the main loop.
     if full_message.get("content") and full_message.get("tool_calls"):
         from ..utils.output_processing import process_model_output
+
         processed_content = process_model_output(full_message["content"])
         console.print(Markdown(processed_content))
 
