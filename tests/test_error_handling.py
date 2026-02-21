@@ -105,7 +105,7 @@ def test_error_recovery_flows(tmp_path):
     assert recovery_action is not None
     assert recovery_action.strategy in [RecoveryStrategy.SUGGEST, RecoveryStrategy.ESCALATE]
 
-def test_all_tools_use_standardized_errors():
+def test_all_tools_use_standardized_errors(tmp_path):
     """Test that all tools use create_error_response pattern"""
     # List of all tools that should use standardized error handling
     tools_to_test = [
@@ -438,7 +438,7 @@ def test_error_handling_performance():
     duration = end_time - start_time
     assert duration < 1.0, f"Error creation took {duration} seconds, expected < 1.0"
 
-def test_error_context_consistency():
+def test_error_context_consistency(tmp_path):
     """Test that error context is consistent across different tools"""
     # Create errors from different tools
     tools = ["read_file", "write_file", "execute_command", "list_files"]

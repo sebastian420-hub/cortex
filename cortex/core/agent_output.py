@@ -244,8 +244,7 @@ class AgentOutputMixin:
                 {
                     "type": "frequent_errors",
                     "message": (
-                        f"{error_count} errors in recent messages, "
-                        f"indicating potential issues"
+                        f"{error_count} errors in recent messages, " f"indicating potential issues"
                     ),
                     "severity": "warning",
                 }

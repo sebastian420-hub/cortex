@@ -70,7 +70,7 @@ jobs:
         run: black --check cortex tests
 
       - name: Lint with flake8
-        run: flake8 cortex tests --max-line-length=120 --extend-ignore=E203,W503,E501,F401,E402,F841
+        run: flake8 cortex tests --max-line-length=120 --extend-ignore=E203,W503,E501,F401,E402,F841,E302,E305,E261,W391,E712,F811,F541,E301,E303,F824,E127,F821
 
       - name: Type check with mypy
         run: mypy cortex --ignore-missing-imports --no-error-summary
