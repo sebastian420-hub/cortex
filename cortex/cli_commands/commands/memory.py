@@ -18,24 +18,29 @@ class MemoryCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Show memory contents or search semantic memory (/memory search [--global] <query>)"
+        return "Manage memory (subcommands: search, clear)"
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the memory command"""
-        if args and args.strip().startswith("search "):
-            search_args = args.strip()[7:].strip()
-            global_search = False
-            if search_args.startswith("--global "):
-                global_search = True
-                query = search_args[9:].strip()
-            elif search_args == "--global":
-                console.print("[red]Usage: /memory search --global <query>[/red]")
+        if args:
+            trimmed_args = args.strip()
+            if trimmed_args.startswith("search "):
+                search_args = trimmed_args[7:].strip()
+                global_search = False
+                if search_args.startswith("--global "):
+                    global_search = True
+                    query = search_args[9:].strip()
+                elif search_args == "--global":
+                    console.print("[red]Usage: /memory search --global <query>[/red]")
+                    return
+                else:
+                    query = search_args
+                    
+                self._handle_search(ctx, query, global_search)
                 return
-            else:
-                query = search_args
-                
-            self._handle_search(ctx, query, global_search)
-            return
+            elif trimmed_args == "clear":
+                self._handle_clear(ctx)
+                return
 
         # Default display
         if ctx.agent.memory_bank and ctx.agent.memory_bank.items:
@@ -55,6 +60,23 @@ class MemoryCommand(Command):
             count = sm.count()
             session_id = getattr(ctx.agent.memory_bank, "session_id", "none")
             console.print(f"[dim]Semantic Memory (Vector DB): {count} documents indexed (Session: {session_id})[/dim]")
+            console.print("[dim]Use '/memory clear' to wipe the entire vector database.[/dim]")
+
+    def _handle_clear(self, ctx: CommandContext) -> None:
+        """Handle clearing the semantic memory database"""
+        if not hasattr(ctx.agent.memory_bank, "clear_semantic_memory"):
+            console.print("[red]Semantic memory is not enabled or supported.[/red]")
+            return
+
+        # Ask for confirmation (simulated since we are in a non-interactive tool call usually,
+        # but the CLI itself is interactive)
+        console.print("[yellow]Warning: This will permanently delete all long-term semantic memories for this project.[/yellow]")
+        
+        success = ctx.agent.memory_bank.clear_semantic_memory()
+        if success:
+            console.print("[green]✓[/green] Semantic memory database cleared successfully.")
+        else:
+            console.print("[red]✗[/red] Failed to clear semantic memory database.")
 
     def _handle_search(self, ctx: CommandContext, query: str, global_search: bool = False) -> None:
         """Handle semantic search subcommand"""

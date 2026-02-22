@@ -129,3 +129,27 @@ class TestSemanticMemoryIntegration:
                             break
             
             assert found_in_table or "8080" in all_text
+
+    def test_memory_clear_command(self, tmp_path, semantic_config):
+        """Verify the /memory clear CLI command."""
+        from cortex.cli_commands.commands.memory import MemoryCommand
+        from cortex.cli_commands.commands.base import CommandContext
+        
+        config = AgentConfig(model="llama3.2", enable_layered_memory=True, semantic_memory=semantic_config)
+        
+        with patch('cortex.core.providers.factory.ProviderFactory.get_provider'):
+            agent = Cortex(config=config, project_dir=tmp_path)
+            agent.memory_bank.add_fact("Something to delete", source="user")
+            
+            import time
+            time.sleep(0.5)
+            assert agent.memory_bank.semantic_manager.count() == 1
+            
+            cmd = MemoryCommand()
+            ctx = CommandContext(agent=agent, config=config, hook_manager=agent.hook_manager, output_format="text")
+            
+            # Execute clear
+            cmd.execute(ctx, args="clear")
+            
+            # Verify database is empty
+            assert agent.memory_bank.semantic_manager.count() == 0

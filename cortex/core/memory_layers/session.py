@@ -560,6 +560,24 @@ class EnhancedMemoryBank(MemoryBank):
         self.progress_markers.clear()
         self.context_summaries.clear()
 
+    def clear_semantic_memory(self) -> bool:
+        """
+        Clear all documents from the semantic vector database.
+
+        Returns:
+            True if successful, False otherwise.
+        """
+        if not self.semantic_manager:
+            return False
+        
+        try:
+            self.semantic_manager.clear_collection()
+            return True
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to clear semantic memory: {e}")
+            return False
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
         base_dict = super().to_dict()
