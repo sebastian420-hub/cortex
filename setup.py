@@ -41,6 +41,8 @@ setup(
         "tree-sitter-typescript>=0.21.0",
         "tree-sitter-java>=0.21.0",
         "tree-sitter-go>=0.21.0",
+        "chromadb>=0.5.0",
+        "sentence-transformers>=3.0.0",
     ],
     entry_points={
         "console_scripts": [

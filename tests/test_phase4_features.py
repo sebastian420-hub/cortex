@@ -24,13 +24,13 @@ class TestMemoryBank:
 
     def test_memory_bank_import(self):
         """Test that MemoryBank can be imported."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         assert MemoryBank is not None
 
     def test_memory_bank_creation(self):
         """Test creating a memory bank."""
-        from cortex.core.memory import MemoryBank, create_memory_bank
+        from cortex.core.memory.core_memory import MemoryBank, create_memory_bank
 
         bank = create_memory_bank(max_items=50)
         assert bank is not None
@@ -39,7 +39,7 @@ class TestMemoryBank:
 
     def test_add_decision(self):
         """Test adding a decision memory."""
-        from cortex.core.memory import MemoryBank, MemoryType, MemorySource
+        from cortex.core.memory.core_memory import MemoryBank, MemoryType, MemorySource
 
         bank = MemoryBank()
         bank.add_decision("Chose pytest over unittest for testing")
@@ -50,7 +50,7 @@ class TestMemoryBank:
 
     def test_add_fact(self):
         """Test adding a fact memory."""
-        from cortex.core.memory import MemoryBank, MemoryType
+        from cortex.core.memory.core_memory import MemoryBank, MemoryType
 
         bank = MemoryBank()
         bank.add_fact("Entry point is main.py")
@@ -60,7 +60,7 @@ class TestMemoryBank:
 
     def test_add_preference(self):
         """Test adding a preference memory."""
-        from cortex.core.memory import MemoryBank, MemoryType, MemorySource
+        from cortex.core.memory.core_memory import MemoryBank, MemoryType, MemorySource
 
         bank = MemoryBank()
         bank.add_preference("User prefers TypeScript", source=MemorySource.USER)
@@ -71,7 +71,7 @@ class TestMemoryBank:
 
     def test_add_file(self):
         """Test adding a file reference."""
-        from cortex.core.memory import MemoryBank, MemoryType
+        from cortex.core.memory.core_memory import MemoryBank, MemoryType
 
         bank = MemoryBank()
         bank.add_file("src/main.py", "Main entry point")
@@ -82,7 +82,7 @@ class TestMemoryBank:
 
     def test_add_error(self):
         """Test adding an error memory."""
-        from cortex.core.memory import MemoryBank, MemoryType
+        from cortex.core.memory.core_memory import MemoryBank, MemoryType
 
         bank = MemoryBank()
         bank.add_error("File not found: config.yaml", "loading config")
@@ -92,7 +92,7 @@ class TestMemoryBank:
 
     def test_deduplication(self):
         """Test that similar memories are deduplicated."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank()
         bank.add_fact("Entry point is main.py")
@@ -102,7 +102,7 @@ class TestMemoryBank:
 
     def test_get_by_type(self):
         """Test filtering memories by type."""
-        from cortex.core.memory import MemoryBank, MemoryType
+        from cortex.core.memory.core_memory import MemoryBank, MemoryType
 
         bank = MemoryBank()
         bank.add_fact("Fact 1")
@@ -117,7 +117,7 @@ class TestMemoryBank:
 
     def test_get_relevant(self):
         """Test getting relevant memories for a query."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank()
         bank.add_fact("The authentication module is in src/auth.py")
@@ -130,7 +130,7 @@ class TestMemoryBank:
 
     def test_get_summary(self):
         """Test generating a summary string."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank()
         bank.add_decision("Using pytest")
@@ -144,7 +144,7 @@ class TestMemoryBank:
 
     def test_get_full_display(self):
         """Test the full display format."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank()
         bank.add_decision("Using pytest")
@@ -157,7 +157,7 @@ class TestMemoryBank:
 
     def test_pruning(self):
         """Test that old items are pruned when over max."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank(max_items=3)
         bank.add_fact("Fact 1")
@@ -169,7 +169,7 @@ class TestMemoryBank:
 
     def test_serialization(self):
         """Test serializing and deserializing memory bank."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank()
         bank.add_decision("Decision 1")
@@ -186,7 +186,7 @@ class TestMemoryBank:
 
     def test_clear(self):
         """Test clearing the memory bank."""
-        from cortex.core.memory import MemoryBank
+        from cortex.core.memory.core_memory import MemoryBank
 
         bank = MemoryBank()
         bank.add_fact("Fact 1")
@@ -201,7 +201,7 @@ class TestMemoryExtraction:
 
     def test_extract_from_user_preferences(self):
         """Test extracting preferences from user messages."""
-        from cortex.core.memory import MemoryBank, extract_memories_from_messages, MemoryType
+        from cortex.core.memory.core_memory import MemoryBank, extract_memories_from_messages, MemoryType
 
         bank = MemoryBank()
         messages = [
@@ -216,7 +216,7 @@ class TestMemoryExtraction:
 
     def test_extract_from_tool_results(self):
         """Test extracting file references from tool results."""
-        from cortex.core.memory import MemoryBank, extract_memories_from_messages, MemoryType
+        from cortex.core.memory.core_memory import MemoryBank, extract_memories_from_messages, MemoryType
         import json
 
         bank = MemoryBank()

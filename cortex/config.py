@@ -155,6 +155,16 @@ DEFAULT_CONTEXT_COMPRESSION = {
     "large_file_threshold": 5000,  # Tokens threshold for large file warnings
 }
 
+# Default semantic memory settings
+DEFAULT_SEMANTIC_MEMORY = {
+    "enabled": False,  # Disabled by default
+    "provider": "chroma",  # "chroma" or other future providers
+    "embedding_model": "local",  # "local" or "openai" etc.
+    "collection_name": "cortex_semantic_memory",
+    "clear_on_init": False,
+    "persist_directory": ".cortex/semantic_db",  # Relative to project root
+}
+
 
 class AgentConfig:
     """
@@ -211,6 +221,8 @@ class AgentConfig:
         rate_limit: Optional[Dict[str, Any]] = None,
         # Routing settings (new)
         routing: Optional[Dict[str, Any]] = None,
+        # Semantic memory settings (new)
+        semantic_memory: Optional[Dict[str, Any]] = None,
         # Summarization settings (new)
         summarization: Optional[Dict[str, Any]] = None,
         # Hybrid architecture settings
@@ -286,6 +298,9 @@ class AgentConfig:
         # Routing settings (merge with defaults)
         self.routing = {**DEFAULT_ROUTING, **(routing or {})}
 
+        # Semantic memory settings (merge with defaults)
+        self.semantic_memory = {**DEFAULT_SEMANTIC_MEMORY, **(semantic_memory or {})}
+        
         # Summarization settings (merge with defaults)
         self.summarization = {**DEFAULT_CONTEXT_COMPRESSION, **(summarization or {})}
 
@@ -551,6 +566,7 @@ class AgentConfig:
             "transactions": self.transactions,
             "routing": self.routing,
             # Hybrid architecture
+            "semantic_memory": self.semantic_memory, # New
             "profiling": self.profiling,
             "feature_flags": self.feature_flags,
             "services": self.services,

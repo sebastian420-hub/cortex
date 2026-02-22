@@ -11,7 +11,7 @@ from .summarization import (
     HybridSummarizer,
     create_summarizer,
 )
-from .memory import (
+from .memory.core_memory import (
     MemoryBank,
     MemoryItem,
     MemoryType,

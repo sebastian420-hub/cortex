@@ -19,7 +19,7 @@ from .summarization import (
     create_summarizer,
     SummarizationStrategy,
 )
-from .memory import create_memory_bank, MemoryBank
+from .memory.core_memory import create_memory_bank, MemoryBank
 from .memory_layers import StateManager, EnhancedMemoryBank
 from .planning import PlanningEngine
 from .orchestration import (
