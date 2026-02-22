@@ -174,10 +174,19 @@ class EnhancedMemoryBank(MemoryBank):
                         else:
                             metadata[k] = str(v)
 
-                self.semantic_manager.add_document(
-                    text=item.content,
-                    metadata=metadata
-                )
+                # Use chunking for large documents (e.g. tool results)
+                if len(item.content) > 1500:
+                    self.semantic_manager.add_large_document(
+                        text=item.content,
+                        metadata=metadata,
+                        chunk_size=1000,
+                        overlap=200
+                    )
+                else:
+                    self.semantic_manager.add_document(
+                        text=item.content,
+                        metadata=metadata
+                    )
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to index memory item semantically: {e}")
@@ -383,7 +392,12 @@ class EnhancedMemoryBank(MemoryBank):
         if not self.semantic_manager:
             return []
         
-        return self.semantic_manager.search_documents(query, top_k=top_k)
+        try:
+            return self.semantic_manager.search_documents(query, top_k=top_k)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to retrieve semantic context: {e}")
+            return []
 
     def extract_learnings_from_tool_results(self, tool_results: List[Dict[str, Any]]) -> None:
         """

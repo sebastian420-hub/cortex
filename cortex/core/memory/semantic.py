@@ -120,6 +120,57 @@ class ChromaMemoryManager:
             logger.error(f"Failed to add document to Chroma: {e}")
             raise
 
+    def add_large_document(
+        self, text: str, metadata: Dict[str, Any], chunk_size: int = 1000, overlap: int = 200
+    ) -> List[str]:
+        """
+        Splits a large document into chunks and adds them to semantic memory.
+
+        Args:
+            text: Large document content
+            metadata: Metadata for all chunks
+            chunk_size: Maximum characters per chunk
+            overlap: Overlap between chunks
+
+        Returns:
+            List of IDs for added chunks
+        """
+        if not text:
+            return []
+
+        chunks = self.chunk_text(text, chunk_size, overlap)
+        chunk_metadatas = []
+        for i, _ in enumerate(chunks):
+            chunk_md = metadata.copy()
+            chunk_md["chunk_index"] = i
+            chunk_md["is_chunk"] = True
+            chunk_metadatas.append(chunk_md)
+
+        return self.add_documents(chunks, chunk_metadatas)
+
+    @staticmethod
+    def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
+        """Split text into overlapping chunks."""
+        if len(text) <= chunk_size:
+            return [text]
+
+        chunks = []
+        start = 0
+        while start < len(text):
+            # If we are near the end and the remaining text is too small to be a useful chunk
+            # just take the rest and stop.
+            if len(text) - start <= overlap and chunks:
+                break
+                
+            end = min(start + chunk_size, len(text))
+            chunks.append(text[start:end])
+            
+            if end == len(text):
+                break
+                
+            start += chunk_size - overlap
+        return chunks
+
     def add_documents(self, texts: List[str], metadatas: List[Dict[str, Any]], ids: Optional[List[str]] = None) -> List[str]:
         """
         Adds multiple documents to the semantic memory.

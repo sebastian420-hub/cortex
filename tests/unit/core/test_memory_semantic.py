@@ -60,10 +60,22 @@ class TestChromaMemoryManager:
     @pytest.fixture
     def mock_embedding_model(self):
         """Mock embedding model for Chroma tests."""
+        dims = 5
         mock = MagicMock(spec=BaseEmbeddingModel)
-        mock.dimensions.return_value = 5
-        mock.encode.side_effect = lambda text: [float(ord(c)) for c in text[:5]] + [0.0] * (mock.dimensions() - 5)
-        mock.encode_batch.side_effect = lambda texts: [mock.encode(t) for t in texts]
+        mock.dimensions.return_value = dims
+        
+        def mock_encode(text):
+            # Always return a list of length 'dims'
+            if not text:
+                return []
+            vec = [float(ord(c)) for c in text[:dims]]
+            # Pad with zeros if text is shorter than dims
+            while len(vec) < dims:
+                vec.append(0.0)
+            return vec
+            
+        mock.encode.side_effect = mock_encode
+        mock.encode_batch.side_effect = lambda texts: [mock_encode(t) for t in texts]
         return mock
 
     @pytest.fixture
@@ -143,6 +155,30 @@ class TestChromaMemoryManager:
         assert chroma_manager.count() == 2
         chroma_manager.clear_collection()
         assert chroma_manager.count() == 0
+
+    def test_chunk_text(self):
+        """Test text chunking helper."""
+        text = "1234567890"
+        # Size 5, overlap 2 -> [12345, 45678, 7890]
+        chunks = ChromaMemoryManager.chunk_text(text, chunk_size=5, overlap=2)
+        assert chunks == ["12345", "45678", "7890"]
+        
+        # Small text
+        assert ChromaMemoryManager.chunk_text("abc", 5, 2) == ["abc"]
+
+    def test_add_large_document(self, chroma_manager: ChromaMemoryManager):
+        """Test adding a large document with chunking."""
+        text = "This is a very long document that should be chunked."
+        # chunk_size=10, overlap=2
+        ids = chroma_manager.add_large_document(text, {"source": "large"}, chunk_size=10, overlap=2)
+        
+        assert len(ids) > 1
+        assert chroma_manager.count() == len(ids)
+        
+        # Verify metadata
+        results = chroma_manager.search_documents("document", top_k=10)
+        assert all(r["metadata"]["is_chunk"] for r in results)
+        assert any(r["metadata"]["chunk_index"] == 0 for r in results)
 
     def test_chroma_not_installed(self, tmp_path: Path):
         """Test error when chromadb is not installed."""
