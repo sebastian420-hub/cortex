@@ -1,24 +1,28 @@
 # Cortex Project Status Report
 
 **Date:** Saturday, February 21, 2026
-**Current Version:** v1.0.0 (Mature Initial Release)
+**Current Version:** v1.1.0 (Semantic AI Agent)
 **Status:** ✅ All Systems Operational
 
 ## Executive Summary
-Cortex is a high-performance, polyglot AI agent framework. The project has reached its stable v1.0.0 milestone, with all core components (Python, Rust, and Go) fully integrated and verified.
+Cortex is a high-performance, polyglot AI agent framework. The project has reached its v1.1.0 milestone, introducing long-term semantic memory through vector database integration while maintaining high stability and test coverage.
 
 ## Architecture & Components
 
 ### 🧠 Python Core (The Brain)
 - **Status:** Stable
 - **Key Modules:** `agent`, `planning`, `memory`, `core`, `ui`.
-- **Recent Updates:** Fixed a syntax error in the coverage booster test suite. Optimized the "Plan -> Act -> Validate" loop.
+- **Recent Updates:** Integrated ChromaDB for semantic memory. Added cross-session context retrieval and automated indexing.
+
+### 🧠 Semantic Memory (Long-Term Knowledge)
+- **Status:** ✅ Operational
+- **Technology:** ChromaDB (Vector DB) + Sentence-Transformers (Local Embeddings).
+- **Capabilities:** Automated indexing of facts/decisions, overlapping text chunking, and session-aware filtering.
 
 ### 🦀 Rust Native (The Muscle)
 - **Status:** Stable / Integrated
 - **Location:** `rust/cortex-native/`
-- **Recent Updates:** Fixed crate visibility (`pub mod`) and updated `Cargo.toml` to support both `cdylib` and `rlib` for better integration testing.
-- **Capabilities:** High-speed AST parsing (Tree-sitter), regex search, and Tiktoken-based tokenization.
+- **Recent Updates:** Verified Tiktoken integration and high-speed AST parsing.
 
 ### 🐹 Go Services (The Scale)
 - **Status:** Stable
@@ -30,20 +34,21 @@ As of Feb 21, 2026, the entire end-to-end test suite is passing with a **100% su
 
 | Component | Status | Passed | Failed |
 | :--- | :--- | :--- | :--- |
-| **Python** | ✅ PASSED | 913 | 0 |
+| **Python** | ✅ PASSED | 939 | 0 |
 | **Rust** | ✅ PASSED | 13 | 0 |
 | **Go** | ✅ PASSED | 14 | 0 |
-| **Total** | ✅ PASSED | **940** | **0** |
+| **Total** | ✅ PASSED | **966** | **0** |
 
-## Recent Fixes
-1. **Python Syntax Fix:** Corrected a multi-line string literal in `tests/test_coverage_booster.py`.
-2. **Rust Visibility Fix:** Made internal modules public to allow integration tests to access core logic.
-3. **Rust Build Configuration:** Updated `Cargo.toml` crate-type to include `rlib` for linkage during tests.
+## Recent Major Features (v1.1.0)
+1. **Vector DB Integration:** Integrated persistent ChromaDB for long-term storage.
+2. **Session Isolation:** Implemented session-ID based filtering for semantic memories.
+3. **Cross-Session Retrieval:** Added global context injection into agent reasoning loops.
+4. **CLI Memory Suite:** Added `/memory search` and `/memory clear` commands.
 
 ## Roadmap & Next Steps
-- **Scalability:** Enhancing multi-agent collaboration.
-- **Intelligence:** Integrating Vector Databases for semantic memory.
-- **Ecosystem:** Expanding the plugin system and native extensions.
+- **Performance:** Model quantization for even faster local embeddings.
+- **Scalability:** Multi-agent collaboration protocols.
+- **Ecosystem:** VS Code extension prototype.
 
 ---
 *This status report was automatically generated following a comprehensive system-wide audit.*

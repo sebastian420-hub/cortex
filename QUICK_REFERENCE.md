@@ -80,6 +80,7 @@ prompt = builder.build_system_prompt(
     enable_memory=True,               # Include memory guidance
     state_context="Current: Fixing bug",  # Current state
     project_context="Python API project", # Project details
+    semantic_context="Past refactors...", # New: Relevant historical context
     custom_instructions="Be thorough", # Extra instructions
 )
 

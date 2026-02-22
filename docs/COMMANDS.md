@@ -278,6 +278,22 @@ Display help information for available commands.
 > /help
 ```
 
+### `/memory [search|clear]`
+
+Manage the semantic memory (Vector Database).
+
+**Subcommands:**
+- `search <query>`: Search for semantically similar memories in the **current session**.
+- `search --global <query>`: Search across **all past sessions** in this project.
+- `clear`: Permanently delete the entire semantic database for this project.
+
+**Examples:**
+```bash
+> /memory search "database port"
+> /memory search --global "reason for choosing fastapi"
+> /memory clear
+```
+
 ### `/clear`
 
 Clear the conversation history (keeps system prompt).
@@ -378,6 +394,19 @@ hooks_enabled: true
 | `auto_save` | boolean | `false` | Automatically save sessions |
 | `output_format` | string | `text` | Output format: `text`, `json`, or `stream-json` |
 | `hooks_enabled` | boolean | `true` | Enable hook system |
+| `semantic_memory` | object | N/A | Semantic memory configuration (see below) |
+
+### Semantic Memory Configuration
+
+You can tune the vector database behavior in your `config.yaml`:
+
+```yaml
+semantic_memory:
+  enabled: true
+  persist_directory: ".cortex/semantic_db"
+  collection_name: "cortex_semantic_memory"
+  clear_on_init: false
+```
 
 ### Project Context Files
 

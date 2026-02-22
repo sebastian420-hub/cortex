@@ -461,6 +461,23 @@ memory_bank.add_fact("Project uses FastAPI framework", source="analysis")
 memory_bank.query("What framework is used?")
 ```
 
+### 7.3 Semantic Memory Layer (v1.1.0)
+
+The Semantic Memory layer provides long-term, cross-session knowledge retention using a vector database. It augments the `EnhancedMemoryBank` with high-dimensional embedding search.
+
+#### Components
+- **Vector DB**: ChromaDB (persistent local client)
+- **Embeddings**: `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions)
+- **Storage**: Project-local persistence in `.cortex/semantic_db/` using SQLite and HNSW indexing.
+
+#### Key Operations
+- **Automatic Indexing**: Background indexing of all facts, decisions, and significant tool results.
+- **Overlapping Chunking**: Large documents are split into 1000-character chunks with 200-character overlap to preserve semantic context.
+- **Multi-Scope Retrieval**:
+    - **Session-Scoped**: Retrieves context only from the current active session.
+    - **Global-Scoped**: Retrieves context from all historical data in the project.
+- **Prompt Augmentation**: Top-K results are injected into the agent's system prompt under "Relevant Historical Context".
+
 ## 8. Planning System
 
 ### 8.1 Plan Structure

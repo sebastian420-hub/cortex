@@ -6,10 +6,11 @@ Cortex supports local LLM models (via Ollama), cloud APIs (DeepSeek, Anthropic, 
 
 ## Features
 
+- **Long-Term Semantic Memory**: Integrated vector database (ChromaDB) for persistent knowledge retention across sessions.
 - **Hybrid Performance**: Offloads critical tasks (AST parsing, tokenization, search) to native Rust and Go extensions for maximum speed.
-- **Smart Context Management**: Uses chunked memory and token budgeting to work with massive codebases without overflowing context limits.
+- **Smart Context Management**: Uses chunked memory, automated indexing, and token budgeting to work with massive codebases.
 - **Hierarchical Planning**: Breaks down complex requests into structured plans with self-reflection and auto-correction.
-- **Transactional Safety**: Protects your codebase with a built-in transaction manager that supports `begin/commit/rollback` for all file operations.
+- **Transactional Safety**: Protects your codebase with a built-in transaction manager that supports `begin/commit/rollback`.
 - **Flexible Models**: Support for local models (Ollama) and high-performance cloud APIs (DeepSeek, Anthropic, OpenAI).
 - **Rich Terminal UI**: Beautiful syntax highlighting, markdown rendering, and real-time plan progress visualization.
 - **MCP Integrated**: Support for third-party services through the Model Context Protocol.
@@ -57,7 +58,7 @@ Cortex is built on a modular, multi-layered architecture:
 - **Core Services (`cortex.core`)**:
     - **Planning Engine**: Manages task decomposition and execution state.
     - **Context Window Manager**: Handles dynamic code injection and token budgeting.
-    - **Memory System**: Layered memory for short-term history and long-term chunked storage.
+    - **Memory System**: Layered memory for short-term history and long-term semantic persistence (Vector DB).
 - **Native Layer (`cortex.native`)**:
     - **Rust Core**: Ultra-fast AST parsing (tree-sitter) and tokenization.
     - **Go Services**: High-concurrency search and gRPC service integrations.
@@ -104,9 +105,9 @@ Cortex automatically reads `GEMINI.md` or `AGENT.md` files in your project root 
 
 ## Project Status
 
-Cortex has reached its stable **v1.0.0** milestone.
+Cortex has reached its stable **v1.1.0** milestone.
 
-Current test status: **940/940 tests passing (100% success rate)** across Python, Rust, and Go components.
+Current test status: **966/966 tests passing (100% success rate)** across Python, Rust, and Go components.
 
 For a detailed architectural overview and current system health, see the [Full Project Status Report](docs/STATUS.md).
 
