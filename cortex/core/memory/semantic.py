@@ -218,7 +218,11 @@ class ChromaMemoryManager:
             raise
 
     def search_documents(
-        self, query_text: str, top_k: int = 5, where_clause: Optional[Dict[str, Any]] = None
+        self,
+        query_text: str,
+        top_k: int = 5,
+        where_clause: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Searches for semantically similar documents in the memory.
@@ -227,6 +231,7 @@ class ChromaMemoryManager:
             query_text: The text query to use for similarity search.
             top_k: The number of top similar documents to retrieve.
             where_clause: Optional ChromaDB-style filter for metadata.
+            session_id: Optional session ID to filter by.
 
         Returns:
             A list of dictionaries, each containing 'document', 'metadata', and 'distance'.
@@ -235,11 +240,24 @@ class ChromaMemoryManager:
             return []
 
         try:
+            doc_count = self.count()
+            if doc_count == 0:
+                return []
+
+            # Prepare filtering
+            final_where = where_clause or {}
+            if session_id:
+                if final_where:
+                    # If there's already a where clause, combine them
+                    final_where = {"$and": [final_where, {"session_id": session_id}]}
+                else:
+                    final_where = {"session_id": session_id}
+
             results = self.collection.query(
                 query_texts=[query_text],
                 n_results=top_k,
-                where=where_clause,
-                include=['documents', 'metadatas', 'distances']
+                where=final_where if final_where else None,
+                include=["documents", "metadatas", "distances"],
             )
 
             if not results or not results['documents'] or not results['documents'][0]:

@@ -18,13 +18,23 @@ class MemoryCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Show memory contents or search semantic memory (/memory search <query>)"
+        return "Show memory contents or search semantic memory (/memory search [--global] <query>)"
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the memory command"""
         if args and args.strip().startswith("search "):
-            query = args.strip()[7:].strip()
-            self._handle_search(ctx, query)
+            search_args = args.strip()[7:].strip()
+            global_search = False
+            if search_args.startswith("--global "):
+                global_search = True
+                query = search_args[9:].strip()
+            elif search_args == "--global":
+                console.print("[red]Usage: /memory search --global <query>[/red]")
+                return
+            else:
+                query = search_args
+                
+            self._handle_search(ctx, query, global_search)
             return
 
         # Default display
@@ -43,30 +53,35 @@ class MemoryCommand(Command):
         if hasattr(ctx.agent.memory_bank, "semantic_manager") and ctx.agent.memory_bank.semantic_manager:
             sm = ctx.agent.memory_bank.semantic_manager
             count = sm.count()
-            console.print(f"[dim]Semantic Memory (Vector DB): {count} documents indexed[/dim]")
+            session_id = getattr(ctx.agent.memory_bank, "session_id", "none")
+            console.print(f"[dim]Semantic Memory (Vector DB): {count} documents indexed (Session: {session_id})[/dim]")
 
-    def _handle_search(self, ctx: CommandContext, query: str) -> None:
+    def _handle_search(self, ctx: CommandContext, query: str, global_search: bool = False) -> None:
         """Handle semantic search subcommand"""
         if not hasattr(ctx.agent.memory_bank, "retrieve_semantic_context"):
             console.print("[red]Semantic memory is not enabled.[/red]")
             return
 
         if not query:
-            console.print("[red]Usage: /memory search <query>[/red]")
+            console.print("[red]Usage: /memory search [--global] <query>[/red]")
             return
 
-        console.print(f"[cyan]Searching semantic memory for:[/cyan] '{query}'...")
-        results = ctx.agent.memory_bank.retrieve_semantic_context(query, top_k=5)
+        scope = "all sessions" if global_search else "current session"
+        console.print(f"[cyan]Searching semantic memory ({scope}) for:[/cyan] '{query}'...")
+        results = ctx.agent.memory_bank.retrieve_semantic_context(query, top_k=5, global_search=global_search)
 
         if not results:
             console.print("[yellow]No semantically similar memories found.[/yellow]")
             return
 
         from rich.table import Table
-        table = Table(title=f"🔍 Semantic Search Results for '{query}'")
+        title_scope = "Global" if global_search else "Session"
+        table = Table(title=f"🔍 {title_scope} Semantic Search Results for '{query}'")
         table.add_column("Similarity", justify="right", style="dim")
         table.add_column("Content", style="white")
         table.add_column("Type", style="cyan")
+        if global_search:
+            table.add_column("Session", style="dim")
 
         for res in results:
             # Distance: lower is better in Chroma
@@ -78,7 +93,11 @@ class MemoryCommand(Command):
             metadata = res.get("metadata", {})
             m_type = metadata.get("type", "unknown")
             
-            table.add_row(score, content, m_type)
+            if global_search:
+                s_id = metadata.get("session_id", "unknown")
+                table.add_row(score, content, m_type, s_id)
+            else:
+                table.add_row(score, content, m_type)
 
         console.print(table)
 

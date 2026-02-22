@@ -526,9 +526,31 @@ class Cortex:
             # Use last user message as query for semantic retrieval
             last_user_msg = self.conversation.get_last_user_message()
             if last_user_msg:
-                results = self.memory_bank.retrieve_semantic_context(last_user_msg, top_k=3)
-                if results:
-                    semantic_context = "\n".join([f"- {r['document']}" for r in results])
+                # Get relevant items from current session
+                session_results = self.memory_bank.retrieve_semantic_context(
+                    last_user_msg, top_k=2, global_search=False
+                )
+                
+                # Get one highly relevant item from past sessions
+                global_results = self.memory_bank.retrieve_semantic_context(
+                    last_user_msg, top_k=1, global_search=True
+                )
+                
+                context_items = []
+                if session_results:
+                    context_items.append("From current session:")
+                    context_items.extend([f"- {r['document']}" for r in session_results])
+                
+                if global_results:
+                    # Filter out if it's the same as a session result
+                    session_docs = [r["document"] for r in session_results]
+                    for r in global_results:
+                        if r["document"] not in session_docs:
+                            context_items.append("From past sessions:")
+                            context_items.append(f"- {r['document']}")
+                
+                if context_items:
+                    semantic_context = "\n".join(context_items)
 
         # Get all tool schemas (includes base + orchestration tools)
         exclude = []

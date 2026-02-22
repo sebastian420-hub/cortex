@@ -114,15 +114,22 @@ class EnhancedMemoryBank(MemoryBank):
     5. Context assembly summaries
     """
 
-    def __init__(self, max_items: int = 100, semantic_config: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        max_items: int = 100,
+        semantic_config: Optional[Dict[str, Any]] = None,
+        session_id: Optional[str] = None,
+    ):
         """
         Initialize enhanced memory bank.
 
         Args:
             max_items: Maximum items to retain (oldest pruned first)
             semantic_config: Optional configuration for semantic memory
+            session_id: Optional session ID for filtering
         """
         super().__init__(max_items)
+        self.session_id = session_id
         self.failed_approaches: List[FailedApproach] = []
         self.successful_patterns: List[SuccessfulPattern] = []
         self.session_insights: List[MemoryItem] = []
@@ -163,6 +170,7 @@ class EnhancedMemoryBank(MemoryBank):
                     "source": item.source.value if hasattr(item.source, "value") else str(item.source),
                     "confidence": float(item.confidence),
                     "timestamp": item.timestamp,
+                    "session_id": self.session_id or "unknown",
                 }
                 # Add any extra metadata
                 if item.metadata:
@@ -378,13 +386,16 @@ class EnhancedMemoryBank(MemoryBank):
             )
         )
 
-    def retrieve_semantic_context(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def retrieve_semantic_context(
+        self, query: str, top_k: int = 5, global_search: bool = False
+    ) -> List[Dict[str, Any]]:
         """
         Retrieve semantically relevant context from the vector database.
 
         Args:
             query: The query text to search for
             top_k: Number of results to retrieve
+            global_search: If True, search across all sessions. If False, filter by current session.
 
         Returns:
             List of dictionaries with 'document' and 'metadata'
@@ -393,7 +404,12 @@ class EnhancedMemoryBank(MemoryBank):
             return []
         
         try:
-            return self.semantic_manager.search_documents(query, top_k=top_k)
+            # Use session filtering if not a global search
+            filter_session_id = None if global_search else self.session_id
+            
+            return self.semantic_manager.search_documents(
+                query, top_k=top_k, session_id=filter_session_id
+            )
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning(f"Failed to retrieve semantic context: {e}")

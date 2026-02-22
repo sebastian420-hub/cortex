@@ -108,8 +108,8 @@ class AgentInitializer:
 
         # Initialize all components
         self.provider = self._init_provider()
-        self.memory_bank = self._init_memory_bank()
         self.state_manager = self._init_state_manager()
+        self.memory_bank = self._init_memory_bank()
         self.conversation = self._init_conversation()
         self.checkpoint_manager = self._init_checkpoint_manager()
         self.health_monitor = SessionHealthMonitor()
@@ -139,8 +139,15 @@ class AgentInitializer:
     def _init_memory_bank(self) -> MemoryBank:
         """Initialize memory bank for tracking decisions and facts"""
         if self.enable_layered_memory:
+            # Extract session_id from state_manager if available
+            session_id = None
+            if hasattr(self, "state_manager") and hasattr(self.state_manager, "state"):
+                session_id = self.state_manager.state.session_id
+
             return EnhancedMemoryBank(
-                max_items=100, semantic_config=self.config.semantic_memory
+                max_items=100,
+                semantic_config=self.config.semantic_memory,
+                session_id=session_id,
             )
         return create_memory_bank(max_items=50)
 
