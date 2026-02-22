@@ -93,6 +93,39 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
     # -------------------------------------------------------------------------
     # Anthropic Models (Claude)
     # -------------------------------------------------------------------------
+    "claude-4-6-sonnet": ModelProfile(
+        name="Claude 4.6 Sonnet",
+        context_window=1000000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=128,
+        supports_vision=True,
+        notes="Latest Anthropic Sonnet model (Feb 2026). 1M token window. Superior coding and planning.",
+    ),
+    "claude-4-6-opus": ModelProfile(
+        name="Claude 4.6 Opus",
+        context_window=1000000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=128,
+        supports_vision=True,
+        notes="Most capable Anthropic model (Feb 2026). Enhanced debugging and complex codebase reasoning.",
+    ),
+    "claude-3-7-sonnet": ModelProfile(
+        name="Claude 3.7 Sonnet",
+        context_window=200000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=128,
+        supports_vision=True,
+        notes="Latest Claude model, superior reasoning and tool use",
+    ),
     "claude-3-5-sonnet": ModelProfile(
         name="Claude 3.5 Sonnet",
         context_window=200000,
@@ -102,7 +135,7 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
         supports_json_mode=True,
         max_tools_per_prompt=64,
         supports_vision=True,
-        notes="Best for complex coding tasks, excellent tool use",
+        notes="High-performance Claude model, excellent tool use",
     ),
     "claude-3-opus": ModelProfile(
         name="Claude 3 Opus",
@@ -370,6 +403,39 @@ MODEL_PROFILES: Dict[str, ModelProfile] = {
     # -------------------------------------------------------------------------
     # OpenRouter Models
     # -------------------------------------------------------------------------
+    "anthropic/claude-4.6-sonnet": ModelProfile(
+        name="Claude 4.6 Sonnet (OpenRouter)",
+        context_window=1000000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=128,
+        supports_vision=True,
+        notes="Latest Claude Sonnet via OpenRouter",
+    ),
+    "anthropic/claude-4.6-opus": ModelProfile(
+        name="Claude 4.6 Opus (OpenRouter)",
+        context_window=1000000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=128,
+        supports_vision=True,
+        notes="Latest Claude Opus via OpenRouter",
+    ),
+    "anthropic/claude-3-7-sonnet": ModelProfile(
+        name="Claude 3.7 Sonnet (OpenRouter)",
+        context_window=200000,
+        tool_following=CapabilityLevel.EXCELLENT,
+        reasoning=CapabilityLevel.EXCELLENT,
+        prompt_style=PromptStyle.DETAILED,
+        supports_json_mode=True,
+        max_tools_per_prompt=128,
+        supports_vision=True,
+        notes="Latest Claude via OpenRouter",
+    ),
     "anthropic/claude-3.5-sonnet": ModelProfile(
         name="Claude 3.5 Sonnet (OpenRouter)",
         context_window=200000,
@@ -532,7 +598,7 @@ def get_model_profile(model_name: str) -> ModelProfile:
         "llama": "llama3.2",
         "mistral": "mistral",
         "mixtral": "mixtral",
-        "claude": "claude-3-5-sonnet",
+        "claude": "claude-4-6-sonnet",
         "gpt-4": "gpt-4-turbo",
         "gpt-3": "gpt-3.5-turbo",
         "deepseek": "deepseek-chat",

@@ -208,12 +208,12 @@ class AnthropicProvider(ModelProvider):
 
     def normalize_model_name(self, model: str) -> str:
         """Normalize Anthropic model names"""
-        # Anthropic models: claude-3-5-sonnet-20241022, claude-3-haiku-20240307, etc.
+        # Anthropic models: claude-4-6-sonnet, claude-3-5-sonnet-20241022, etc.
         if model.startswith("claude-"):
             return model
         # If just "claude", default to latest sonnet
         if model.lower() == "claude":
-            return "claude-3-5-sonnet-20241022"
+            return "claude-4-6-sonnet"
         return model
 
     def validate_api_key(self) -> bool:

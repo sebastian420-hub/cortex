@@ -71,7 +71,8 @@ localagent --model deepseek-r1:8b
 localagent --model deepseek-chat
 
 # Anthropic Claude (requires ANTHROPIC_API_KEY)
-localagent --model claude-3-5-sonnet-20241022
+localagent --model claude-4-6-sonnet
+localagent --model claude-4-6-opus
 ```
 
 ### Provider Selection
@@ -487,9 +488,9 @@ localagent
 export DEEPSEEK_API_KEY=your_key_here
 localagent --model deepseek-chat -p "refactor authentication module"
 
-# Use Claude 3.5 Sonnet
+# Use Claude 4.6 Sonnet
 export ANTHROPIC_API_KEY=your_key_here
-localagent --model claude-3-5-sonnet-20241022 -p "optimize database queries"
+localagent --model claude-4-6-sonnet -p "optimize database queries"
 ```
 
 ### Automation Examples

@@ -78,7 +78,7 @@ HELP_ENTRIES: List[HelpEntry] = [
         short_desc="Switch or list models",
         long_desc="Change the LLM model for the current session or list available models. Use '/model list' to see all supported models and their current API key status.",  # noqa: E501
         category=HelpCategory.SESSION,
-        examples=["/model claude-3-5-sonnet", "/model llama3.2", "/model list"],
+        examples=["/model claude-4-6-sonnet", "/model llama3.2", "/model list"],
         keywords=["model", "switch", "list", "providers", "llm"],
         beginner_friendly=True,
     ),

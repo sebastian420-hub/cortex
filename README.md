@@ -12,7 +12,7 @@ Cortex is engineered to overcome common limitations of traditional AI agents thr
 *   **Long-Term Semantic Memory (v1.1.0)**: Cortex features a persistent, local **Vector Database (ChromaDB)**. It automatically indexes all learned facts, decisions, and solutions across sessions, enabling intelligent recall of relevant historical context and continuous learning.
 *   **Transactional Code Safety**: All file modifications are managed within a built-in transaction system, providing `begin/commit/rollback` capabilities. This ensures codebase integrity and allows developers to work with confidence.
 *   **Advanced Planning & Orchestration**: Complex development tasks are managed through a hierarchical planning engine that includes goal decomposition, adaptive execution, and self-correction mechanisms.
-*   **Local-First & Flexible Model Support**: Designed for privacy and flexibility, Cortex prioritizes local execution with Ollama-powered LLMs, while also supporting cloud-based models via OpenRouter (default), DeepSeek, and Anthropic.
+*   **Local-First & Flexible Model Support**: Designed for privacy and flexibility, Cortex prioritizes local execution with Ollama-powered LLMs, while also supporting cloud-based models via OpenRouter (default), DeepSeek, and Anthropic (Claude 4.6+).
 
 ---
 

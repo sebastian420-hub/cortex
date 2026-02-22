@@ -125,7 +125,7 @@ def test_provider_normalize_model_names():
                 provider.normalize_model_name("claude-3-haiku-20240307")
                 == "claude-3-haiku-20240307"
             )
-            assert provider.normalize_model_name("claude") == "claude-3-5-sonnet-20241022"
+            assert provider.normalize_model_name("claude") == "claude-4-6-sonnet"
         except (ProviderError, ImportError):
             pytest.skip("anthropic package not installed")
 
