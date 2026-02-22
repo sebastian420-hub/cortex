@@ -74,6 +74,15 @@ HELP_ENTRIES: List[HelpEntry] = [
         beginner_friendly=True,
     ),
     HelpEntry(
+        command="/model",
+        short_desc="Switch or list models",
+        long_desc="Change the LLM model for the current session or list available models. Use '/model list' to see all supported models and their current API key status.",  # noqa: E501
+        category=HelpCategory.SESSION,
+        examples=["/model claude-3-5-sonnet", "/model llama3.2", "/model list"],
+        keywords=["model", "switch", "list", "providers", "llm"],
+        beginner_friendly=True,
+    ),
+    HelpEntry(
         command="/save",
         short_desc="Save current session",
         long_desc="Save the current conversation session to a file. Sessions can be loaded later to continue work. If no name is provided, a timestamp-based name is used.",  # noqa: E501
@@ -154,12 +163,19 @@ HELP_ENTRIES: List[HelpEntry] = [
     ),
     HelpEntry(
         command="/memory",
-        short_desc="Show memory bank",
-        long_desc="Display the contents of the memory bank, which stores facts and context learned during the session.",  # noqa: E501
+        short_desc="Manage semantic memory",
+        long_desc="""Manage the semantic memory (Vector Database).
+        
+Subcommands:
+- search <query>: Search for similar memories in the current session.
+- search --global <query>: Search across all past sessions in this project.
+- clear: Permanently delete the entire semantic database for this project.
+
+The memory bank stores facts, decisions, and context learned during interactions.""",  # noqa: E501
         category=HelpCategory.CONTEXT,
-        examples=["/memory"],
+        examples=["/memory", "/memory search 'api key'", "/memory search --global 'refactor'", "/memory clear"],
         related=["/stats", "/summary"],
-        keywords=["memory", "facts", "context", "learned"],
+        keywords=["memory", "facts", "context", "learned", "vector", "db", "search", "clear"],
         beginner_friendly=False,
     ),
     HelpEntry(
@@ -388,6 +404,11 @@ HELP_ENTRIES: List[HelpEntry] = [
 - `grep(pattern="def main", output_mode="content")` - Show matching lines
 - `grep(pattern="TODO", output_mode="count")` - Count occurrences
 
+## Code Analysis (AST)
+- `ast_search(pattern="User", language="python")` - Find symbol definitions
+- `ast_extract(symbol="process_data")` - Get function/class source with metadata
+- `ast_analyze(path="main.py")` - Deep structural analysis of a file
+
 ## File Operations
 - `read_file(path="main.py")` - Read and understand file contents
 - `edit(file_path="x.py", old_string="a", new_string="b")` - Surgical string replacement
@@ -482,7 +503,7 @@ Use tools efficiently: Start with search (glob/grep) before reading, use edit fo
 - `/plan` - Enter planning (read-only) mode
 - `/reset-context` - Clear history, keep memory
 - `/focus <path>` - Set focus directory
-- `/memory` - Show memory bank contents
+- `/memory [search|clear]` - Manage semantic memory bank
 - `/stats` - Show session statistics
 
 ## Display & Configuration
