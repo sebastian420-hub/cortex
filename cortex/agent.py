@@ -520,6 +520,16 @@ class Cortex:
             self.memory_bank.get_summary() if hasattr(self, "memory_bank") else None
         )
 
+        # Get semantic context if enabled
+        semantic_context = None
+        if self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context"):
+            # Use last user message as query for semantic retrieval
+            last_user_msg = self.conversation.get_last_user_message()
+            if last_user_msg:
+                results = self.memory_bank.retrieve_semantic_context(last_user_msg, top_k=3)
+                if results:
+                    semantic_context = "\n".join([f"- {r['document']}" for r in results])
+
         # Get all tool schemas (includes base + orchestration tools)
         exclude = []
         if not self.enable_planning:
@@ -541,6 +551,7 @@ class Cortex:
             state_context=state_context,
             project_context=self.project_context,
             memory_bank_context=memory_bank_context,
+            semantic_context=semantic_context,  # New parameter
             permission_mode=self.permission_mode,
         )
 

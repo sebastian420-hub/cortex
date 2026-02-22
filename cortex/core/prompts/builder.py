@@ -301,6 +301,7 @@ class PromptBuilder:
         state_context: Optional[str] = None,
         project_context: Optional[str] = None,
         memory_bank_context: Optional[str] = None,
+        semantic_context: Optional[str] = None,
         custom_instructions: Optional[str] = None,
         permission_mode: str = "NORMAL",
     ) -> str:
@@ -314,6 +315,7 @@ class PromptBuilder:
             state_context: Current state context to inject
             project_context: Project-specific context (from AGENT.md etc.)
             memory_bank_context: Memory bank summary
+            semantic_context: Semantically relevant historical context
             custom_instructions: Additional custom instructions
             permission_mode: Permission mode string
 
@@ -346,8 +348,8 @@ class PromptBuilder:
         sections.append(self._build_planning_section(enable_planning))
 
         # 6. Memory & State context
-        if enable_memory or memory_bank_context:
-            sections.append(self._build_memory_section(memory_bank_context))
+        if enable_memory or memory_bank_context or semantic_context:
+            sections.append(self._build_memory_section(memory_bank_context, semantic_context))
 
         if state_context:
             sections.append(f"# Current State\n\n{state_context}")
@@ -612,11 +614,16 @@ When calling `create_and_execute_plan`, ALWAYS provide a concrete `steps` list. 
 
 **Note on todo_write:** Use `todo_write` ONLY for simple progress tracking of 2-3 basic manual steps. For anything involving coordinated codebase changes, you MUST use `create_and_execute_plan`."""  # noqa: E501
 
-    def _build_memory_section(self, memory_bank_context: Optional[str]) -> str:
+    def _build_memory_section(
+        self, memory_bank_context: Optional[str], semantic_context: Optional[str] = None
+    ) -> str:
         """Build memory system guidance section."""
         section = "# Memory System\n\n"
         if memory_bank_context:
             section += f"## Session Memory\n\n{memory_bank_context}\n\n"
+
+        if semantic_context:
+            section += f"## Relevant Historical Context\n\n{semantic_context}\n\n"
 
         if self.profile.prompt_style in (PromptStyle.EXPLICIT, PromptStyle.CONCISE):
             section += "The system tracks files read and decisions made automatically."

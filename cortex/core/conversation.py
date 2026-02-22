@@ -200,6 +200,18 @@ class ConversationManager:
         """Get the current conversation history"""
         return self.history.copy()
 
+    def get_last_user_message(self) -> Optional[str]:
+        """
+        Get the content of the most recent user message.
+
+        Returns:
+            String content of the last user message, or None if not found.
+        """
+        for msg in reversed(self.history):
+            if msg.get("role") == "user":
+                return msg.get("content")
+        return None
+
     def clear(self, keep_system: bool = True) -> None:
         """Clear conversation history"""
         if keep_system and self.history and self.history[0].get("role") == "system":

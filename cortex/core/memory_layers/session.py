@@ -17,7 +17,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, Tuple
 import uuid
 
-from ..memory import MemoryBank, MemoryItem, MemoryType, MemorySource
+from ..memory.core_memory import MemoryBank, MemoryItem, MemoryType, MemorySource
+from ..memory.semantic import ChromaMemoryManager
+from ..memory.embeddings import LocalEmbeddingModel
 
 
 class SessionMemoryType(str, Enum):
@@ -112,12 +114,13 @@ class EnhancedMemoryBank(MemoryBank):
     5. Context assembly summaries
     """
 
-    def __init__(self, max_items: int = 100):
+    def __init__(self, max_items: int = 100, semantic_config: Optional[Dict[str, Any]] = None):
         """
         Initialize enhanced memory bank.
 
         Args:
             max_items: Maximum items to retain (oldest pruned first)
+            semantic_config: Optional configuration for semantic memory
         """
         super().__init__(max_items)
         self.failed_approaches: List[FailedApproach] = []
@@ -125,6 +128,45 @@ class EnhancedMemoryBank(MemoryBank):
         self.session_insights: List[MemoryItem] = []
         self.progress_markers: Dict[str, str] = {}  # task_id -> progress_description
         self.context_summaries: Dict[str, str] = {}  # context_key -> summary
+        
+        # Initialize semantic memory manager if enabled
+        self.semantic_manager: Optional[ChromaMemoryManager] = None
+        if semantic_config and semantic_config.get("enabled", False):
+            try:
+                persist_dir = semantic_config.get("persist_directory", ".cortex/semantic_db")
+                # Ensure persist_dir is a Path object
+                persist_path = Path(persist_dir)
+                if not persist_path.is_absolute():
+                    # If relative, make it relative to the current working directory
+                    # or a known project root if available.
+                    persist_path = Path.cwd() / persist_path
+                
+                self.semantic_manager = ChromaMemoryManager(
+                    persist_directory=persist_path,
+                    collection_name=semantic_config.get("collection_name", "cortex_semantic_memory"),
+                    clear_on_init=semantic_config.get("clear_on_init", False)
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"Failed to initialize semantic memory: {e}")
+
+    def add(self, item: MemoryItem) -> None:
+        """Add a memory item and index it semantically if enabled."""
+        super().add(item)
+        
+        # Automatically index in semantic memory if available
+        if self.semantic_manager:
+            try:
+                metadata = item.to_dict()
+                # Remove content from metadata to avoid redundancy
+                metadata.pop("content", None)
+                self.semantic_manager.add_document(
+                    text=item.content,
+                    metadata=metadata
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to index memory item semantically: {e}")
 
     def record_failed_approach(
         self,
@@ -285,6 +327,22 @@ class EnhancedMemoryBank(MemoryBank):
             )
         )
 
+    def retrieve_semantic_context(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+        """
+        Retrieve semantically relevant context from the vector database.
+
+        Args:
+            query: The query text to search for
+            top_k: Number of results to retrieve
+
+        Returns:
+            List of dictionaries with 'document' and 'metadata'
+        """
+        if not self.semantic_manager:
+            return []
+        
+        return self.semantic_manager.search_documents(query, top_k=top_k)
+
     def extract_learnings_from_tool_results(self, tool_results: List[Dict[str, Any]]) -> None:
         """
         Extract learnings from tool execution results.
@@ -441,7 +499,14 @@ class EnhancedMemoryBank(MemoryBank):
             "session_insights": [si.to_dict() for si in self.session_insights],
             "progress_markers": self.progress_markers,
             "context_summaries": self.context_summaries,
+            "semantic_enabled": self.semantic_manager is not None,
         }
+        
+        if self.semantic_manager:
+            enhanced_dict["semantic_config"] = {
+                "persist_directory": str(self.semantic_manager.persist_directory),
+                "collection_name": self.semantic_manager.collection_name,
+            }
 
         return enhanced_dict
 
@@ -454,9 +519,17 @@ class EnhancedMemoryBank(MemoryBank):
         session_insights_data = data.pop("session_insights", [])
         progress_markers = data.pop("progress_markers", {})
         context_summaries = data.pop("context_summaries", {})
+        
+        semantic_config = data.pop("semantic_config", {})
+        semantic_enabled = data.pop("semantic_enabled", False)
+        if semantic_enabled and not semantic_config.get("enabled"):
+            semantic_config["enabled"] = True
 
         # Create base memory bank
-        emb = cls(max_items=data.get("max_items", 100))
+        emb = cls(
+            max_items=data.get("max_items", 100),
+            semantic_config=semantic_config if semantic_enabled else None
+        )
 
         # Restore base items
         if "items" in data:

@@ -10,7 +10,7 @@ from ...core.memory import MemorySource
 
 
 class MemoryCommand(Command):
-    """Show memory bank contents"""
+    """Show memory bank contents and search semantic memory"""
 
     @property
     def name(self) -> str:
@@ -18,10 +18,16 @@ class MemoryCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Show memory bank contents"
+        return "Show memory contents or search semantic memory (/memory search <query>)"
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the memory command"""
+        if args and args.strip().startswith("search "):
+            query = args.strip()[7:].strip()
+            self._handle_search(ctx, query)
+            return
+
+        # Default display
         if ctx.agent.memory_bank and ctx.agent.memory_bank.items:
             console.print(
                 Panel(
@@ -32,6 +38,49 @@ class MemoryCommand(Command):
             )
         else:
             console.print("[dim]Memory bank is empty.[/dim]")
+        
+        # Show semantic memory status if available
+        if hasattr(ctx.agent.memory_bank, "semantic_manager") and ctx.agent.memory_bank.semantic_manager:
+            sm = ctx.agent.memory_bank.semantic_manager
+            count = sm.count()
+            console.print(f"[dim]Semantic Memory (Vector DB): {count} documents indexed[/dim]")
+
+    def _handle_search(self, ctx: CommandContext, query: str) -> None:
+        """Handle semantic search subcommand"""
+        if not hasattr(ctx.agent.memory_bank, "retrieve_semantic_context"):
+            console.print("[red]Semantic memory is not enabled.[/red]")
+            return
+
+        if not query:
+            console.print("[red]Usage: /memory search <query>[/red]")
+            return
+
+        console.print(f"[cyan]Searching semantic memory for:[/cyan] '{query}'...")
+        results = ctx.agent.memory_bank.retrieve_semantic_context(query, top_k=5)
+
+        if not results:
+            console.print("[yellow]No semantically similar memories found.[/yellow]")
+            return
+
+        from rich.table import Table
+        table = Table(title=f"🔍 Semantic Search Results for '{query}'")
+        table.add_column("Similarity", justify="right", style="dim")
+        table.add_column("Content", style="white")
+        table.add_column("Type", style="cyan")
+
+        for res in results:
+            # Distance: lower is better in Chroma
+            score = f"{1.0 - res.get('distance', 0):.2f}"
+            content = res.get("document", "")
+            if len(content) > 150:
+                content = content[:147] + "..."
+            
+            metadata = res.get("metadata", {})
+            m_type = metadata.get("type", "unknown")
+            
+            table.add_row(score, content, m_type)
+
+        console.print(table)
 
 
 class FocusCommand(Command):
