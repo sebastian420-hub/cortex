@@ -157,9 +157,23 @@ class EnhancedMemoryBank(MemoryBank):
         # Automatically index in semantic memory if available
         if self.semantic_manager:
             try:
-                metadata = item.to_dict()
-                # Remove content from metadata to avoid redundancy
-                metadata.pop("content", None)
+                # Create a serializable version of metadata
+                metadata = {
+                    "type": item.type.value if hasattr(item.type, "value") else str(item.type),
+                    "source": item.source.value if hasattr(item.source, "value") else str(item.source),
+                    "confidence": float(item.confidence),
+                    "timestamp": item.timestamp,
+                }
+                # Add any extra metadata
+                if item.metadata:
+                    for k, v in item.metadata.items():
+                        if hasattr(v, "value"):
+                            metadata[k] = v.value
+                        elif isinstance(v, (str, int, float, bool)):
+                            metadata[k] = v
+                        else:
+                            metadata[k] = str(v)
+
                 self.semantic_manager.add_document(
                     text=item.content,
                     metadata=metadata
@@ -167,6 +181,34 @@ class EnhancedMemoryBank(MemoryBank):
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to index memory item semantically: {e}")
+
+    def add_decision(
+        self, decision: str, source: MemorySource = MemorySource.INFERRED, confidence: float = 0.8
+    ) -> None:
+        """Add a decision memory and index semantically."""
+        self.add(
+            MemoryItem(
+                type=MemoryType.DECISION, content=decision, source=source, confidence=confidence
+            )
+        )
+
+    def add_fact(
+        self, fact: str, source: MemorySource = MemorySource.TOOL_RESULT, confidence: float = 1.0
+    ) -> None:
+        """Add a fact memory and index semantically."""
+        self.add(
+            MemoryItem(type=MemoryType.FACT, content=fact, source=source, confidence=confidence)
+        )
+
+    def add_preference(
+        self, preference: str, source: MemorySource = MemorySource.USER, confidence: float = 0.9
+    ) -> None:
+        """Add a user preference and index semantically."""
+        self.add(
+            MemoryItem(
+                type=MemoryType.PREFERENCE, content=preference, source=source, confidence=confidence
+            )
+        )
 
     def record_failed_approach(
         self,

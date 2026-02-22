@@ -79,7 +79,8 @@ class ChromaMemoryManager:
             
             collection = self.client.get_or_create_collection(
                 name=self.collection_name,
-                embedding_function=self.embedding_function # Pass the wrapped embedding function
+                embedding_function=self.embedding_function, # Pass the wrapped embedding function
+                metadata={"hnsw:space": "cosine"} # Explicitly use cosine similarity
             )
             return collection
         except Exception as e:
@@ -102,18 +103,19 @@ class ChromaMemoryManager:
             logger.warning("Attempted to add empty text to ChromaDB. Skipping.")
             return "" # Return empty ID for empty text
 
+        import uuid
         try:
             # ChromaDB handles embedding internally with the provided embedding_function
-            # We just need to ensure the `ids` list contains something for add()
-            ids = [doc_id] if doc_id else [f"doc_{self.count()}_{hash(text)}"]
+            # Use UUID for more reliable IDs
+            final_id = doc_id or f"doc_{uuid.uuid4()}"
             
             self.collection.add(
                 documents=[text],
                 metadatas=[metadata],
-                ids=ids
+                ids=[final_id]
             )
-            logger.debug(f"Added document to Chroma. ID: {ids[0]}")
-            return ids[0]
+            logger.debug(f"Added document to Chroma. ID: {final_id}")
+            return final_id
         except Exception as e:
             logger.error(f"Failed to add document to Chroma: {e}")
             raise
@@ -135,6 +137,7 @@ class ChromaMemoryManager:
         if len(texts) != len(metadatas):
             raise ValueError("Lengths of texts and metadatas must match.")
         
+        import uuid
         # Filter out empty texts and their corresponding metadatas/ids
         filtered_texts, filtered_metadatas, filtered_ids = [], [], []
         for i, text in enumerate(texts):
@@ -145,7 +148,7 @@ class ChromaMemoryManager:
                     filtered_ids.append(ids[i])
                 else:
                     # Generate a unique ID if not provided
-                    filtered_ids.append(f"doc_{self.count() + i}_{hash(text)}")
+                    filtered_ids.append(f"doc_{uuid.uuid4()}")
 
         if not filtered_texts:
             logger.warning("Attempted to add an empty list of valid texts to ChromaDB. Skipping.")
@@ -188,7 +191,7 @@ class ChromaMemoryManager:
                 include=['documents', 'metadatas', 'distances']
             )
 
-            if not results or not results['documents']:
+            if not results or not results['documents'] or not results['documents'][0]:
                 return []
 
             formatted_results = []

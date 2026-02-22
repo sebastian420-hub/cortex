@@ -139,7 +139,9 @@ class AgentInitializer:
     def _init_memory_bank(self) -> MemoryBank:
         """Initialize memory bank for tracking decisions and facts"""
         if self.enable_layered_memory:
-            return EnhancedMemoryBank(max_items=100)
+            return EnhancedMemoryBank(
+                max_items=100, semantic_config=self.config.semantic_memory
+            )
         return create_memory_bank(max_items=50)
 
     def _init_state_manager(self) -> StateManager:
