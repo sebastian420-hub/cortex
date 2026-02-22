@@ -38,6 +38,7 @@ ENV/
 .coverage
 htmlcov/
 .tox/
+tmp_benchmark_db/
 
 # LocalAgent
 .localagent/
