@@ -60,6 +60,7 @@ cortex --model llama3
 ## Key Capabilities
 
 *   **Fast Codebase Analysis**: Leverages Rust for AST parsing (Tree-sitter) and efficient code search.
+*   **AST-Driven Surgical Refactoring**: Precise, deterministic symbol renaming and code block replacement with automatic syntax verification and rollback.
 *   **Persistent Context**: Stores and retrieves semantic information, facts, and past resolutions across multiple sessions.
 *   **Recoverable File Operations**: Ensures safe modifications with transactional integrity.
 *   **Goal-Driven Task Management**: Utilizes a hierarchical planning engine for complex tasks.

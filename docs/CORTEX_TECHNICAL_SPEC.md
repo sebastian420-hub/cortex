@@ -1,6 +1,6 @@
 # Cortex: Technical Specification
 
-## Version 1.0.0
+## Version 1.1.0
 
 ## Table of Contents
 
@@ -317,6 +317,7 @@ Tool Definition → Tool Registry → Tool Execution → Result Processing
 - `ast_analyze(file_path, query_type)` - AST analysis
 - `ast_extract(pattern, file_type)` - Code extraction
 - `ast_search(pattern, language)` - Structural search
+- `ast_refactor(file_path, action, symbol_name, ...)` - Surgical AST-driven refactoring
 
 #### System Tools
 - `execute_command(command, reason)` - Shell execution
@@ -887,6 +888,7 @@ ENTRYPOINT ["cortex"]
 
 | Version | Date | Changes | Author |
 |---------|------|---------|--------|
+| 1.1.0 | 2026-02-24 | Added AST-driven surgical refactoring and semantic memory | Cortex Team |
 | 1.0.0 | 2024-01-15 | Initial technical specification | Cortex Team |
 | 0.9.0 | 2024-01-10 | Draft for review | AI Assistant |
 
