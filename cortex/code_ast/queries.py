@@ -7,7 +7,7 @@ and other code structures from ASTs.
 
 import logging
 from typing import List, Dict, Any, Optional, Tuple
-from .models import FunctionInfo, ClassInfo, ImportInfo
+from .models import FunctionInfo, ClassInfo, ImportInfo, QueryResult
 
 logger = logging.getLogger(__name__)
 
@@ -282,82 +282,64 @@ class ASTQueries:
 
     def extract_functions(self, ast: Any, language: str) -> List[FunctionInfo]:
         """
-        Extract function definitions from AST.
-
-        Args:
-            ast: Tree-sitter AST
-            language: Programming language
-
-        Returns:
-            List of FunctionInfo objects
+        Extract function definitions from AST by walking the tree.
         """
-        if language not in self.QUERY_PATTERNS or "function" not in self.QUERY_PATTERNS[language]:
-            return []
-
-        query_pattern = self.QUERY_PATTERNS[language]["function"]
-        results = self.execute_query(ast, language, query_pattern)
-
         functions = []
-        current_function = None
+        try:
+            from tree_sitter import Node
 
-        for result in results:
-            if result["name"] == "function" or result["name"] == "method":
-                if current_function:
-                    functions.append(current_function)
+            def walk(node: Node):
+                if node.type in ["function_definition", "function_declaration", "method_declaration", "method_definition"]:
+                    name_node = node.child_by_field_name("name")
+                    if name_node:
+                        functions.append(
+                            FunctionInfo(
+                                name=name_node.text.decode("utf-8"),
+                                start_line=node.start_point[0] + 1,
+                                end_line=node.end_point[0] + 1,
+                                start_column=node.start_point[1] + 1,
+                                end_column=node.end_point[1] + 1,
+                            )
+                        )
+                
+                for child in node.children:
+                    walk(child)
 
-                current_function = FunctionInfo(
-                    name=result.get("text", ""),
-                    start_line=result["start_line"],
-                    end_line=result["end_line"],
-                    parameters=[],
-                    return_type=None,
-                    docstring=None,
-                    decorators=[],
-                )
-
-        if current_function:
-            functions.append(current_function)
-
+            walk(ast.root_node)
+        except Exception as e:
+            logger.error(f"Failed to walk AST for functions: {e}")
+        
         return functions
 
     def extract_classes(self, ast: Any, language: str) -> List[ClassInfo]:
         """
-        Extract class definitions from AST.
-
-        Args:
-            ast: Tree-sitter AST
-            language: Programming language
-
-        Returns:
-            List of ClassInfo objects
+        Extract class definitions from AST by walking the tree.
         """
-        if language not in self.QUERY_PATTERNS or "class" not in self.QUERY_PATTERNS[language]:
-            return []
-
-        query_pattern = self.QUERY_PATTERNS[language]["class"]
-        results = self.execute_query(ast, language, query_pattern)
-
         classes = []
-        current_class = None
+        try:
+            from tree_sitter import Node
 
-        for result in results:
-            if result["name"] == "class":
-                if current_class:
-                    classes.append(current_class)
+            def walk(node: Node):
+                if node.type in ["class_definition", "class_declaration"]:
+                    name_node = node.child_by_field_name("name")
+                    if name_node:
+                        classes.append(
+                            ClassInfo(
+                                name=name_node.text.decode("utf-8"),
+                                start_line=node.start_point[0] + 1,
+                                end_line=node.end_point[0] + 1,
+                                start_column=node.start_point[1] + 1,
+                                end_column=node.end_point[1] + 1,
+                            )
+                        )
+                
+                for child in node.children:
+                    walk(child)
 
-                current_class = ClassInfo(
-                    name=result.get("text", ""),
-                    start_line=result["start_line"],
-                    end_line=result["end_line"],
-                    methods=[],
-                    bases=[],
-                    docstring=None,
-                    decorators=[],
-                )
-
-        if current_class:
-            classes.append(current_class)
-
+            walk(ast.root_node)
+        except Exception as e:
+            logger.error(f"Failed to walk AST for classes: {e}")
+        
         return classes
 
     def extract_imports(self, ast: Any, language: str) -> List[ImportInfo]:
@@ -444,17 +426,50 @@ class ASTQueries:
         Returns:
             List of (line, column) positions
         """
-        # This is a simplified implementation
-        # A real implementation would use tree-sitter queries
-        positions = []
+        nodes = self.find_symbol_nodes(ast, language, symbol)
+        return [(n.start_line, n.start_column) for n in nodes]
+
+    def find_symbol_nodes(self, ast: Any, language: str, symbol: str) -> List[QueryResult]:
+        """
+        Find all nodes of a symbol in AST.
+
+        Args:
+            ast: Tree-sitter AST
+            language: Programming language
+            symbol: Symbol name to find
+
+        Returns:
+            List of QueryResult objects
+        """
+        results = []
 
         try:
-            # Walk the tree and find identifier nodes matching the symbol
             from tree_sitter import Node
 
+            # Language-specific identifier types
+            identifier_types = {
+                "python": ["identifier"],
+                "javascript": ["identifier", "property_identifier", "shorthand_property_identifier"],
+                "typescript": ["identifier", "property_identifier", "type_identifier"],
+                "java": ["identifier", "type_identifier"],
+                "go": ["identifier", "field_identifier", "type_identifier"],
+                "rust": ["identifier", "type_identifier", "field_identifier"],
+            }
+
+            target_types = identifier_types.get(language, ["identifier"])
+
             def walk(node: Node):
-                if node.type == "identifier" and node.text.decode("utf-8") == symbol:
-                    positions.append((node.start_point[0] + 1, node.start_point[1] + 1))
+                if node.type in target_types and node.text.decode("utf-8") == symbol:
+                    results.append(
+                        QueryResult(
+                            captures=[],
+                            text=symbol,
+                            start_line=node.start_point[0] + 1,
+                            end_line=node.end_point[0] + 1,
+                            start_column=node.start_point[1] + 1,
+                            end_column=node.end_point[1] + 1,
+                        )
+                    )
 
                 for child in node.children:
                     walk(child)
@@ -462,9 +477,9 @@ class ASTQueries:
             walk(ast.root_node)
 
         except Exception as e:
-            logger.error(f"Failed to find symbol {symbol}: {e}")
+            logger.error(f"Failed to find symbol nodes for {symbol}: {e}")
 
-        return positions
+        return results
 
     def get_function_at_position(
         self, ast: Any, language: str, line: int, column: int

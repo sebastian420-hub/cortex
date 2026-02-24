@@ -12,6 +12,7 @@ from ..registry import ToolRegistry
 from .ast_search_tool import ASTSearchTool
 from .ast_extract_tool import ASTExtractTool
 from .ast_analyze_tool import ASTAnalyzeTool
+from ..ast_edit_tool import ASTEditTool
 
 logger = logging.getLogger(__name__)
 
@@ -265,6 +266,48 @@ def register_ast_tools(registry: ToolRegistry) -> None:
         namespace="builtin",
     )
 
+    # Register AST Refactor Tool
+    registry.register(
+        name="ast_refactor",
+        tool_class=ASTEditTool,
+        schema=build_schema(
+            tool_name="ast_refactor",
+            description="Surgical code refactoring using AST parsing. Supports renaming symbols and replacing code blocks with syntax verification.",  # noqa: E501
+            parameters=[
+                {
+                    "name": "file_path",
+                    "type": "string",
+                    "description": "Path to the file to refactor",
+                    "required": True,
+                },
+                {
+                    "name": "action",
+                    "type": "string",
+                    "description": "Refactoring action to perform",
+                    "required": True,
+                    "enum": ["rename_symbol", "replace_block"],
+                },
+                {
+                    "name": "symbol_name",
+                    "type": "string",
+                    "description": "Name of the function, class, or variable to refactor",
+                    "required": True,
+                },
+                {
+                    "name": "new_name",
+                    "type": "string",
+                    "description": "New name (required for rename_symbol)",
+                },
+                {
+                    "name": "new_content",
+                    "type": "string",
+                    "description": "New content (required for replace_block)",
+                },
+            ],
+        ),
+        namespace="builtin",
+    )
+
     logger.info("AST tools registered successfully")
 
 
@@ -301,6 +344,14 @@ def get_ast_tool_descriptions() -> List[Dict[str, Any]]:
                 "ast_analyze path='.' analysis_type='complexity'",
                 "ast_analyze path='src/' analysis_type='dependencies' max_depth=5",
                 "ast_analyze path='.' analysis_type='all' include_issues=True",
+            ],
+        },
+        {
+            "name": "ast_refactor",
+            "description": "Surgical code refactoring using AST parsing. Supports renaming symbols and replacing code blocks with syntax verification.",  # noqa: E501
+            "examples": [
+                "ast_refactor file_path='app.py' action='rename_symbol' symbol_name='old_func' new_name='new_func'",
+                "ast_refactor file_path='models.py' action='replace_block' symbol_name='User' new_content='class User:\n    pass'",
             ],
         },
     ]

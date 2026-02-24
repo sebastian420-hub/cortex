@@ -87,6 +87,8 @@ class ToolFormatter:
             # AST
             "ast_search",
             "ast_extract",
+            "ast_refactor",
+            "ast_analyze",
         ]
 
         def get_priority(tool: Dict[str, Any]) -> int:

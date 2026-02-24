@@ -15,6 +15,8 @@ class FunctionInfo:
     name: str
     start_line: int
     end_line: int
+    start_column: int = 0
+    end_column: int = 0
     parameters: List[str] = field(default_factory=list)
     docstring: Optional[str] = None
     decorators: List[str] = field(default_factory=list)
@@ -28,6 +30,8 @@ class ClassInfo:
     name: str
     start_line: int
     end_line: int
+    start_column: int = 0
+    end_column: int = 0
     docstring: Optional[str] = None
     decorators: List[str] = field(default_factory=list)
     bases: List[str] = field(default_factory=list)

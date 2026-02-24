@@ -248,3 +248,17 @@ class ASTParser:
             True if tree-sitter is installed and parsers are loaded
         """
         return self.available and len(self.parsers) > 0
+
+    def detect_language(self, file_path: Path, content: Optional[str] = None) -> Optional[str]:
+        """
+        Detect language from file path and content.
+
+        Args:
+            file_path: Path to the file
+            content: Optional file content
+
+        Returns:
+            Language name or None
+        """
+        from .languages import detect_language as _detect_language
+        return _detect_language(file_path, content)

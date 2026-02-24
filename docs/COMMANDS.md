@@ -574,6 +574,24 @@ The agent has access to these tools (used automatically based on your requests):
   - Parameters: `pattern` (optional), `verbose` (optional)
   - Example: "run tests", "run tests in test_auth.py"
 
+### Code Analysis (AST)
+
+- **`ast_search`** - Enhanced structural search
+  - Parameters: `pattern` (required), `search_type` (optional), `path` (optional)
+  - Example: "search for function definitions matching 'parse_'", "find all classes"
+
+- **`ast_extract`** - Extract semantic structures
+  - Parameters: `path` (required), `extract_type` (optional: function, class, import)
+  - Example: "extract all functions from models.py", "show imports in api.py"
+
+- **`ast_analyze`** - Analyze code quality and complexity
+  - Parameters: `path` (required), `analysis_type` (optional: complexity, dependencies)
+  - Example: "analyze complexity of core.py", "show dependencies for main.py"
+
+- **`ast_refactor`** - Surgical AST-driven refactoring
+  - Parameters: `file_path` (required), `action` (required), `symbol_name` (required), `new_name` (optional), `new_content` (optional)
+  - Example: "rename function 'old_name' to 'new_name'", "replace class body for 'User'"
+
 ### Task Delegation
 
 - **`task`** - Delegate complex tasks to sub-agents
