@@ -1,6 +1,6 @@
 """Planning tools for Cortex agent.
 
-This module provides tools for creating, executing, and monitoring plans
+This module provides tools for monitoring and updating plans
 using the PlanningEngine. These tools enable the LLM to work with structured
 plans for complex multi-step tasks.
 """
@@ -16,215 +16,6 @@ from ..utils.errors import create_error_response, create_success_response, Error
 from ..core.planning import PlanningEngine, Plan, PlanStep, PlanStepStatus, PlanStepType
 
 logger = logging.getLogger(__name__)
-
-
-class CreatePlanTool(Tool):
-    """Tool for creating structured plans from goal descriptions."""
-
-    def __init__(
-        self,
-        project_dir,
-        permission_mode="normal",
-        console=None,
-        timeout_config=None,
-        transaction_manager=None,
-        parent_agent=None,
-    ):
-        super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
-        self.parent_agent = parent_agent
-
-    def execute(
-        self,
-        goal: str,
-        constraints: Optional[List[str]] = None,
-        assumptions: Optional[List[str]] = None,
-        skill_hints: Optional[List[str]] = None,
-        context: Optional[Dict[str, Any]] = None,
-        steps: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
-        """
-        Create a structured plan for achieving a goal.
-
-        Args:
-            goal: The goal to achieve
-            constraints: Constraints to consider in planning
-            assumptions: Assumptions to document
-            skill_hints: Suggested skills to apply
-            context: Additional context for planning
-            steps: Optional pre-defined steps for the plan
-
-        Returns:
-            Dictionary with plan details
-        """
-        if self.console:
-            self.console.print(f"[cyan]Creating plan for goal:[/cyan] {goal}")
-
-        # Check if we have access to planning engine through parent agent
-        if not hasattr(self, 'parent_agent') or not self.parent_agent:
-            return create_error_response(
-                "Planning tools require enhanced agent with planning enabled",
-                ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
-            )
-
-        # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
-            return create_error_response(
-                "Planning engine not available. Please restart with --enhanced flag.",
-                ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
-            )
-
-        try:
-            # Create plan using planning engine
-            planning_engine = self.parent_agent.planning_engine
-            plan = planning_engine.create_plan(
-                goal=goal,
-                context=context,
-                constraints=constraints,
-                assumptions=assumptions,
-                skill_hints=skill_hints,
-                steps=steps,
-            )
-
-            # Get plan summary
-            plan_summary = planning_engine.get_plan_summary(plan)
-
-            if self.console:
-                self.console.print(f"[green]Created plan:[/green] {plan.id}")
-                self.console.print(f"[dim]Steps generated:[/dim] {len(plan.steps)}")
-
-            return create_success_response({
-                "plan_id": plan.id,
-                "goal": plan.goal,
-                "description": plan.description,
-                "step_count": len(plan.steps),
-                "constraints": plan.constraints,
-                "assumptions": plan.assumptions,
-                "plan_summary": plan_summary,
-                "status": plan.status.value,
-            })
-
-        except Exception as e:
-            logger.error(f"Failed to create plan: {e}", exc_info=True)
-            return create_error_response(
-                f"Failed to create plan: {str(e)}",
-                ErrorType.EXECUTION,
-                {"goal": goal}
-            )
-
-
-class ExecutePlanTool(Tool):
-    """Tool for executing existing plans."""
-
-    def __init__(
-        self,
-        project_dir,
-        permission_mode="normal",
-        console=None,
-        timeout_config=None,
-        transaction_manager=None,
-        parent_agent=None,
-    ):
-        super().__init__(project_dir, permission_mode, console, timeout_config, transaction_manager)
-        self.parent_agent = parent_agent
-
-    def execute(
-        self,
-        plan_id: str,
-        max_steps: Optional[int] = None,
-        stop_on_failure: bool = True,
-    ) -> Dict[str, Any]:
-        """
-        Execute a plan by ID.
-
-        Args:
-            plan_id: ID of the plan to execute
-            max_steps: Maximum number of steps to execute (optional)
-            stop_on_failure: Stop execution if a step fails (default: True)
-
-        Returns:
-            Dictionary with execution results
-        """
-        if self.console:
-            self.console.print(f"[cyan]Executing plan:[/cyan] {plan_id}")
-
-        # Check if we have access to planning engine through parent agent
-        if not hasattr(self, 'parent_agent') or not self.parent_agent:
-            return create_error_response(
-                "Planning tools require enhanced agent with planning enabled",
-                ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
-            )
-
-        # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
-            return create_error_response(
-                "Planning engine not available. Please restart with --enhanced flag.",
-                ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
-            )
-
-        try:
-            planning_engine = self.parent_agent.planning_engine
-
-            # Get plan by ID
-            plan = planning_engine.get_plan(plan_id)
-            if not plan:
-                return create_error_response(
-                    f"Plan not found: {plan_id}",
-                    ErrorType.NOT_FOUND,
-                    {"plan_id": plan_id}
-                )
-
-            if self.console:
-                self.console.print(f"[dim]Plan goal:[/dim] {plan.goal}")
-                self.console.print(f"[dim]Steps to execute:[/dim] {len(plan.steps)}")
-
-            # Execute plan
-            execution_result = planning_engine.execute_plan(
-                plan=plan,
-                max_steps=max_steps,
-                stop_on_failure=stop_on_failure,
-            )
-
-            # Extract relevant information
-            result_data = {
-                "plan_id": plan_id,
-                "execution_success": execution_result.get("success", False),
-                "message": execution_result.get("message", ""),
-            }
-
-            # Add progress information if available
-            if "progress" in execution_result:
-                result_data["progress"] = execution_result["progress"]
-
-            # Add step results if available
-            if "step_results" in execution_result:
-                result_data["step_count_executed"] = len(execution_result["step_results"])
-
-                # Count successful steps
-                successful_steps = sum(
-                    1 for r in execution_result["step_results"]
-                    if r.get("success", False)
-                )
-                result_data["successful_steps"] = successful_steps
-
-            if self.console:
-                if execution_result.get("success", False):
-                    self.console.print("[green]Plan execution completed successfully[/green]")
-                else:
-                    self.console.print("[yellow]Plan execution completed with issues[/yellow]")
-
-            return create_success_response(result_data)
-
-        except Exception as e:
-            logger.error(f"Failed to execute plan: {e}", exc_info=True)
-            return create_error_response(
-                f"Failed to execute plan: {str(e)}",
-                ErrorType.EXECUTION,
-                {"plan_id": plan_id}
-            )
 
 
 class MonitorPlanTool(Tool):
@@ -261,19 +52,23 @@ class MonitorPlanTool(Tool):
             self.console.print(f"[cyan]Monitoring plan:[/cyan] {plan_id}")
 
         # Check if we have access to planning engine through parent agent
-        if not hasattr(self, 'parent_agent') or not self.parent_agent:
+        if not hasattr(self, "parent_agent") or not self.parent_agent:
             return create_error_response(
                 "Planning tools require enhanced agent with planning enabled",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
+                {"hint": "Use --enhanced flag when starting Cortex"},
             )
 
         # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
+        if (
+            not hasattr(self, "parent_agent")
+            or not self.parent_agent
+            or not getattr(self.parent_agent, "planning_engine", None)
+        ):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
+                {"hint": "Use --enhanced flag when starting Cortex"},
             )
 
         try:
@@ -283,9 +78,7 @@ class MonitorPlanTool(Tool):
             plan = planning_engine.get_plan(plan_id)
             if not plan:
                 return create_error_response(
-                    f"Plan not found: {plan_id}",
-                    ErrorType.NOT_FOUND,
-                    {"plan_id": plan_id}
+                    f"Plan not found: {plan_id}", ErrorType.NOT_FOUND, {"plan_id": plan_id}
                 )
 
             # Get basic plan info
@@ -321,15 +114,17 @@ class MonitorPlanTool(Tool):
                     }
 
                     if detail_level == "detailed":
-                        step_info.update({
-                            "expected_outcome": step.expected_outcome,
-                            "actual_outcome": step.actual_outcome,
-                            "tool_name": step.tool_name,
-                            "skill_name": step.skill_name,
-                            "started_at": step.started_at,
-                            "completed_at": step.completed_at,
-                            "error": step.error,
-                        })
+                        step_info.update(
+                            {
+                                "expected_outcome": step.expected_outcome,
+                                "actual_outcome": step.actual_outcome,
+                                "tool_name": step.tool_name,
+                                "skill_name": step.skill_name,
+                                "started_at": step.started_at,
+                                "completed_at": step.completed_at,
+                                "error": step.error,
+                            }
+                        )
 
                     steps_data.append(step_info)
 
@@ -337,18 +132,23 @@ class MonitorPlanTool(Tool):
 
             if self.console:
                 completion_pct = progress.get("completion_percentage", 0)
-                status_color = "green" if plan.status == PlanStepStatus.COMPLETED else \
-                              "yellow" if plan.status == PlanStepStatus.IN_PROGRESS else "dim"
-                self.console.print(f"[{status_color}]Plan status: {plan.status.value} ({completion_pct:.1f}%)[/{status_color}]")  # noqa: E501
+                status_color = (
+                    "green"
+                    if plan.status == PlanStepStatus.COMPLETED
+                    else "yellow"
+                    if plan.status == PlanStepStatus.IN_PROGRESS
+                    else "dim"
+                )
+                self.console.print(
+                    f"[{status_color}]Plan status: {plan.status.value} ({completion_pct:.1f}%)[/{status_color}]"
+                )  # noqa: E501
 
             return create_success_response(result)
 
         except Exception as e:
             logger.error(f"Failed to monitor plan: {e}", exc_info=True)
             return create_error_response(
-                f"Failed to monitor plan: {str(e)}",
-                ErrorType.EXECUTION,
-                {"plan_id": plan_id}
+                f"Failed to monitor plan: {str(e)}", ErrorType.EXECUTION, {"plan_id": plan_id}
             )
 
 
@@ -392,19 +192,23 @@ class UpdatePlanTool(Tool):
             self.console.print(f"[cyan]Updating plan:[/cyan] {plan_id}")
 
         # Check if we have access to planning engine through parent agent
-        if not hasattr(self, 'parent_agent') or not self.parent_agent:
+        if not hasattr(self, "parent_agent") or not self.parent_agent:
             return create_error_response(
                 "Planning tools require enhanced agent with planning enabled",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
+                {"hint": "Use --enhanced flag when starting Cortex"},
             )
 
         # Check if planning engine is available
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
+        if (
+            not hasattr(self, "parent_agent")
+            or not self.parent_agent
+            or not getattr(self.parent_agent, "planning_engine", None)
+        ):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"}
+                {"hint": "Use --enhanced flag when starting Cortex"},
             )
 
         try:
@@ -414,9 +218,7 @@ class UpdatePlanTool(Tool):
             plan = planning_engine.get_plan(plan_id)
             if not plan:
                 return create_error_response(
-                    f"Plan not found: {plan_id}",
-                    ErrorType.NOT_FOUND,
-                    {"plan_id": plan_id}
+                    f"Plan not found: {plan_id}", ErrorType.NOT_FOUND, {"plan_id": plan_id}
                 )
 
             # Perform requested action
@@ -437,9 +239,7 @@ class UpdatePlanTool(Tool):
 
                 if not step:
                     return create_error_response(
-                        "Failed to add step to plan",
-                        ErrorType.EXECUTION,
-                        {"plan_id": plan_id}
+                        "Failed to add step to plan", ErrorType.EXECUTION, {"plan_id": plan_id}
                     )
 
                 result = {
@@ -468,7 +268,7 @@ class UpdatePlanTool(Tool):
                         return create_error_response(
                             f"Failed to update step {step_id}",
                             ErrorType.EXECUTION,
-                            {"plan_id": plan_id, "step_id": step_id}
+                            {"plan_id": plan_id, "step_id": step_id},
                         )
 
                     result = {
@@ -481,7 +281,7 @@ class UpdatePlanTool(Tool):
                     return create_error_response(
                         "Only status updates are currently supported",
                         ErrorType.VALIDATION,
-                        {"supported_updates": ["status"]}
+                        {"supported_updates": ["status"]},
                     )
 
             elif action == "remove_step" and step_id:
@@ -491,7 +291,7 @@ class UpdatePlanTool(Tool):
                 return create_error_response(
                     "Step removal not yet implemented",
                     ErrorType.NOT_IMPLEMENTED,
-                    {"plan_id": plan_id, "step_id": step_id}
+                    {"plan_id": plan_id, "step_id": step_id},
                 )
 
             elif action == "reorder_steps" and new_order:
@@ -501,14 +301,21 @@ class UpdatePlanTool(Tool):
                 return create_error_response(
                     "Step reordering not yet implemented",
                     ErrorType.NOT_IMPLEMENTED,
-                    {"plan_id": plan_id}
+                    {"plan_id": plan_id},
                 )
 
             else:
                 return create_error_response(
                     f"Invalid action or missing parameters: {action}",
                     ErrorType.VALIDATION,
-                    {"valid_actions": ["add_step", "update_step", "remove_step", "reorder_steps"]}
+                    {
+                        "valid_actions": [
+                            "add_step",
+                            "update_step",
+                            "remove_step",
+                            "reorder_steps",
+                        ]
+                    },
                 )
 
             if self.console:
@@ -521,7 +328,7 @@ class UpdatePlanTool(Tool):
             return create_error_response(
                 f"Failed to update plan: {str(e)}",
                 ErrorType.EXECUTION,
-                {"plan_id": plan_id, "action": action}
+                {"plan_id": plan_id, "action": action},
             )
 
 
@@ -569,11 +376,15 @@ class CreateAndExecutePlanTool(Tool):
             self.console.print(f"[cyan]🚀 Creating and executing plan for goal:[/cyan] {goal}")
 
         # Check if we have access to planning engine
-        if not hasattr(self, 'parent_agent') or not self.parent_agent or not getattr(self.parent_agent, 'planning_engine', None):  # noqa: E501
+        if (
+            not hasattr(self, "parent_agent")
+            or not self.parent_agent
+            or not getattr(self.parent_agent, "planning_engine", None)
+        ):  # noqa: E501
             return create_error_response(
                 "Planning engine not available. Please restart with --enhanced flag.",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag to enable planning features"}
+                {"hint": "Use --enhanced flag to enable planning features"},
             )
 
         try:
@@ -617,98 +428,9 @@ class CreateAndExecutePlanTool(Tool):
         except Exception as e:
             logger.error(f"Failed to create and execute plan: {e}", exc_info=True)
             return create_error_response(
-                f"Failed to create and execute plan: {str(e)}",
-                ErrorType.EXECUTION
+                f"Failed to create and execute plan: {str(e)}", ErrorType.EXECUTION
             )
 
-
-# Tool schemas for registration
-CREATE_PLAN_SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "create_plan",
-        "description": (
-            "Create a structured plan for achieving a goal. Use for complex multi-step tasks "
-            "that require coordinated execution. Planning helps break down complex goals into "
-            "manageable steps with dependencies and expected outcomes."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "goal": {
-                    "type": "string",
-                    "description": "The goal to achieve (e.g., 'Add authentication to API')",
-                },
-                "constraints": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Constraints to consider (e.g., 'Must work with existing tests')",  # noqa: E501
-                },
-                "assumptions": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Assumptions to document (e.g., 'User model already exists')",
-                },
-                "skill_hints": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Suggested skills to apply (e.g., ['authentication', 'testing'])",  # noqa: E501
-                },
-                "context": {
-                    "type": "object",
-                    "description": "Additional context for planning",
-                    "additionalProperties": True,
-                },
-                "steps": {
-                    "type": "array",
-                    "description": "List of concrete steps for the plan. Each step should be actionable.",  # noqa: E501
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "description": {
-                                "type": "string",
-                                "description": "What this step involves (e.g., 'Read auth.py')",
-                            },
-                            "step_type": {
-                                "type": "string",
-                                "enum": ["tool_call", "subtask", "decision", "checkpoint", "reflection", "skill_application"],  # noqa: E501
-                                "description": "The type of step (default: 'tool_call')",
-                            },
-                            "dependencies": {
-                                "type": "array",
-                                "items": {"type": "string"},
-                                "description": "List of IDs for steps that must complete first",
-                            },
-                            "expected_outcome": {
-                                "type": "string",
-                                "description": "What success looks like for this step",
-                            },
-                            "tool_name": {
-                                "type": "string",
-                                "description": "The tool to use for 'tool_call' steps (e.g., 'read_file')",  # noqa: E501
-                            },
-                            "tool_arguments": {
-                                "type": "object",
-                                "description": "Arguments for the tool (e.g., {'path': 'auth.py'})",
-                                "additionalProperties": True,
-                            },
-                            "skill_name": {
-                                "type": "string",
-                                "description": "The skill to use for 'skill_application' steps",
-                            },
-                            "id": {
-                                "type": "string",
-                                "description": "Unique ID for this step (e.g., 'step_1')",
-                            },
-                        },
-                        "required": ["description"],
-                    },
-                },
-            },
-            "required": ["goal", "steps"],
-        },
-    },
-}
 
 CREATE_AND_EXECUTE_PLAN_SCHEMA = {
     "type": "function",
@@ -769,36 +491,6 @@ CREATE_AND_EXECUTE_PLAN_SCHEMA = {
                 },
             },
             "required": ["goal", "steps"],
-        },
-    },
-}
-
-EXECUTE_PLAN_SCHEMA = {
-    "type": "function",
-    "function": {
-        "name": "execute_plan",
-        "description": (
-            "Execute an existing plan. Runs plan steps in dependency order, "
-            "monitoring progress and handling failures. Use after creating a plan "
-            "to actually implement the planned steps."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "plan_id": {
-                    "type": "string",
-                    "description": "ID of the plan to execute",
-                },
-                "max_steps": {
-                    "type": "integer",
-                    "description": "Maximum number of steps to execute (optional)",
-                },
-                "stop_on_failure": {
-                    "type": "boolean",
-                    "description": "Stop execution if a step fails (default: true)",
-                },
-            },
-            "required": ["plan_id"],
         },
     },
 }

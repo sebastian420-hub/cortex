@@ -670,6 +670,8 @@ def init_command_registry(session_manager: SessionManager) -> "CommandRegistry":
         CacheCommand,
         RollbackCommand,
         TransactionsCommand,
+        # Gym command
+        GymCommand,
     )
 
     registry = CommandRegistry()
@@ -712,6 +714,9 @@ def init_command_registry(session_manager: SessionManager) -> "CommandRegistry":
     registry.register(CacheCommand())
     registry.register(RollbackCommand())
     registry.register(TransactionsCommand())
+
+    # Register gym command
+    registry.register(GymCommand())
 
     return registry
 

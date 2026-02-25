@@ -26,6 +26,37 @@ class AgentFocus(str, Enum):
     DEBUGGING = "debugging"  # Debugging an issue
     REFLECTING = "reflecting"  # Reflecting on results
     ADAPTING = "adapting"  # Adapting plan based on feedback
+    TRAINING = "training"  # Practicing in a cognitive gym sandbox
+
+
+@dataclass
+class MetacognitiveState:
+    """
+    Internal state metrics that make the agent feel more "alive".
+    Inspired by bio-inspired cognitive architectures.
+    """
+
+    confidence_score: float = 0.8  # 0.0 - 1.0, internal confidence in current path
+    urgency_score: float = 0.1  # 0.0 - 1.0, drive to act/refactor/complete
+    emotional_tone: str = "analytical"  # "analytical", "confident", "cautious", "frustrated"
+    internal_monologue: str = ""  # Brief internal thought injected into prompt
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "confidence_score": round(self.confidence_score, 3),
+            "urgency_score": round(self.urgency_score, 3),
+            "emotional_tone": self.emotional_tone,
+            "internal_monologue": self.internal_monologue,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "MetacognitiveState":
+        return cls(
+            confidence_score=d.get("confidence_score", 0.8),
+            urgency_score=d.get("urgency_score", 0.1),
+            emotional_tone=d.get("emotional_tone", "analytical"),
+            internal_monologue=d.get("internal_monologue", ""),
+        )
 
 
 @dataclass
@@ -39,6 +70,7 @@ class AgentState:
     - Planning state (active plan and progress)
     - Execution state (current tool, results)
     - Learning state (insights, patterns)
+    - Metacognitive state (confidence, urgency, tone)
     """
 
     # Identity
@@ -79,6 +111,9 @@ class AgentState:
     patterns_recognized: int = 0
     adaptations_made: int = 0
 
+    # Metacognitive state
+    metacognition: MetacognitiveState = field(default_factory=MetacognitiveState)
+
     # Task-specific state
     task_state: Dict[str, Any] = field(default_factory=dict)
 
@@ -109,6 +144,7 @@ class AgentState:
             "insights_generated": self.insights_generated,
             "patterns_recognized": self.patterns_recognized,
             "adaptations_made": self.adaptations_made,
+            "metacognition": self.metacognition.to_dict(),
             "task_state": self.task_state,
         }
 
@@ -137,6 +173,7 @@ class AgentState:
             insights_generated=data.get("insights_generated", 0),
             patterns_recognized=data.get("patterns_recognized", 0),
             adaptations_made=data.get("adaptations_made", 0),
+            metacognition=MetacognitiveState.from_dict(data.get("metacognition", {})),
             task_state=data.get("task_state", {}),
         )
 
@@ -284,7 +321,10 @@ class StateManager:
             self.state.failed_tools += 1
 
         # Extract learnings to session memory
-        self.state.session_memory.extract_learnings_from_tool_results([result])
+        # We inject the tool_name into the result so the memory bank can identify it
+        result_with_context = result.copy()
+        result_with_context["tool_name"] = tool_name
+        self.state.session_memory.extract_learnings_from_tool_results([result_with_context])
 
         # Add tool context to working memory
         purpose = f"Executing {tool_name}"
@@ -322,7 +362,70 @@ class StateManager:
             source=MemorySource.INFERRED,
         )
 
+        # Boost confidence on insight generation
+        self.state.metacognition.confidence_score = min(
+            1.0, self.state.metacognition.confidence_score + 0.05
+        )
+
         self.state.update_timestamp()
+
+    def update_metacognition(self, tool_name: str, result: Dict[str, Any]) -> None:
+        """
+        Appraise the result of an action and update internal cognitive metrics.
+        This makes the agent feel more reactive to its own performance.
+        """
+        success = result.get("success", False)
+        meta = self.state.metacognition
+
+        if success:
+            # Positive appraisal: boost confidence, shift toward confident tone
+            meta.confidence_score = min(1.0, meta.confidence_score + 0.1)
+            
+            if meta.confidence_score > 0.8:
+                meta.emotional_tone = "confident"
+            else:
+                meta.emotional_tone = "analytical"
+                
+            # Reduce urgency if a major tool succeeded
+            if tool_name in ["write_file", "edit"]:
+                meta.urgency_score = max(0.0, meta.urgency_score - 0.2)
+        else:
+            # Negative appraisal: drop confidence, shift toward cautious or frustrated
+            meta.confidence_score = max(0.1, meta.confidence_score - 0.15)
+            
+            # Use >= 2 here because failed_tools is incremented AFTER this appraisal
+            # in record_tool_execution, so 2 existing failures + this one = 3.
+            if self.state.failed_tools >= 2:
+                meta.emotional_tone = "frustrated"
+                meta.urgency_score = min(1.0, meta.urgency_score + 0.2) # Spike urgency to fix it
+            else:
+                meta.emotional_tone = "cautious"
+
+        # Generate internal monologue based on state
+        if meta.emotional_tone == "frustrated":
+            meta.internal_monologue = "I'm hitting repeated obstacles. I need to rethink my assumptions and be more meticulous."
+        elif meta.emotional_tone == "confident":
+            meta.internal_monologue = "My current approach is working well. I should maintain this momentum."
+        elif meta.emotional_tone == "cautious":
+            meta.internal_monologue = "That didn't go as expected. I should double-check the environment before trying again."
+        else:
+            meta.internal_monologue = "I am processing the results and adjusting my strategy."
+
+        # Environmental urgency (Drive)
+        # If there are many failed approaches, urgency increases
+        if len(self.state.session_memory.failed_approaches) > 2:
+            meta.urgency_score = min(1.0, meta.urgency_score + 0.1)
+
+    def get_metacognitive_context(self) -> str:
+        """Get internal state context for prompt injection."""
+        meta = self.state.metacognition
+        return (
+            f"INTERNAL STATE:\n"
+            f"- Tone: {meta.emotional_tone}\n"
+            f"- Confidence: {meta.confidence_score:.2f}\n"
+            f"- Urgency: {meta.urgency_score:.2f}\n"
+            f"- Monologue: {meta.internal_monologue}"
+        )
 
     def record_pattern(self, pattern: str, context: str, effectiveness: float = 1.0) -> None:
         """

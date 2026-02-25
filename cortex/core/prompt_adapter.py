@@ -113,8 +113,7 @@ def get_tool_priority_list(model_name: str) -> list:
 
     # Extended tools for capable models
     extended_tools = [
-        "create_plan",
-        "execute_plan",
+        "create_and_execute_plan",
         "monitor_plan",
         "update_plan",
         "web_search",

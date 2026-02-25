@@ -36,6 +36,7 @@ class MemoryItem:
     source: MemorySource
     confidence: float = 1.0  # 0.0 to 1.0
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
+    last_verified: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -46,6 +47,7 @@ class MemoryItem:
             "source": self.source.value,
             "confidence": self.confidence,
             "timestamp": self.timestamp,
+            "last_verified": self.last_verified,
             "metadata": self.metadata,
         }
 
@@ -58,6 +60,7 @@ class MemoryItem:
             source=MemorySource(data["source"]),
             confidence=data.get("confidence", 1.0),
             timestamp=data.get("timestamp", datetime.now().isoformat()),
+            last_verified=data.get("last_verified", data.get("timestamp", datetime.now().isoformat())),
             metadata=data.get("metadata", {}),
         )
 

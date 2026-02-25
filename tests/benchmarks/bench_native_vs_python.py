@@ -5,6 +5,7 @@ Skips native benchmarks if the Rust extension is not available.
 
 import pytest
 from unittest.mock import MagicMock
+from pathlib import Path
 
 try:
     from cortex.native import (
@@ -40,15 +41,16 @@ class TestSearchComparison:
         """Benchmark: Python ripgrep subprocess on 100 files (baseline)."""
         from cortex.tools.grep_tool import GrepTool
 
+        project_path = Path(small_codebase)
         tool = GrepTool(
-            project_dir=str(small_codebase),
+            project_dir=project_path,
             permission_mode="auto-approve",
             console=MagicMock(),
         )
         result = benchmark(
             tool.execute,
             pattern="function",
-            path=str(small_codebase),
+            path=str(project_path),
             output_mode="files_with_matches",
         )
         assert "error" not in result or not result.get("is_error")

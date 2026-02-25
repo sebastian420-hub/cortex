@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cortex"
-version = "1.0.0"
+version = "1.2.0"
 description = "A unified agent for coding, cybersecurity, and personal assistance"
 readme = "README.md"
 requires-python = ">=3.8"

@@ -89,8 +89,8 @@ class TestEnhancedCortexInitialization:
         # Check for unified prompt key sections
         assert "Planning System" in system_message["content"]
         assert "When to Use Planning" in system_message["content"]
-        assert "create_plan" in system_message["content"]
-        assert "execute_plan" in system_message["content"]
+        assert "create_and_execute_plan" in system_message["content"]
+        assert "monitor_plan" in system_message["content"]
         assert "Memory System" in system_message["content"]
         assert "Working Memory" in system_message["content"]
 

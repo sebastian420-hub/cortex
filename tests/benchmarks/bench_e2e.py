@@ -13,13 +13,15 @@ from cortex.cache.file_cache import FileCache
 @pytest.fixture
 def tools(small_codebase):
     console = MagicMock()
+    # Ensure project_dir is a Path object
+    project_path = Path(small_codebase)
     grep = GrepTool(
-        project_dir=str(small_codebase),
+        project_dir=project_path,
         permission_mode="auto-approve",
         console=console,
     )
     glob = GlobTool(
-        project_dir=str(small_codebase),
+        project_dir=project_path,
         permission_mode="auto-approve",
         console=console,
     )
@@ -41,15 +43,16 @@ class TestE2EWorkflowBenchmarks:
         Simulates: User asks "find all functions that take two arguments"
         """
         grep, glob = tools
+        project_path = Path(small_codebase)
 
         def code_search_workflow():
             # Step 1: Find Python files
-            files_result = glob.execute(pattern="**/*.py", path=str(small_codebase))
+            files_result = glob.execute(pattern="**/*.py", path=str(project_path))
 
             # Step 2: Search for pattern
             search_result = grep.execute(
                 pattern=r"def \w+\(arg1, arg2\)",
-                path=str(small_codebase),
+                path=str(project_path),
                 glob="*.py",
                 output_mode="content",
                 head_limit=20,
@@ -69,16 +72,17 @@ class TestE2EWorkflowBenchmarks:
         Simulates: User asks "analyze the source files in src/"
         """
         _, glob = tools
+        project_path = Path(small_codebase)
 
         def file_analysis_workflow():
             # Step 1: Find files
             files_result = glob.execute(
-                pattern="src/**/*", path=str(small_codebase), max_results=20
+                pattern="src/**/*", path=str(project_path), max_results=20
             )
 
             # Step 2: Read a few files and count tokens
             total_tokens = 0
-            src_dir = small_codebase / "src"
+            src_dir = project_path / "src"
             if src_dir.exists():
                 for f in list(src_dir.iterdir())[:10]:
                     if f.is_file():
@@ -94,18 +98,19 @@ class TestE2EWorkflowBenchmarks:
 
         Simulates: Reading the same files repeatedly (cache hit scenario)
         """
+        project_path = Path(small_codebase)
         # Pre-populate cache
-        files = list((small_codebase / "src").iterdir())[:20]
+        files = list((project_path / "src").iterdir())[:20]
         for f in files:
             if f.is_file():
                 content = f.read_text(errors="ignore")
-                cache.set(str(f), content)
+                cache.set(f, content)
 
         def cached_read_workflow():
             total_tokens = 0
             for f in files[:10]:
                 if f.is_file():
-                    content = cache.get(str(f))
+                    content = cache.get(f)
                     if content:
                         total_tokens += estimate_tokens(content)
             return total_tokens
@@ -143,12 +148,13 @@ class TestE2EWorkflowBenchmarks:
         Simulates: User asks "find all classes and their methods"
         """
         grep, _ = tools
+        project_path = Path(small_codebase)
 
         def multi_search_workflow():
             # Search for classes
             classes = grep.execute(
                 pattern=r"class \w+",
-                path=str(small_codebase),
+                path=str(project_path),
                 glob="*.py",
                 output_mode="content",
                 head_limit=20,
@@ -157,7 +163,7 @@ class TestE2EWorkflowBenchmarks:
             # Search for methods
             methods = grep.execute(
                 pattern=r"def \w+\(self",
-                path=str(small_codebase),
+                path=str(project_path),
                 glob="*.py",
                 output_mode="content",
                 head_limit=20,

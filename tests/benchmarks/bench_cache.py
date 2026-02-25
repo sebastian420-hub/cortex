@@ -23,7 +23,7 @@ def populated_cache(cache, benchmark_tmp_dir):
         path = files_dir / f"file_{i}.py"
         content = f"# File {i}\n" + f"x = {i}\n" * 50
         path.write_text(content)
-        cache.set(str(path), content)
+        cache.set(path, content)
 
     return cache, files_dir
 
@@ -38,7 +38,7 @@ class TestFileCacheBenchmarks:
         content = "x = 1\n" * 10
         path.write_text(content)
 
-        benchmark(cache.set, str(path), content)
+        benchmark(cache.set, path, content)
 
     def test_cache_set_medium_file(self, benchmark, cache, tmp_path):
         """Benchmark: Cache set for a medium file (~5KB)."""
@@ -46,18 +46,18 @@ class TestFileCacheBenchmarks:
         content = "x = 1\n" * 1000
         path.write_text(content)
 
-        benchmark(cache.set, str(path), content)
+        benchmark(cache.set, path, content)
 
     def test_cache_get_hit(self, benchmark, populated_cache):
         """Benchmark: Cache get (hit)."""
         cache, files_dir = populated_cache
-        path = str(files_dir / "file_25.py")
+        path = files_dir / "file_25.py"
 
         benchmark(cache.get, path)
 
     def test_cache_get_miss(self, benchmark, cache):
         """Benchmark: Cache get (miss)."""
-        benchmark(cache.get, "/nonexistent/path.py")
+        benchmark(cache.get, Path("/nonexistent/path.py"))
 
     def test_cache_invalidate(self, benchmark, populated_cache):
         """Benchmark: Cache invalidation."""
@@ -65,7 +65,7 @@ class TestFileCacheBenchmarks:
         counter = [0]
 
         def invalidate():
-            path = str(files_dir / f"file_{counter[0] % 50}.py")
+            path = files_dir / f"file_{counter[0] % 50}.py"
             cache.invalidate(path)
             counter[0] += 1
 
@@ -81,7 +81,7 @@ class TestFileCacheBenchmarks:
             path = tmp_path / f"pressure_{idx}.py"
             content = f"# File {idx}\n" * 20
             path.write_text(content)
-            small_cache.set(str(path), content)
+            small_cache.set(path, content)
             counter[0] += 1
 
         benchmark(set_with_eviction)
@@ -91,10 +91,6 @@ class TestFileCacheBenchmarks:
         cache, _ = populated_cache
 
         def get_stats():
-            return {
-                "size": len(cache._cache),
-                "hits": cache._stats.get("hits", 0),
-                "misses": cache._stats.get("misses", 0),
-            }
+            return cache.get_stats()
 
         benchmark(get_stats)

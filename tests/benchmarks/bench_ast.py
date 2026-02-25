@@ -1,6 +1,7 @@
 """Benchmarks for AST parsing operations."""
 
 import pytest
+from pathlib import Path
 
 
 def _get_parser():
@@ -111,10 +112,11 @@ class TestASTCacheBenchmarks:
             pytest.skip("Python parser not available")
 
         tree = parser.parse(sample_python_code, "python")
-        cache.put("test_file.py", sample_python_code, tree)
+        path = Path("test_file.py")
+        cache.put(path, sample_python_code, tree)
 
         def cache_get():
-            return cache.get("test_file.py", sample_python_code)
+            return cache.get(path, sample_python_code)
 
         benchmark(cache_get)
 
@@ -126,6 +128,6 @@ class TestASTCacheBenchmarks:
 
         def cache_miss():
             counter[0] += 1
-            return cache.get(f"nonexistent_{counter[0]}.py", sample_python_code)
+            return cache.get(Path(f"nonexistent_{counter[0]}.py"), sample_python_code)
 
         benchmark(cache_miss)

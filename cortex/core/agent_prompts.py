@@ -52,6 +52,13 @@ class PromptGenerator:
             self.agent.memory_bank.get_summary() if hasattr(self.agent, "memory_bank") else None
         )
 
+        # Get metacognitive context
+        metacognitive_context = (
+            self.agent.state_manager.get_metacognitive_context()
+            if hasattr(self.agent, "state_manager")
+            else None
+        )
+
         # Get all tool schemas
         tool_schemas = get_registry().get_all_schemas()
 
@@ -63,6 +70,7 @@ class PromptGenerator:
             state_context=state_context,
             project_context=getattr(self.agent, "project_context", None),
             memory_bank_context=memory_bank_context,
+            metacognitive_context=metacognitive_context,
             permission_mode=self.agent.permission_mode,
         )
 

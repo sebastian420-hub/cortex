@@ -1,5 +1,6 @@
 """File search and listing tools"""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -59,12 +60,21 @@ class ListFilesTool(Tool):
 class SearchFilesTool(Tool):
     """Tool for searching text in files"""
 
-    def execute(self, query: str, file_pattern: Optional[str] = None) -> Dict[str, Any]:
+    def execute(
+        self, query: str, file_pattern: Optional[str] = None, path: str = "."
+    ) -> Dict[str, Any]:
         """Search for text in files"""
         if self.console:
-            self.console.print(f"[cyan]🔍 Searching for:[/cyan] '{query}'")
+            self.console.print(f"[cyan]🔍 Searching for:[/cyan] '{query}' in {path}")
 
         try:
+            target_path = Path(path)
+            full_path = validate_path(self.project_dir, str(target_path))
+            
+            # If path is a file, use its parent directory
+            if os.path.isfile(full_path):
+                full_path = os.path.dirname(full_path)
+
             # Use ripgrep if available, otherwise fallback to grep
             pattern_arg = f"-g '{file_pattern}'" if file_pattern else ""
 
@@ -75,7 +85,7 @@ class SearchFilesTool(Tool):
                     shell=True,  # nosec
                     capture_output=True,
                     text=True,
-                    cwd=self.project_dir,
+                    cwd=full_path,
                     timeout=10,
                 )
             except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
@@ -85,7 +95,7 @@ class SearchFilesTool(Tool):
                     shell=True,  # nosec
                     capture_output=True,
                     text=True,
-                    cwd=self.project_dir,
+                    cwd=full_path,
                     timeout=10,
                 )
 
