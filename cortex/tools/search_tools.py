@@ -1,5 +1,6 @@
 """File search and listing tools"""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -67,7 +68,12 @@ class SearchFilesTool(Tool):
             self.console.print(f"[cyan]🔍 Searching for:[/cyan] '{query}' in {path}")
 
         try:
-            full_path = validate_path(self.project_dir, path)
+            target_path = Path(path)
+            full_path = validate_path(self.project_dir, str(target_path))
+            
+            # If path is a file, use its parent directory
+            if os.path.isfile(full_path):
+                full_path = os.path.dirname(full_path)
 
             # Use ripgrep if available, otherwise fallback to grep
             pattern_arg = f"-g '{file_pattern}'" if file_pattern else ""
