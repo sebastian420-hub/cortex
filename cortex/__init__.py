@@ -1,6 +1,6 @@
 """Cortex - A unified agent for coding, cybersecurity, and personal assistance"""
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 # Load environment variables from .env file if present
 try:

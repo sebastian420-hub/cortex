@@ -321,7 +321,10 @@ class StateManager:
             self.state.failed_tools += 1
 
         # Extract learnings to session memory
-        self.state.session_memory.extract_learnings_from_tool_results([result])
+        # We inject the tool_name into the result so the memory bank can identify it
+        result_with_context = result.copy()
+        result_with_context["tool_name"] = tool_name
+        self.state.session_memory.extract_learnings_from_tool_results([result_with_context])
 
         # Add tool context to working memory
         purpose = f"Executing {tool_name}"
@@ -390,7 +393,9 @@ class StateManager:
             # Negative appraisal: drop confidence, shift toward cautious or frustrated
             meta.confidence_score = max(0.1, meta.confidence_score - 0.15)
             
-            if self.state.failed_tools > 2:
+            # Use >= 2 here because failed_tools is incremented AFTER this appraisal
+            # in record_tool_execution, so 2 existing failures + this one = 3.
+            if self.state.failed_tools >= 2:
                 meta.emotional_tone = "frustrated"
                 meta.urgency_score = min(1.0, meta.urgency_score + 0.2) # Spike urgency to fix it
             else:

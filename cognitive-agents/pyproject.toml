@@ -1,0 +1,17 @@
+[project]
+name = "cognitive-agents"
+version = "0.1.0"
+description = "A reusable cognitive architecture for LLM-powered agents."
+authors = [{ name = "Your Name", email = "you@example.com" }]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/cognitive-agents"
+"Bug Tracker" = "https://github.com/yourusername/cognitive-agents/issues"

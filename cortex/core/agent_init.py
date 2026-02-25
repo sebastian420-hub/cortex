@@ -139,16 +139,32 @@ class AgentInitializer:
     def _init_memory_bank(self) -> MemoryBank:
         """Initialize memory bank for tracking decisions and facts"""
         if self.enable_layered_memory:
-            # Extract session_id from state_manager if available
-            session_id = None
-            if hasattr(self, "state_manager") and hasattr(self.state_manager, "state"):
-                session_id = self.state_manager.state.session_id
-
-            return EnhancedMemoryBank(
-                max_items=100,
-                semantic_config=self.config.semantic_memory,
-                session_id=session_id,
-            )
+            # Re-use the session_memory from state_manager for consistency
+            memory_bank = self.state_manager.state.session_memory
+            
+            # Configure semantic memory if enabled in config
+            if self.config.semantic_memory and self.config.semantic_memory.get("enabled"):
+                # We need to manually initialize semantic manager since StateManager 
+                # doesn't know about AgentConfig.
+                try:
+                    from .memory_layers.session import EnhancedMemoryBank
+                    if isinstance(memory_bank, EnhancedMemoryBank):
+                        # Re-initialize with config to ensure semantic manager is set
+                        new_bank = EnhancedMemoryBank(
+                            max_items=100,
+                            semantic_config=self.config.semantic_memory,
+                            session_id=self.state_manager.state.session_id
+                        )
+                        # Copy existing items if any
+                        new_bank.items = memory_bank.items
+                        # Update state manager to use this new correctly-configured bank
+                        self.state_manager.state.session_memory = new_bank
+                        return new_bank
+                except Exception as e:
+                    logger.error(f"Failed to configure semantic memory on session bank: {e}")
+            
+            return memory_bank
+            
         return create_memory_bank(max_items=50)
 
     def _init_state_manager(self) -> StateManager:

@@ -5,6 +5,20 @@ All notable changes to Cortex will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-25
+
+### Added
+- **Bio-inspired Metacognitive Core**: New internal state tracking for confidence, urgency, and emotional tone.
+- **Cognitive Gym**: Autonomous practice environment for agents to improve skills in sandboxed projects.
+- **Metacognitive Reflection**: Capability for agents to generate 'Synthetic Experiences' and learn from past successes/failures.
+- **Dynamic System Prompting**: Metacognitive state is now injected into the system prompt for better self-awareness.
+
+### Fixed
+- Fixed critical bug where the agent and state manager used inconsistent memory bank instances.
+- Fixed system prompt refresh issue where internal state wasn't being sent to the LLM.
+- Adjusted appraisal logic for more realistic emotional transitions (frustration, caution).
+- Improved memory bank synchronization between session and global state.
+
 ## [2.0.0] - 2025-01-XX
 
 ### Changed

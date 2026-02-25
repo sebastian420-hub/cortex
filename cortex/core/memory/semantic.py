@@ -51,11 +51,16 @@ class ChromaMemoryManager:
         # Chroma expects an embedding function, we will wrap our BaseEmbeddingModel
         class CustomEmbeddingFunction(embedding_functions.EmbeddingFunction):
             def __init__(self, embedding_model_instance: BaseEmbeddingModel):
-                super().__init__()
                 self._embedding_model_instance = embedding_model_instance
 
             def __call__(self, texts: List[str]) -> List[List[float]]:
                 return self._embedding_model_instance.encode_batch(texts)
+            
+            def name(self) -> str:
+                return f"cortex_{self._embedding_model_instance.__class__.__name__}"
+            
+            def get_config(self) -> Dict[str, Any]:
+                return {"model_name": self._embedding_model_instance.__class__.__name__}
         
         self.embedding_function = CustomEmbeddingFunction(self._embedding_model)
 

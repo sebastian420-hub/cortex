@@ -1012,7 +1012,8 @@ class Cortex:
 
                 try:
                     # Refresh system prompt with latest state/memory
-                    self.conversation.system_prompt = self._get_system_prompt()
+                    new_system_prompt = self._get_system_prompt()
+                    self.conversation.update_system_prompt(new_system_prompt)
                     messages = self.conversation.get_history()
 
                     exclude = []

@@ -3,6 +3,7 @@
 Skips gRPC benchmarks if Go services are not running.
 """
 
+from pathlib import Path
 import pytest
 
 from cortex.cache.file_cache import FileCache
@@ -28,7 +29,7 @@ def populated_local_cache(local_cache, benchmark_tmp_dir):
         path = files_dir / f"file_{i}.py"
         content = f"# File {i}\n" + f"x = {i}\n" * 50
         path.write_text(content)
-        local_cache.set(str(path), content)
+        local_cache.set(path, content)
 
     return local_cache, files_dir
 
@@ -40,13 +41,13 @@ class TestLocalCacheBaseline:
     def test_local_cache_get_hit(self, benchmark, populated_local_cache):
         """Benchmark: Local cache get (hit)."""
         cache, files_dir = populated_local_cache
-        path = str(files_dir / "file_25.py")
+        path = files_dir / "file_25.py"
 
         benchmark(cache.get, path)
 
     def test_local_cache_get_miss(self, benchmark, local_cache):
         """Benchmark: Local cache get (miss)."""
-        benchmark(local_cache.get, "/nonexistent/path.py")
+        benchmark(local_cache.get, Path("/nonexistent/path.py"))
 
     def test_local_cache_set(self, benchmark, local_cache, tmp_path):
         """Benchmark: Local cache set."""
@@ -54,12 +55,12 @@ class TestLocalCacheBaseline:
         content = "x = 1\n" * 100
         path.write_text(content)
 
-        benchmark(local_cache.set, str(path), content)
+        benchmark(local_cache.set, path, content)
 
     def test_local_cache_batch_read(self, benchmark, populated_local_cache):
         """Benchmark: Local cache batch read (10 files)."""
         cache, files_dir = populated_local_cache
-        paths = [str(files_dir / f"file_{i}.py") for i in range(10)]
+        paths = [files_dir / f"file_{i}.py" for i in range(10)]
 
         def batch_read():
             return [cache.get(p) for p in paths]

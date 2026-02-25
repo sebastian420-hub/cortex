@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock
+from pathlib import Path
 
 from cortex.tools.grep_tool import GrepTool
 from cortex.tools.glob_tool import GlobTool
@@ -9,8 +10,9 @@ from cortex.tools.glob_tool import GlobTool
 
 @pytest.fixture
 def grep_tool(small_codebase):
+    project_path = Path(small_codebase)
     tool = GrepTool(
-        project_dir=str(small_codebase),
+        project_dir=project_path,
         permission_mode="auto-approve",
         console=MagicMock(),
     )
@@ -19,8 +21,9 @@ def grep_tool(small_codebase):
 
 @pytest.fixture
 def glob_tool(small_codebase):
+    project_path = Path(small_codebase)
     tool = GlobTool(
-        project_dir=str(small_codebase),
+        project_dir=project_path,
         permission_mode="auto-approve",
         console=MagicMock(),
     )
@@ -29,8 +32,9 @@ def glob_tool(small_codebase):
 
 @pytest.fixture
 def grep_tool_medium(medium_codebase):
+    project_path = Path(medium_codebase)
     tool = GrepTool(
-        project_dir=str(medium_codebase),
+        project_dir=project_path,
         permission_mode="auto-approve",
         console=MagicMock(),
     )
@@ -39,8 +43,9 @@ def grep_tool_medium(medium_codebase):
 
 @pytest.fixture
 def glob_tool_medium(medium_codebase):
+    project_path = Path(medium_codebase)
     tool = GlobTool(
-        project_dir=str(medium_codebase),
+        project_dir=project_path,
         permission_mode="auto-approve",
         console=MagicMock(),
     )
@@ -53,30 +58,33 @@ class TestGrepBenchmarks:
 
     def test_grep_simple_pattern_small(self, benchmark, grep_tool, small_codebase):
         """Benchmark: Simple pattern search on 100 files."""
+        project_path = Path(small_codebase)
         result = benchmark(
             grep_tool.execute,
             pattern="function",
-            path=str(small_codebase),
+            path=str(project_path),
             output_mode="files_with_matches",
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_grep_regex_pattern_small(self, benchmark, grep_tool, small_codebase):
         """Benchmark: Regex pattern search on 100 files."""
+        project_path = Path(small_codebase)
         result = benchmark(
             grep_tool.execute,
             pattern=r"def \w+\(.*\):",
-            path=str(small_codebase),
+            path=str(project_path),
             output_mode="files_with_matches",
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_grep_content_mode_small(self, benchmark, grep_tool, small_codebase):
         """Benchmark: Content output mode on 100 files."""
+        project_path = Path(small_codebase)
         result = benchmark(
             grep_tool.execute,
             pattern="import",
-            path=str(small_codebase),
+            path=str(project_path),
             output_mode="content",
             head_limit=50,
         )
@@ -84,10 +92,11 @@ class TestGrepBenchmarks:
 
     def test_grep_with_glob_filter(self, benchmark, grep_tool, small_codebase):
         """Benchmark: Search with glob filter on 100 files."""
+        project_path = Path(small_codebase)
         result = benchmark(
             grep_tool.execute,
             pattern="class",
-            path=str(small_codebase),
+            path=str(project_path),
             glob="*.py",
             output_mode="files_with_matches",
         )
@@ -95,30 +104,33 @@ class TestGrepBenchmarks:
 
     def test_grep_count_mode(self, benchmark, grep_tool, small_codebase):
         """Benchmark: Count mode on 100 files."""
+        project_path = Path(small_codebase)
         result = benchmark(
             grep_tool.execute,
             pattern="Line",
-            path=str(small_codebase),
+            path=str(project_path),
             output_mode="count",
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_grep_simple_pattern_medium(self, benchmark, grep_tool_medium, medium_codebase):
         """Benchmark: Simple pattern search on 1000 files."""
+        project_path = Path(medium_codebase)
         result = benchmark(
             grep_tool_medium.execute,
             pattern="function",
-            path=str(medium_codebase),
+            path=str(project_path),
             output_mode="files_with_matches",
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_grep_regex_pattern_medium(self, benchmark, grep_tool_medium, medium_codebase):
         """Benchmark: Regex pattern search on 1000 files."""
+        project_path = Path(medium_codebase)
         result = benchmark(
             grep_tool_medium.execute,
             pattern=r"def \w+\(",
-            path=str(medium_codebase),
+            path=str(project_path),
             output_mode="files_with_matches",
         )
         assert "error" not in result or not result.get("is_error")
@@ -130,45 +142,50 @@ class TestGlobBenchmarks:
 
     def test_glob_all_python_small(self, benchmark, glob_tool, small_codebase):
         """Benchmark: Glob all Python files in 100-file codebase."""
+        project_path = Path(small_codebase)
         result = benchmark(
             glob_tool.execute,
             pattern="**/*.py",
-            path=str(small_codebase),
+            path=str(project_path),
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_glob_all_files_small(self, benchmark, glob_tool, small_codebase):
         """Benchmark: Glob all files in 100-file codebase."""
+        project_path = Path(small_codebase)
         result = benchmark(
             glob_tool.execute,
             pattern="**/*",
-            path=str(small_codebase),
+            path=str(project_path),
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_glob_specific_dir(self, benchmark, glob_tool, small_codebase):
         """Benchmark: Glob in specific subdirectory."""
+        project_path = Path(small_codebase)
         result = benchmark(
             glob_tool.execute,
             pattern="src/**/*.py",
-            path=str(small_codebase),
+            path=str(project_path),
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_glob_all_python_medium(self, benchmark, glob_tool_medium, medium_codebase):
         """Benchmark: Glob all Python files in 1000-file codebase."""
+        project_path = Path(medium_codebase)
         result = benchmark(
             glob_tool_medium.execute,
             pattern="**/*.py",
-            path=str(medium_codebase),
+            path=str(project_path),
         )
         assert "error" not in result or not result.get("is_error")
 
     def test_glob_all_files_medium(self, benchmark, glob_tool_medium, medium_codebase):
         """Benchmark: Glob all files in 1000-file codebase."""
+        project_path = Path(medium_codebase)
         result = benchmark(
             glob_tool_medium.execute,
             pattern="**/*",
-            path=str(medium_codebase),
+            path=str(project_path),
         )
         assert "error" not in result or not result.get("is_error")
