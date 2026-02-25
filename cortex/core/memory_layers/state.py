@@ -26,6 +26,7 @@ class AgentFocus(str, Enum):
     DEBUGGING = "debugging"  # Debugging an issue
     REFLECTING = "reflecting"  # Reflecting on results
     ADAPTING = "adapting"  # Adapting plan based on feedback
+    TRAINING = "training"  # Practicing in a cognitive gym sandbox
 
 
 @dataclass

@@ -28,6 +28,9 @@ from .grep_tool import GrepTool
 from .glob_tool import GlobTool
 from .edit_tool import EditTool
 
+# Metacognition tools
+from .metacognition import MetacognitiveReflectorTool, REFLECT_SCHEMA
+
 # Phase 3 web tools
 from .web_tools import WebFetchTool, WebSearchTool, clear_fetch_cache
 
@@ -307,6 +310,7 @@ TOOLS: List[Dict[str, Any]] = [
             },
         },
     },
+    REFLECT_SCHEMA,
     {
         "type": "function",
         "function": {
@@ -830,6 +834,9 @@ __all__ = [
     "GrepTool",
     "GlobTool",
     "EditTool",
+    # Metacognition
+    "MetacognitiveReflectorTool",
+    "REFLECT_SCHEMA",
     # Phase 3 web tools
     "WebFetchTool",
     "WebSearchTool",

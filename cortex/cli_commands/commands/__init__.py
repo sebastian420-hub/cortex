@@ -16,6 +16,7 @@ from .session import (
 from .stats import ProjectCommand, StatsCommand, RoutingCommand, StorageCommand, CleanupCommand
 from .cache import CacheCommand
 from .transaction import RollbackCommand, TransactionsCommand
+from .gym import GymCommand
 from .help import HelpCommand, ExitCommand
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "CacheCommand",
     "RollbackCommand",
     "TransactionsCommand",
+    "GymCommand",
     "HelpCommand",
     "ExitCommand",
 ]

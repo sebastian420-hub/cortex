@@ -566,7 +566,10 @@ class Cortex:
                 "monitor_plan",
                 "update_plan",
                 "create_and_execute_plan",
+                "metacognitive_reflect",
             ]
+        else:
+            exclude = ["metacognitive_reflect"]
 
         tool_schemas = get_registry().get_all_schemas(exclude_names=exclude)
 
@@ -1020,7 +1023,11 @@ class Cortex:
                             "monitor_plan",
                             "update_plan",
                             "create_and_execute_plan",
+                            "metacognitive_reflect",
                         ]
+                    else:
+                        # Even if planning is enabled, we keep reflection for specific training/session end
+                        exclude = ["metacognitive_reflect"]
                     tools = get_registry().get_all_schemas(exclude_names=exclude)
 
                     with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):

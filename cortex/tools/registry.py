@@ -253,6 +253,9 @@ class ToolRegistry:
         from .glob_tool import GlobTool
         from .edit_tool import EditTool
 
+        # Metacognition tools
+        from .metacognition import MetacognitiveReflectorTool, REFLECT_SCHEMA
+
         # Phase 3 web tools
         from .web_tools import WebFetchTool, WebSearchTool
 
@@ -318,6 +321,7 @@ class ToolRegistry:
             "grep": GrepTool,
             "glob": GlobTool,
             "edit": EditTool,
+            "metacognitive_reflect": MetacognitiveReflectorTool,
             # Phase 3 web tools
             "web_fetch": WebFetchTool,
             "web_search": WebSearchTool,
@@ -802,6 +806,7 @@ class ToolRegistry:
                     },
                 },
             },
+            "metacognitive_reflect": REFLECT_SCHEMA,
             # Phase 3 web tools
             "web_fetch": {
                 "type": "function",

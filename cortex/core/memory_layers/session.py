@@ -484,6 +484,34 @@ class EnhancedMemoryBank(MemoryBank):
                     pattern = f"Search with {tool_name} found {pattern_count} matches"
                     context = f"Successfully used {tool_name} for discovery"
                     self.record_successful_pattern(pattern, context)
+                
+                # Special handling for metacognitive reflection
+                elif tool_name == "metacognitive_reflect":
+                    exp = result_data.get("synthetic_experience", {})
+                    if exp:
+                        # Index as a high-confidence synthetic experience
+                        self.add(
+                            MemoryItem(
+                                type=MemoryType.CONTEXT,
+                                content=f"SYNTHETIC EXPERIENCE: {exp.get('task')}\nInsight: {exp.get('insight')}\nMonologue: {exp.get('monologue')}",
+                                source=MemorySource.INFERRED,
+                                confidence=1.0,
+                                metadata={
+                                    "synthetic": True,
+                                    "task": exp.get("task"),
+                                    "success": exp.get("success")
+                                }
+                            )
+                        )
+                        # Also record patterns and failures explicitly
+                        for p in exp.get("patterns", []):
+                            self.record_successful_pattern(p, f"From synthetic experience: {exp.get('task')}")
+                        for f in exp.get("failures", []):
+                            self.record_failed_approach(
+                                approach=f.get("approach", "unknown"),
+                                error=f.get("error", "unknown"),
+                                root_cause=f.get("root_cause")
+                            )
 
     def get_session_summary(self) -> str:
         """
