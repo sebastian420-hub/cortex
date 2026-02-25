@@ -97,13 +97,24 @@ Cortex employs a multi-layered architecture focused on performance, modularity, 
 
 For a detailed architectural breakdown, consult the [Cortex Technical Specification](docs/CORTEX_TECHNICAL_SPEC.md).
 
+### 🔬 Research & Benchmarking
+
+Cortex includes a systematic **Research Framework** for evaluating agent intelligence and resilience through tiered engineering challenges in isolated sandboxes. 
+
+See the [Research Framework Documentation](docs/RESEARCH_FRAMEWORK.md) for details on:
+- **Sandbox Isolation**: Safe execution of complex tasks.
+- **Evaluation Tiers**: Control, Architectural, and Stress testing.
+- **KPI Tracking**: Success rate, turns taken, and "Correction Latency".
+- **Challenge Bank**: Standardized benchmarks for continuous improvement.
+
 ---
 
 ## Development & Contribution
 
 Cortex is an open-source project and welcomes contributions from developers.
 
-*   **Project Status**: **v1.1.0 (Semantic AI Agent)**. All 966/966 tests are passing (100% success rate) across Python, Rust, and Go components.
+*   **Project Status**: **v1.2.0 (Bio-inspired Metacognition)**. All 950/950 tests are passing (100% success rate) across Python, Rust, and Go components.
+*   **Research**: We use a custom [Research Framework](docs/RESEARCH_FRAMEWORK.md) to benchmark agent performance under stress.
 *   **Roadmap**: Our plans for multi-agent systems, IDE integrations, and further enhancements are detailed in the [Development Roadmap](docs/ROADMAP.md).
 *   **Contribute**: Information on contributing will be available in [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon).
 
