@@ -304,6 +304,7 @@ class PromptBuilder:
         project_context: Optional[str] = None,
         memory_bank_context: Optional[str] = None,
         semantic_context: Optional[str] = None,
+        metacognitive_context: Optional[str] = None,
         custom_instructions: Optional[str] = None,
         permission_mode: str = "NORMAL",
     ) -> str:
@@ -318,6 +319,7 @@ class PromptBuilder:
             project_context: Project-specific context (from AGENT.md etc.)
             memory_bank_context: Memory bank summary
             semantic_context: Semantically relevant historical context
+            metacognitive_context: Internal state metrics (tone, confidence)
             custom_instructions: Additional custom instructions
             permission_mode: Permission mode string
 
@@ -329,7 +331,12 @@ class PromptBuilder:
         # 1. Core identity and instructions
         sections.append(self._build_core_section(permission_mode))
 
-        # 2. Output schema (for models that support JSON mode)
+        # 2. Metacognition (Internal State) - Bio-inspired "Limbic" layer
+        if metacognitive_context:
+            sections.append(f"# Internal Metacognition\n\n{metacognitive_context}\n\n"
+                           f"Use the internal monologue and tone above to guide your reasoning.")
+
+        # 3. Output schema (for models that support JSON mode)
         if self.profile.supports_json_mode:
             schema_section = self._build_output_schema_section()
             if schema_section:

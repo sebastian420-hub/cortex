@@ -519,6 +519,11 @@ class Cortex:
         memory_bank_context = (
             self.memory_bank.get_summary() if hasattr(self, "memory_bank") else None
         )
+        metacognitive_context = (
+            self.state_manager.get_metacognitive_context()
+            if hasattr(self, "state_manager")
+            else None
+        )
 
         # Get semantic context if enabled
         semantic_context = None
@@ -574,6 +579,7 @@ class Cortex:
             project_context=self.project_context,
             memory_bank_context=memory_bank_context,
             semantic_context=semantic_context,  # New parameter
+            metacognitive_context=metacognitive_context,
             permission_mode=self.permission_mode,
         )
 
@@ -823,6 +829,19 @@ class Cortex:
             # Execute tool
             result = tool.execute(**arguments)
             success = result.get("success", False)
+
+            # --- Metacognitive Appraisal ---
+            if hasattr(self, "state_manager"):
+                self.state_manager.update_metacognition(tool_name, result)
+            
+            # Bio-inspired belief reinforcement
+            if self.enable_layered_memory and hasattr(self.memory_bank, "verify_memory"):
+                # Use a heuristic: if we were looking for a file and found it, verify that memory
+                if "path" in arguments:
+                    self.memory_bank.verify_memory(arguments["path"], success)
+                elif "filepath" in arguments:
+                    self.memory_bank.verify_memory(arguments["filepath"], success)
+            # -------------------------------
 
         except ValueError:
             result = create_error_response(

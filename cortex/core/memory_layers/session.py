@@ -386,6 +386,31 @@ class EnhancedMemoryBank(MemoryBank):
             )
         )
 
+    def verify_memory(self, content_substring: str, success: bool) -> None:
+        """
+        Verify or invalidate a memory based on tool results.
+        Bio-inspired: reinforcement of beliefs.
+        """
+        for item in self.items:
+            if content_substring.lower() in item.content.lower():
+                item.last_verified = datetime.now().isoformat()
+                if success:
+                    item.confidence = min(1.0, item.confidence + 0.1)
+                else:
+                    item.confidence = max(0.1, item.confidence - 0.3)
+                
+                # If confidence is very low, it will be pruned during the next _prune call
+                break
+
+    def decay_memories(self, decay_factor: float = 0.05) -> None:
+        """
+        Slightly decay confidence of all memories over time.
+        Bio-inspired: forgetfulness.
+        """
+        for item in self.items:
+            if item.source != MemorySource.USER:  # Don't decay explicit user instructions
+                item.confidence = max(0.1, item.confidence - decay_factor)
+
     def retrieve_semantic_context(
         self, query: str, top_k: int = 5, global_search: bool = False
     ) -> List[Dict[str, Any]]:
