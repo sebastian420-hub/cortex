@@ -77,9 +77,8 @@ class ToolFormatter:
             "execute_command",
             # Planning
             "create_and_execute_plan",
-            "create_plan",
-            "execute_plan",
             "monitor_plan",
+            "update_plan",
             "todo_write",
             # Web
             "web_search",
@@ -353,7 +352,7 @@ class PromptBuilder:
             sections.append(self._build_tool_guide())
 
         # 5. Planning & Task Management
-        # Scaling: uses todo_write for simple, create_plan for complex
+        # Scaling: uses todo_write for simple, create_and_execute_plan for complex
         sections.append(self._build_planning_section(enable_planning))
 
         # 6. Memory & State context
@@ -573,9 +572,9 @@ todo_write(todos=[
             return """# PLANNING TOOLS
 
 For complex tasks, use planning tools:
-1. `create_plan` - Make a plan
-2. `execute_plan` - Run the plan
-3. `monitor_plan` - Check progress
+1. `create_and_execute_plan` - Make and run a plan
+2. `monitor_plan` - Check progress
+3. `update_plan` - Adjust the plan
 
 USE PLANNING when task is complex (4+ steps). SKIP for simple tasks."""
 
@@ -583,9 +582,9 @@ USE PLANNING when task is complex (4+ steps). SKIP for simple tasks."""
             return """# Planning Tools
 
 For complex tasks (4+ steps, multiple files):
-- `create_plan(goal, constraints)` - Create structured plan
-- `execute_plan(plan_id)` - Execute plan steps
+- `create_and_execute_plan(goal, steps)` - Create and run structured plan
 - `monitor_plan(plan_id)` - Check progress
+- `update_plan(plan_id, action)` - Modify plan
 
 Skip planning for simple, single-step tasks."""
 
@@ -603,14 +602,12 @@ You have access to a powerful structured planning engine for managing complex, m
 
 **RULES FOR COMPLEX TASKS:**
 1. **NO MANUAL TOOL CALLS**: For tasks with 4+ steps, do NOT call `glob`, `grep`, or `read_file` manually in parallel. Instead, define them as steps in a plan.  # noqa: E501
-2. **ACTIVE PLAN CONSTRAINT**: If a plan is currently ACTIVE (in_progress), you are FORBIDDEN from using manual tools. You MUST use `execute_plan` to continue the workflow or `update_plan` to adjust it.  # noqa: E501
-3. **USE ATOMIC EXECUTION**: Prefer `create_and_execute_plan` over manual `create_plan` + `execute_plan` sequences.  # noqa: E501
+2. **ACTIVE PLAN CONSTRAINT**: If a plan is currently ACTIVE (in_progress), you are FORBIDDEN from using manual tools. You MUST use `update_plan` to adjust it if needed or wait for results.  # noqa: E501
+3. **USE ATOMIC EXECUTION**: Always use `create_and_execute_plan` to start a new multi-step task.  # noqa: E501
 4. **MAINTAIN CONTEXT**: The engine will report results back to your history after each step executes.  # noqa: E501
 
 **Planning Tools:**
 - `create_and_execute_plan`: (PREFERRED) Atomic creation and execution. Use this to start a multi-step workflow immediately.  # noqa: E501
-- `create_plan`: Create a structured plan for manual review (Advanced use only).
-- `execute_plan`: Run a previously created plan.
 - `monitor_plan`: Check status of an active plan.
 - `update_plan`: Modify or add steps if the plan needs adjustment.
 

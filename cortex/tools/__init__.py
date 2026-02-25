@@ -57,13 +57,9 @@ from ..subagent import TaskTool, TASK_TOOL_SCHEMA
 
 # Planning tools
 from .planning_tools import (
-    CreatePlanTool,
-    ExecutePlanTool,
     MonitorPlanTool,
     UpdatePlanTool,
     CreateAndExecutePlanTool,
-    CREATE_PLAN_SCHEMA,
-    EXECUTE_PLAN_SCHEMA,
     MONITOR_PLAN_SCHEMA,
     UPDATE_PLAN_SCHEMA,
     CREATE_AND_EXECUTE_PLAN_SCHEMA,
@@ -657,10 +653,9 @@ TOOLS: List[Dict[str, Any]] = [
     # Ask user questions tool
     ASK_USER_TOOL_SCHEMA,
     # Planning tools for enhanced agent
-    CREATE_PLAN_SCHEMA,
-    EXECUTE_PLAN_SCHEMA,
     MONITOR_PLAN_SCHEMA,
     UPDATE_PLAN_SCHEMA,
+    CREATE_AND_EXECUTE_PLAN_SCHEMA,
     # Delegation tools for model orchestration
     DELEGATE_TO_MODEL_SCHEMA,
     RETURN_TO_COORDINATOR_SCHEMA,
@@ -795,10 +790,9 @@ __all__ = [
     "TASK_TOOL_SCHEMA",
     "TODO_TOOL_SCHEMA",
     "ASK_USER_TOOL_SCHEMA",
-    "CREATE_PLAN_SCHEMA",
-    "EXECUTE_PLAN_SCHEMA",
     "MONITOR_PLAN_SCHEMA",
     "UPDATE_PLAN_SCHEMA",
+    "CREATE_AND_EXECUTE_PLAN_SCHEMA",
     "DELEGATE_TO_MODEL_SCHEMA",
     "RETURN_TO_COORDINATOR_SCHEMA",
     # Base class

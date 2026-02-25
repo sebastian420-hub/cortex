@@ -49,8 +49,6 @@ def truncate_tool_result(
 
     # NEVER truncate planning or memory tools as they contain critical state
     if tool_name in (
-        "create_plan",
-        "execute_plan",
         "monitor_plan",
         "update_plan",
         "create_and_execute_plan",

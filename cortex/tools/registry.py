@@ -264,13 +264,9 @@ class ToolRegistry:
 
         # Planning tools
         from .planning_tools import (
-            CreatePlanTool,
-            ExecutePlanTool,
             MonitorPlanTool,
             UpdatePlanTool,
             CreateAndExecutePlanTool,
-            CREATE_PLAN_SCHEMA,
-            EXECUTE_PLAN_SCHEMA,
             MONITOR_PLAN_SCHEMA,
             UPDATE_PLAN_SCHEMA,
             CREATE_AND_EXECUTE_PLAN_SCHEMA,
@@ -328,8 +324,6 @@ class ToolRegistry:
             # Skill tools
             "skill_loader": SkillLoaderTool,
             # Planning tools
-            "create_plan": CreatePlanTool,
-            "execute_plan": ExecutePlanTool,
             "monitor_plan": MonitorPlanTool,
             "update_plan": UpdatePlanTool,
             "create_and_execute_plan": CreateAndExecutePlanTool,
@@ -438,6 +432,10 @@ class ToolRegistry:
                         "type": "object",
                         "properties": {
                             "query": {"type": "string", "description": "Text to search for"},
+                            "path": {
+                                "type": "string",
+                                "description": "Directory to search in (default: project root)",
+                            },
                             "file_pattern": {
                                 "type": "string",
                                 "description": "Limit search to files matching pattern (e.g., '*.py')",  # noqa: E501
@@ -888,8 +886,6 @@ class ToolRegistry:
                     },
                 },
             },
-            "create_plan": CREATE_PLAN_SCHEMA,
-            "execute_plan": EXECUTE_PLAN_SCHEMA,
             "monitor_plan": MONITOR_PLAN_SCHEMA,
             "update_plan": UPDATE_PLAN_SCHEMA,
             "create_and_execute_plan": CREATE_AND_EXECUTE_PLAN_SCHEMA,

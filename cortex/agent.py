@@ -561,8 +561,6 @@ class Cortex:
         exclude = []
         if not self.enable_planning:
             exclude = [
-                "create_plan",
-                "execute_plan",
                 "monitor_plan",
                 "update_plan",
                 "create_and_execute_plan",
@@ -1019,8 +1017,6 @@ class Cortex:
                     exclude = []
                     if not self.enable_planning:
                         exclude = [
-                            "create_plan",
-                            "execute_plan",
                             "monitor_plan",
                             "update_plan",
                             "create_and_execute_plan",
