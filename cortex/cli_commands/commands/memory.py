@@ -142,7 +142,9 @@ class FocusCommand(Command):
             if focus_path.exists() and focus_path.is_dir():
                 # Add to memory as a fact
                 ctx.agent.memory_bank.add_fact(
-                    f"User focused on directory: {focus_path}", source=MemorySource.USER
+                    f"User focused on directory: {focus_path}",
+                    source=MemorySource.USER,
+                    metadata={"transient": True},  # this session's focus, not lasting knowledge
                 )
                 console.print(f"[green]✓[/green] Focus set to: {focus_path}")
                 console.print("[dim]Future searches will prioritize this directory[/dim]")

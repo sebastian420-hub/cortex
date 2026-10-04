@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, Tuple
 import uuid
 
+from ..memory.contract import should_index
 from ..memory.core_memory import MemoryBank, MemoryItem, MemoryType, MemorySource
 from ..memory.semantic import ChromaMemoryManager
 from ..memory.embeddings import LocalEmbeddingModel
@@ -42,6 +43,7 @@ class FailedApproach:
     alternative_suggested: Optional[str] = None  # What to try instead
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
+    occurrences: int = 1  # how many times this same failure happened
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -52,6 +54,7 @@ class FailedApproach:
             "alternative_suggested": self.alternative_suggested,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
+            "occurrences": self.occurrences,
         }
 
     @classmethod
@@ -64,6 +67,7 @@ class FailedApproach:
             alternative_suggested=data.get("alternative_suggested"),
             timestamp=data.get("timestamp", datetime.now().isoformat()),
             metadata=data.get("metadata", {}),
+            occurrences=data.get("occurrences", 1),
         )
 
 
@@ -166,9 +170,10 @@ class EnhancedMemoryBank(MemoryBank):
     def add(self, item: MemoryItem) -> None:
         """Add a memory item and index it semantically if enabled."""
         super().add(item)
-        
-        # Automatically index in semantic memory if available
-        if self.semantic_manager:
+
+        # Long-term memory only takes what the contract allows (core/memory/contract.py): not the
+        # user's raw requests, raw errors, file references or the session's own bookkeeping.
+        if self.semantic_manager and should_index(item):
             try:
                 # Create a serializable version of metadata
                 metadata = {
@@ -176,6 +181,7 @@ class EnhancedMemoryBank(MemoryBank):
                     "source": item.source.value if hasattr(item.source, "value") else str(item.source),
                     "confidence": float(item.confidence),
                     "timestamp": item.timestamp,
+                    "last_verified": item.last_verified,
                     "session_id": self.session_id or "unknown",
                 }
                 # Add any extra metadata
@@ -216,11 +222,21 @@ class EnhancedMemoryBank(MemoryBank):
         )
 
     def add_fact(
-        self, fact: str, source: MemorySource = MemorySource.TOOL_RESULT, confidence: float = 1.0
+        self,
+        fact: str,
+        source: MemorySource = MemorySource.TOOL_RESULT,
+        confidence: float = 1.0,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Add a fact memory and index semantically."""
+        """Add a fact memory; it is indexed semantically unless the contract says otherwise."""
         self.add(
-            MemoryItem(type=MemoryType.FACT, content=fact, source=source, confidence=confidence)
+            MemoryItem(
+                type=MemoryType.FACT,
+                content=fact,
+                source=source,
+                confidence=confidence,
+                metadata=metadata or {},
+            )
         )
 
     def add_preference(
@@ -251,6 +267,13 @@ class EnhancedMemoryBank(MemoryBank):
             alternative_suggested: What to try instead
             metadata: Additional metadata
         """
+        # The same failure again is counted, not listed again
+        for existing in self.failed_approaches:
+            if existing.approach == approach and existing.error == error:
+                existing.occurrences += 1
+                existing.timestamp = datetime.now().isoformat()
+                return
+
         failed_approach = FailedApproach(
             approach=approach,
             error=error,
@@ -408,6 +431,15 @@ class EnhancedMemoryBank(MemoryBank):
                 # If confidence is very low, it will be pruned during the next _prune call
                 break
 
+        # Long-term memory too: confirm or contradict the stored entries that mention this
+        if self.semantic_manager:
+            try:
+                self.semantic_manager.verify_matching(content_substring, success)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).debug(f"Could not verify semantic memory: {e}")
+
     def decay_memories(self, decay_factor: float = 0.05) -> None:
         """
         Slightly decay confidence of all memories over time.
@@ -475,24 +507,13 @@ class EnhancedMemoryBank(MemoryBank):
                     },
                 )
             else:
-                # Check for patterns in successful execution
+                # Successful reads, writes and searches are not worth remembering: "File operation
+                # read_file on a.py" tells a later session nothing. Only a reflection on finished
+                # work is kept.
                 result_data = result.get("data", {})
 
-                # Look for file operations
-                if "path" in result_data and tool_name in ["read_file", "write_file", "edit"]:
-                    pattern = f"File operation {tool_name} on {result_data.get('path')}"
-                    context = f"Successfully used {tool_name} tool"
-                    self.record_successful_pattern(pattern, context)
-
-                # Look for search operations
-                elif "matches" in result_data and tool_name in ["grep", "search_files"]:
-                    pattern_count = result_data.get("match_count", 0)
-                    pattern = f"Search with {tool_name} found {pattern_count} matches"
-                    context = f"Successfully used {tool_name} for discovery"
-                    self.record_successful_pattern(pattern, context)
-                
                 # Special handling for metacognitive reflection
-                elif tool_name == "metacognitive_reflect":
+                if tool_name == "metacognitive_reflect":
                     exp = result_data.get("synthetic_experience", {})
                     if exp:
                         # Index as a high-confidence synthetic experience
