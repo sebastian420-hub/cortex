@@ -18,6 +18,9 @@ class Tool(ABC):
     default_timeout: int = 30
     # Tool category for timeout lookup (e.g., "git", "test", "search")
     timeout_category: str = "default"
+    # How commands are confined (None or mode "none": not at all); see core/command_sandbox.py.
+    # Set by create_tool_instance, or via the command_sandbox keyword when built directly.
+    _command_sandbox = None
 
     def __init__(
         self,
@@ -33,6 +36,8 @@ class Tool(ABC):
         self.console = console
         self._timeout_config = timeout_config
         self._transaction_manager = transaction_manager
+        if kwargs.get("command_sandbox") is not None:
+            self._command_sandbox = kwargs["command_sandbox"]
 
     def get_timeout(self, operation: Optional[str] = None) -> int:
         """

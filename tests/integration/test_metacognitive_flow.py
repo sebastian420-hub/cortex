@@ -19,6 +19,9 @@ class TestMetacognitiveFlow(unittest.TestCase):
         self.config.get_parallel_execution_config.return_value = {"enabled": False}
         self.config.get_timeout_config.return_value = {}
         self.config.get_routing_config.return_value = {"enabled": False}
+        self.config.get_transactions_config.return_value = {"enabled": False}
+        self.config.get_checkpoints_config.return_value = {"enabled": False}
+        self.config.get_command_sandbox_config.return_value = {"mode": "none"}
         self.config.max_iterations = 5
         self.config.max_iterations_continue_default = False
         

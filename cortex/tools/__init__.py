@@ -148,7 +148,7 @@ TOOLS: List[Dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "execute_command",
-            "description": "Execute a shell command. Use this ONLY when the user explicitly requests running a command (e.g., 'install dependencies', 'run tests', 'git status'). Use for git, npm, pip, pytest, etc. Be cautious with destructive commands. Do NOT use this for greetings, questions, or casual conversation.",  # noqa: E501
+            "description": "Execute a shell command. Use this ONLY when the user explicitly requests running a command (e.g., 'install dependencies', 'run tests', 'git status'). Use for git, npm, pip, pytest, etc. Be cautious with destructive commands. Commands run with the user's own permissions and are not isolated; a blocklist refuses some destructive commands but cannot catch everything, so do not run anything you would not run by hand. Do NOT use this for greetings, questions, or casual conversation.",  # noqa: E501
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -680,6 +680,7 @@ def create_tool_instance(
     parent_agent: Optional["Cortex"] = None,
     timeout_config: Optional["TimeoutConfig"] = None,
     transaction_manager: Optional["TransactionManager"] = None,
+    command_sandbox=None,
 ) -> Tool:
     """
     Create a tool instance by name.
@@ -695,6 +696,7 @@ def create_tool_instance(
         parent_agent: Parent agent instance (required for task tool)
         timeout_config: Optional timeout configuration for tool operations
         transaction_manager: Optional transaction manager for file operations
+        command_sandbox: Optional SandboxConfig that confines the commands tools run
 
     Returns:
         Tool instance
@@ -773,7 +775,7 @@ def create_tool_instance(
             coordinator_model=coordinator_model,
         )
 
-    return get_registry().create_instance(
+    tool = get_registry().create_instance(
         tool_name,
         project_dir,
         permission_mode,
@@ -782,6 +784,10 @@ def create_tool_instance(
         transaction_manager=transaction_manager,
         parent_agent=parent_agent,
     )
+    # Set on the instance rather than passed to the constructor: several tools have fixed
+    # constructor signatures and do not take extra keywords
+    tool._command_sandbox = command_sandbox
+    return tool
 
 
 __all__ = [

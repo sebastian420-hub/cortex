@@ -49,7 +49,13 @@ class GymCommand(Command):
             
             if result.get("success"):
                 console.print(f"[green]Practice session '{task_name}' completed successfully.[/green]")
-                console.print(f"[dim]Learnings have been recorded to Semantic Memory.[/dim]")
+                if result.get("reflected"):
+                    console.print("[dim]Learnings have been recorded to Semantic Memory.[/dim]")
+                else:
+                    console.print(
+                        "[yellow]The session ended without saving learnings: the model did not "
+                        "call metacognitive_reflect.[/yellow]"
+                    )
             else:
                 console.print(f"[red]Practice session failed: {result.get('error')}[/red]")
                 

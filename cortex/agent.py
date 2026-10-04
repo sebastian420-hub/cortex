@@ -27,6 +27,7 @@ from .core.providers import ProviderError, ProviderFactory
 from .core.security import SecurityError
 from .core.streaming import display_streaming_response, stream_model_response
 from .core.checkpoints import GitCheckpointStore
+from .core.command_sandbox import SandboxConfig
 from .core.tool_policy import PLAN_MODE_CLASSES, classify_tool
 from .core.transaction import TransactionManager
 from .core.turn import (
@@ -210,6 +211,8 @@ class Cortex:
             max_backups=transactions_config.get("max_backups", 10),
             enabled=transactions_config.get("enabled", True),
         )
+        # How shell commands are confined (a bad mode raises here, at startup, not mid-session)
+        self.command_sandbox = SandboxConfig.from_dict(self.config.get_command_sandbox_config())
         # Git checkpoints: a snapshot of the whole project before a request's first change, which
         # /undo restores (this is what covers shell commands; transactions only see file tools)
         checkpoints_config = self.config.get_checkpoints_config()
@@ -884,6 +887,7 @@ class Cortex:
                 parent_agent=self,
                 timeout_config=self._timeout_config,
                 transaction_manager=self.transaction_manager,
+                command_sandbox=self.command_sandbox,
             )
 
             # Execute tool

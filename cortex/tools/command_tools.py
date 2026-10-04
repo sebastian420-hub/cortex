@@ -7,6 +7,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 
 from .base import Tool
+from ..core.command_sandbox import SandboxUnavailable, confine, shell_argv
 from ..core.security import is_dangerous_command
 from ..models import PermissionMode
 from ..ui.modes import should_show_panels, is_minimal_mode
@@ -105,14 +106,34 @@ class ExecuteCommandTool(Tool):
 
         try:
             timeout = self.get_timeout()
-            result = subprocess.run(
-                command,
-                shell=True,  # nosec
-                capture_output=True,
-                text=True,
-                cwd=self.project_dir,
-                timeout=timeout,
-            )
+            try:
+                confined = confine(shell_argv(command), self.project_dir, self._command_sandbox)
+            except SandboxUnavailable as e:
+                # Never fall back to running unconfined when confinement was asked for
+                if self.console:
+                    self.console.print(f"[red]BLOCKED:[/red] {e}")
+                return create_error_response(
+                    str(e),
+                    ErrorType.SECURITY,
+                    {"command": command, "reason": "sandbox_unavailable"},
+                )
+            if confined is not None:
+                result = subprocess.run(
+                    confined,
+                    capture_output=True,
+                    text=True,
+                    cwd=self.project_dir,
+                    timeout=timeout,
+                )
+            else:
+                result = subprocess.run(
+                    command,
+                    shell=True,  # nosec
+                    capture_output=True,
+                    text=True,
+                    cwd=self.project_dir,
+                    timeout=timeout,
+                )
 
             output = result.stdout + result.stderr
 

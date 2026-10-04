@@ -70,6 +70,15 @@ DEFAULT_CHECKPOINTS = {
     "stale_days": 7,  # snapshots left behind by sessions that never exited cleanly
 }
 
+# Default command sandbox settings (see core/command_sandbox.py). "none" means commands run with
+# the user's own permissions.
+DEFAULT_COMMAND_SANDBOX = {
+    "mode": "none",  # or "bubblewrap" (Linux)
+    "network": True,  # False cuts commands off from the network (bubblewrap only)
+    "private_home": False,  # True hides the home directory from commands (bubblewrap only)
+    "writable": [],  # extra directories commands may write to (bubblewrap only)
+}
+
 # Default parallel execution settings
 DEFAULT_PARALLEL_EXECUTION = {
     "enabled": True,
@@ -228,6 +237,8 @@ class AgentConfig:
         transactions: Optional[Dict[str, Any]] = None,
         # Git checkpoint settings (/undo)
         checkpoints: Optional[Dict[str, Any]] = None,
+        # Confinement for shell commands
+        command_sandbox: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
         # Rate limiting settings (new)
@@ -306,6 +317,7 @@ class AgentConfig:
         # Transaction settings (merge with defaults)
         self.transactions = {**DEFAULT_TRANSACTIONS, **(transactions or {})}
         self.checkpoints = {**DEFAULT_CHECKPOINTS, **(checkpoints or {})}
+        self.command_sandbox = {**DEFAULT_COMMAND_SANDBOX, **(command_sandbox or {})}
 
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
@@ -368,6 +380,10 @@ class AgentConfig:
     def get_transactions_config(self) -> Dict[str, Any]:
         """Get configuration for TransactionManager."""
         return self.transactions
+
+    def get_command_sandbox_config(self) -> Dict[str, Any]:
+        """Get configuration for command confinement."""
+        return self.command_sandbox
 
     def get_checkpoints_config(self) -> Dict[str, Any]:
         """Get configuration for the git checkpoint store (/undo)."""
@@ -608,6 +624,7 @@ class AgentConfig:
             "file_cache": self.file_cache,
             "transactions": self.transactions,
             "checkpoints": self.checkpoints,
+            "command_sandbox": self.command_sandbox,
             "routing": self.routing,
             # Hybrid architecture
             "semantic_memory": self.semantic_memory,  # New

@@ -41,6 +41,7 @@ SAMPLES = {
     "file_cache": {"enabled": False},
     "transactions": {"max_backups": 2},
     "checkpoints": {"keep": 3},
+    "command_sandbox": {"network": False},
     "routing": {"enabled": True},
     "semantic_memory": {"enabled": True},
     "profiling": {"enabled": True},

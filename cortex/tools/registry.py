@@ -385,7 +385,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "execute_command",
-                    "description": "Execute a shell command. Use for git, npm, pip, pytest, etc. Be cautious with destructive commands.",  # noqa: E501
+                    "description": "Execute a shell command. Use for git, npm, pip, pytest, etc. Be cautious with destructive commands. Commands run with the user's own permissions and are not isolated; a blocklist refuses some destructive commands but cannot catch everything, so do not run anything you would not run by hand.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {

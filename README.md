@@ -115,6 +115,7 @@ Cortex is an open-source project and welcomes contributions from developers.
 
 *   **Project Status**: **v1.2.0 (Bio-inspired Metacognition)**. All 950/950 tests are passing (100% success rate) across Python, Rust, and Go components.
 *   **Research**: We use a custom [Research Framework](docs/RESEARCH_FRAMEWORK.md) to benchmark agent performance under stress.
+*   **Safety model**: what Cortex's protections stop and what they do not, including the optional command sandbox, is in [docs/SECURITY.md](docs/SECURITY.md).
 *   **Roadmap**: Our plans for multi-agent systems, IDE integrations, and further enhancements are detailed in the [Development Roadmap](docs/ROADMAP.md).
 *   **Contribute**: Information on contributing will be available in [CONTRIBUTING.md](CONTRIBUTING.md) (coming soon).
 
