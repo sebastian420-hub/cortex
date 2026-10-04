@@ -40,7 +40,6 @@ from cortex.types import (
     QuestionAnswer as QuestionAnswerType,
 )
 
-
 # ============ Todo Manager Tests ============
 
 

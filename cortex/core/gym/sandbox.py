@@ -11,6 +11,7 @@ from typing import Optional, List, Union
 
 logger = logging.getLogger(__name__)
 
+
 class SandboxProvider:
     """
     Manages isolated filesystem sandboxes for agent practice.
@@ -35,14 +36,14 @@ class SandboxProvider:
         """
         # Create a temporary directory
         temp_dir = Path(tempfile.mkdtemp(prefix=name_prefix))
-        
+
         logger.info(f"Creating sandbox at {temp_dir} from {self.base_project_dir}")
-        
+
         try:
             # Clone the project
             # Use a helper to skip .git and other large/unnecessary folders if needed
             self._clone_project(self.base_project_dir, temp_dir)
-            
+
             self.active_sandboxes.append(temp_dir)
             return temp_dir
         except Exception as e:
@@ -57,17 +58,19 @@ class SandboxProvider:
         Restore a sandbox to the original state of the base project.
         """
         if sandbox_path not in self.active_sandboxes:
-            raise ValueError(f"Path {sandbox_path} is not an active sandbox managed by this provider.")
-            
+            raise ValueError(
+                f"Path {sandbox_path} is not an active sandbox managed by this provider."
+            )
+
         logger.info(f"Restoring sandbox {sandbox_path}")
-        
+
         # Clear current contents
         for item in sandbox_path.iterdir():
             if item.is_dir():
                 shutil.rmtree(item)
             else:
                 item.unlink()
-                
+
         # Re-clone
         self._clone_project(self.base_project_dir, sandbox_path)
 
@@ -93,16 +96,33 @@ class SandboxProvider:
         Internal helper to clone the project while skipping unnecessary files.
         """
         ignore_patterns = shutil.ignore_patterns(
-            ".git", ".pytest_cache", "__pycache__", ".mypy_cache", 
-            "node_modules", "dist", "build", ".venv", "venv"
+            ".git",
+            ".pytest_cache",
+            "__pycache__",
+            ".mypy_cache",
+            "node_modules",
+            "dist",
+            "build",
+            ".venv",
+            "venv",
         )
-        
+
         # We use copytree but we need to handle the case where dst already exists (tempfile.mkdtemp creates it)
         # So we copy the contents of src to dst
         for item in src.iterdir():
-            if item.name in [".git", ".pytest_cache", "__pycache__", ".mypy_cache", "node_modules", "dist", "build", ".venv", "venv"]:
+            if item.name in [
+                ".git",
+                ".pytest_cache",
+                "__pycache__",
+                ".mypy_cache",
+                "node_modules",
+                "dist",
+                "build",
+                ".venv",
+                "venv",
+            ]:
                 continue
-                
+
             s = src / item.name
             d = dst / item.name
             if s.is_dir():

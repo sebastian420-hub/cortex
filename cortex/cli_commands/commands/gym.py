@@ -5,6 +5,7 @@ from .base import Command, CommandContext
 from ...core.gym.manager import GymManager
 from ...ui.console import console
 
+
 class GymCommand(Command):
     """
     Command to start an autonomous practice session in the Cognitive Gym.
@@ -69,7 +70,9 @@ class GymCommand(Command):
         try:
             from bench.suite import TASKS
         except ImportError:
-            console.print("[yellow]The benchmark tasks are only available in a source checkout.[/yellow]")
+            console.print(
+                "[yellow]The benchmark tasks are only available in a source checkout.[/yellow]"
+            )
             return
         for task in TASKS:
             console.print(f"  {task.id}  [dim]{task.kind}: {task.title}[/dim]")

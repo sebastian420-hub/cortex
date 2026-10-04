@@ -201,7 +201,11 @@ class TestMemoryExtraction:
 
     def test_extract_from_user_preferences(self):
         """Test extracting preferences from user messages."""
-        from cortex.core.memory.core_memory import MemoryBank, extract_memories_from_messages, MemoryType
+        from cortex.core.memory.core_memory import (
+            MemoryBank,
+            extract_memories_from_messages,
+            MemoryType,
+        )
 
         bank = MemoryBank()
         messages = [
@@ -216,7 +220,11 @@ class TestMemoryExtraction:
 
     def test_extract_from_tool_results(self):
         """Test extracting file references from tool results."""
-        from cortex.core.memory.core_memory import MemoryBank, extract_memories_from_messages, MemoryType
+        from cortex.core.memory.core_memory import (
+            MemoryBank,
+            extract_memories_from_messages,
+            MemoryType,
+        )
         import json
 
         bank = MemoryBank()

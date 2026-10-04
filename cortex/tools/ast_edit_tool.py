@@ -165,9 +165,12 @@ class ASTEditTool(Tool):
             if ast is None:
                 return create_error_response("Failed to parse file", ErrorType.EXECUTION)
 
-            language = self.ast_service.parser.detect_language(file_path) # Needs update in parser too?
+            language = self.ast_service.parser.detect_language(
+                file_path
+            )  # Needs update in parser too?
             # Actually detect_language is in .languages
             from ..code_ast.languages import detect_language
+
             language = detect_language(file_path)
 
             # Find all nodes for this symbol
@@ -209,7 +212,7 @@ class ASTEditTool(Tool):
             # Apply replacements from bottom to top to preserve offsets
             # Need to convert (line, col) to byte offsets or work line by line
             # Working line by line is safer for simple renames
-            
+
             # Sort nodes by line and column descending
             nodes.sort(key=lambda x: (x.start_line, x.start_column), reverse=True)
 
@@ -218,7 +221,7 @@ class ASTEditTool(Tool):
                 l_idx = node.start_line - 1
                 start_c = node.start_column - 1
                 end_c = node.end_column - 1
-                
+
                 line = modified_lines[l_idx]
                 modified_line = line[:start_c] + new_name + line[end_c:]
                 modified_lines[l_idx] = modified_line
@@ -278,12 +281,12 @@ class ASTEditTool(Tool):
             prefix = "".join(lines[:start_l])
             if start_l < len(lines):
                 prefix += lines[start_l][:start_c]
-            
+
             # Everything after the block end
             suffix = ""
             if end_l < len(lines):
                 suffix += lines[end_l][end_c:]
-            suffix += "".join(lines[end_l + 1:])
+            suffix += "".join(lines[end_l + 1 :])
 
             final_content = prefix + new_content + suffix
 
@@ -313,20 +316,22 @@ class ASTEditTool(Tool):
             logger.error(f"Replace block failed: {e}")
             return create_error_response(str(e), ErrorType.EXECUTION)
 
-    def _find_target_info(self, ast: Any, language: str, name: str) -> Optional[Union[FunctionInfo, ClassInfo]]:
+    def _find_target_info(
+        self, ast: Any, language: str, name: str
+    ) -> Optional[Union[FunctionInfo, ClassInfo]]:
         """Find FunctionInfo or ClassInfo by name."""
         # Check functions
         functions = self.ast_service.queries.extract_functions(ast, language)
         for f in functions:
             if f.name == name:
                 return f
-        
+
         # Check classes
         classes = self.ast_service.queries.extract_classes(ast, language)
         for c in classes:
             if c.name == name:
                 return c
-        
+
         return None
 
     def _verify_syntax(self, content: str, language: str) -> bool:

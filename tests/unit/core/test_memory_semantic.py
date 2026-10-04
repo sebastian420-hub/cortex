@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 from cortex.core.memory.embeddings import LocalEmbeddingModel, BaseEmbeddingModel
 from cortex.core.memory.semantic import ChromaMemoryManager
 
-
 pytestmark = pytest.mark.usefixtures("stub_sentence_transformers")
+
 
 class TestEmbeddingModels:
     """Tests for embedding model abstraction."""
@@ -65,7 +65,7 @@ class TestChromaMemoryManager:
         dims = 5
         mock = MagicMock(spec=BaseEmbeddingModel)
         mock.dimensions.return_value = dims
-        
+
         def mock_encode(text):
             # Always return a list of length 'dims'
             if not text:
@@ -75,7 +75,7 @@ class TestChromaMemoryManager:
             while len(vec) < dims:
                 vec.append(0.0)
             return vec
-            
+
         mock.encode.side_effect = mock_encode
         mock.encode_batch.side_effect = lambda texts: [mock_encode(t) for t in texts]
         return mock
@@ -86,7 +86,7 @@ class TestChromaMemoryManager:
         manager = ChromaMemoryManager(
             persist_directory=tmp_path / "chroma_db",
             embedding_model=mock_embedding_model,
-            clear_on_init=True
+            clear_on_init=True,
         )
         return manager
 
@@ -136,7 +136,9 @@ class TestChromaMemoryManager:
         # Expect "orange grape" to be more similar than "apple pie" to "fruit" with a simple encoder
         # but mock might not make perfect semantic sense, so just check existence.
         documents = [r["document"] for r in results]
-        assert "apple banana" in documents or "orange grape" in documents or "apple pie" in documents
+        assert (
+            "apple banana" in documents or "orange grape" in documents or "apple pie" in documents
+        )
 
     def test_search_documents_empty_query(self, chroma_manager: ChromaMemoryManager):
         """Test searching with an empty query."""
@@ -164,7 +166,7 @@ class TestChromaMemoryManager:
         # Size 5, overlap 2 -> [12345, 45678, 7890]
         chunks = ChromaMemoryManager.chunk_text(text, chunk_size=5, overlap=2)
         assert chunks == ["12345", "45678", "7890"]
-        
+
         # Small text
         assert ChromaMemoryManager.chunk_text("abc", 5, 2) == ["abc"]
 
@@ -173,10 +175,10 @@ class TestChromaMemoryManager:
         text = "This is a very long document that should be chunked."
         # chunk_size=10, overlap=2
         ids = chroma_manager.add_large_document(text, {"source": "large"}, chunk_size=10, overlap=2)
-        
+
         assert len(ids) > 1
         assert chroma_manager.count() == len(ids)
-        
+
         # Verify metadata
         results = chroma_manager.search_documents("document", top_k=10)
         assert all(r["metadata"]["is_chunk"] for r in results)
@@ -187,4 +189,3 @@ class TestChromaMemoryManager:
         with patch("cortex.core.memory.semantic.chromadb", None):
             with pytest.raises(ImportError, match=r"cortex\[memory\]"):
                 ChromaMemoryManager(persist_directory=tmp_path / "chroma_db")
-

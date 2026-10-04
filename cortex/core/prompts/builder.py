@@ -161,16 +161,14 @@ class ToolFormatter:
     def _format_explicit(self, tools: List[Dict[str, Any]]) -> str:
         """Very explicit format with step-by-step for smaller models."""
         sections = ["# TOOLS - READ CAREFULLY\n"]
-        sections.append(
-            """To use a tool, you MUST format your response with a function call.
+        sections.append("""To use a tool, you MUST format your response with a function call.
 
 When you want to use a tool:
 1. Choose the appropriate tool from the list below
 2. Provide all REQUIRED parameters
 3. The system will execute the tool and return results
 
-"""
-        )
+""")
 
         for tool in tools:
             if "function" in tool:

@@ -1,7 +1,6 @@
 """Cortex - A unified agent for coding, cybersecurity, and personal assistance"""
 
 
-
 def _resolve_version() -> str:
     """The version lives in pyproject.toml only; read it from installed metadata."""
     try:

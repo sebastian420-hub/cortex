@@ -15,8 +15,7 @@ from .scripted import ScriptedProvider
 # Known bugs, one entry per test that currently fails. Each is registered as a strict expected
 # failure, so the suite stays green today and the moment a fix lands its test flips to
 # "unexpectedly passed" and forces the entry to be deleted. The list below is the open-bug list.
-KNOWN_BUGS = {
-}
+KNOWN_BUGS = {}
 
 
 def pytest_collection_modifyitems(config, items):

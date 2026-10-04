@@ -60,7 +60,9 @@ class MemoryItem:
             source=MemorySource(data["source"]),
             confidence=data.get("confidence", 1.0),
             timestamp=data.get("timestamp", datetime.now().isoformat()),
-            last_verified=data.get("last_verified", data.get("timestamp", datetime.now().isoformat())),
+            last_verified=data.get(
+                "last_verified", data.get("timestamp", datetime.now().isoformat())
+            ),
             metadata=data.get("metadata", {}),
         )
 

@@ -20,7 +20,10 @@ except ImportError:
     embedding_functions = None
     Collection = None
 
-from .embeddings import BaseEmbeddingModel, LocalEmbeddingModel # Assuming LocalEmbeddingModel is the default
+from .embeddings import (
+    BaseEmbeddingModel,
+    LocalEmbeddingModel,
+)  # Assuming LocalEmbeddingModel is the default
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +80,9 @@ def recency(metadata: Dict[str, Any], now: Optional[datetime] = None) -> float:
     return 0.5 ** (age_days(metadata, now) / HALF_LIFE_DAYS)
 
 
-def rank_score(similarity: float, metadata: Dict[str, Any], now: Optional[datetime] = None) -> float:
+def rank_score(
+    similarity: float, metadata: Dict[str, Any], now: Optional[datetime] = None
+) -> float:
     confidence = float(metadata.get("confidence", DEFAULT_CONFIDENCE))
     return (
         WEIGHT_SIMILARITY * similarity
@@ -102,21 +107,21 @@ class ChromaMemoryManager:
         persist_directory: Path,
         collection_name: str = "cortex_semantic_memory",
         embedding_model: Optional[BaseEmbeddingModel] = None,
-        clear_on_init: bool = False, # For testing or specific use cases
+        clear_on_init: bool = False,  # For testing or specific use cases
     ):
         if chromadb is None:
             raise ImportError(
                 "Semantic memory needs ChromaDB, which is not installed. "
                 "Install it with: pip install 'cortex[memory]'"
             )
-        
+
         self.persist_directory = persist_directory
         self.collection_name = collection_name
         self.client = chromadb.PersistentClient(path=str(persist_directory))
-        
+
         # Use provided embedding model or default to LocalEmbeddingModel
         self._embedding_model = embedding_model if embedding_model else LocalEmbeddingModel()
-        
+
         # Chroma expects an embedding function, we will wrap our BaseEmbeddingModel
         class CustomEmbeddingFunction(embedding_functions.EmbeddingFunction):
             def __init__(self, embedding_model_instance: BaseEmbeddingModel):
@@ -124,13 +129,13 @@ class ChromaMemoryManager:
 
             def __call__(self, texts: List[str]) -> List[List[float]]:
                 return self._embedding_model_instance.encode_batch(texts)
-            
+
             def name(self) -> str:
                 return f"cortex_{self._embedding_model_instance.__class__.__name__}"
-            
+
             def get_config(self) -> Dict[str, Any]:
                 return {"model_name": self._embedding_model_instance.__class__.__name__}
-        
+
         self.embedding_function = CustomEmbeddingFunction(self._embedding_model)
 
         self.collection: Collection = self._get_or_create_collection(clear_on_init)
@@ -147,14 +152,16 @@ class ChromaMemoryManager:
     def _get_or_create_collection(self, clear: bool = False) -> Collection:
         """Helper to get or create the Chroma collection."""
         try:
-            if clear and self.collection_name in [col.name for col in self.client.list_collections()]:
+            if clear and self.collection_name in [
+                col.name for col in self.client.list_collections()
+            ]:
                 logger.warning(f"Clearing existing Chroma collection: {self.collection_name}")
                 self.client.delete_collection(name=self.collection_name)
-            
+
             collection = self.client.get_or_create_collection(
                 name=self.collection_name,
-                embedding_function=self.embedding_function, # Pass the wrapped embedding function
-                metadata={"hnsw:space": "cosine"} # Explicitly use cosine similarity
+                embedding_function=self.embedding_function,  # Pass the wrapped embedding function
+                metadata={"hnsw:space": "cosine"},  # Explicitly use cosine similarity
             )
             return collection
         except Exception as e:
@@ -260,13 +267,13 @@ class ChromaMemoryManager:
             # just take the rest and stop.
             if len(text) - start <= overlap and chunks:
                 break
-                
+
             end = min(start + chunk_size, len(text))
             chunks.append(text[start:end])
-            
+
             if end == len(text):
                 break
-                
+
             start += chunk_size - overlap
         return chunks
 
@@ -295,7 +302,9 @@ class ChromaMemoryManager:
         stored = []
         for i, text in enumerate(texts):
             if text:
-                stored.append(self.add_document(text, metadatas[i], doc_id=(ids[i] if ids else None)))
+                stored.append(
+                    self.add_document(text, metadatas[i], doc_id=(ids[i] if ids else None))
+                )
         if not stored:
             logger.warning("Attempted to add an empty list of valid texts to ChromaDB. Skipping.")
         return stored
@@ -390,11 +399,17 @@ class ChromaMemoryManager:
         """Every entry, most recently confirmed first."""
         found = self.collection.get(include=["documents", "metadatas"])
         entries = [
-            {"id": found["ids"][i], "document": found["documents"][i], "metadata": found["metadatas"][i] or {}}
+            {
+                "id": found["ids"][i],
+                "document": found["documents"][i],
+                "metadata": found["metadatas"][i] or {},
+            }
             for i in range(len(found["ids"]))
         ]
         entries.sort(
-            key=lambda e: str(e["metadata"].get("last_verified") or e["metadata"].get("created") or ""),
+            key=lambda e: str(
+                e["metadata"].get("last_verified") or e["metadata"].get("created") or ""
+            ),
             reverse=True,
         )
         return entries[:limit] if limit else entries
@@ -418,18 +433,14 @@ class ChromaMemoryManager:
         self.collection.update(ids=[doc_id], metadatas=[metadata])
         return True
 
-    def verify_matching(
-        self, substring: str, success: bool, now: Optional[datetime] = None
-    ) -> int:
+    def verify_matching(self, substring: str, success: bool, now: Optional[datetime] = None) -> int:
         """verify() every entry whose text contains ``substring``; returns how many."""
         if not substring:
             return 0
         found = self.collection.get(where_document={"$contains": substring}, include=[])
         return sum(1 for doc_id in found["ids"] if self.verify(doc_id, success, now))
 
-    def update_document(
-        self, doc_id: str, new_text: str, now: Optional[datetime] = None
-    ) -> str:
+    def update_document(self, doc_id: str, new_text: str, now: Optional[datetime] = None) -> str:
         """Replace an entry's text, keeping its history. Returns the (possibly new) id.
 
         The id follows the text, so an edit usually changes it. If the new text already exists
@@ -475,9 +486,10 @@ class ChromaMemoryManager:
         """Clears all documents from the collection."""
         try:
             self.client.delete_collection(name=self.collection_name)
-            self.collection = self._get_or_create_collection(clear=False) # Recreate empty collection
+            self.collection = self._get_or_create_collection(
+                clear=False
+            )  # Recreate empty collection
             logger.info(f"Chroma collection '{self.collection_name}' cleared.")
         except Exception as e:
             logger.error(f"Failed to clear Chroma collection: {e}")
             raise
-

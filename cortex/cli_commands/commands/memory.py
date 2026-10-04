@@ -35,7 +35,7 @@ class MemoryCommand(Command):
                     return
                 else:
                     query = search_args
-                    
+
                 self._handle_search(ctx, query, global_search)
                 return
             elif trimmed_args == "clear":
@@ -51,7 +51,12 @@ class MemoryCommand(Command):
                 self._handle_edit(ctx, trimmed_args[4:].strip())
                 return
             elif trimmed_args.split()[0] in ("delete", "forget"):
-                self._handle_delete(ctx, trimmed_args.split(maxsplit=1)[1:] and trimmed_args.split(maxsplit=1)[1].strip() or "")
+                self._handle_delete(
+                    ctx,
+                    trimmed_args.split(maxsplit=1)[1:]
+                    and trimmed_args.split(maxsplit=1)[1].strip()
+                    or "",
+                )
                 return
 
         # Default display
@@ -65,13 +70,18 @@ class MemoryCommand(Command):
             )
         else:
             console.print("[dim]Memory bank is empty.[/dim]")
-        
+
         # Show semantic memory status if available
-        if hasattr(ctx.agent.memory_bank, "semantic_manager") and ctx.agent.memory_bank.semantic_manager:
+        if (
+            hasattr(ctx.agent.memory_bank, "semantic_manager")
+            and ctx.agent.memory_bank.semantic_manager
+        ):
             sm = ctx.agent.memory_bank.semantic_manager
             count = sm.count()
             session_id = getattr(ctx.agent.memory_bank, "session_id", "none")
-            console.print(f"[dim]Semantic Memory (Vector DB): {count} documents indexed (Session: {session_id})[/dim]")
+            console.print(
+                f"[dim]Semantic Memory (Vector DB): {count} documents indexed (Session: {session_id})[/dim]"
+            )
             console.print("[dim]Use '/memory clear' to wipe the entire vector database.[/dim]")
 
     # ---- managing long-term entries -----------------------------------------------------
@@ -99,7 +109,9 @@ class MemoryCommand(Command):
             or e["id"].startswith(f"mem_{reference}")
         ]
         if not reference or not matches:
-            console.print(f"[red]No memory with id '{reference}'.[/red] [dim]/memory list shows ids.[/dim]")
+            console.print(
+                f"[red]No memory with id '{reference}'.[/red] [dim]/memory list shows ids.[/dim]"
+            )
             return None
         if len(matches) > 1:
             console.print(
@@ -142,7 +154,9 @@ class MemoryCommand(Command):
                 checked,
             )
         console.print(table)
-        console.print("[dim]/memory edit <id> <text>   /memory delete <id>   /memory add <text>[/dim]")
+        console.print(
+            "[dim]/memory edit <id> <text>   /memory delete <id>   /memory add <text>[/dim]"
+        )
 
     def _handle_add(self, ctx: CommandContext, text: str) -> None:
         bank = self._long_term(ctx)
@@ -189,8 +203,10 @@ class MemoryCommand(Command):
 
         # Ask for confirmation (simulated since we are in a non-interactive tool call usually,
         # but the CLI itself is interactive)
-        console.print("[yellow]Warning: This will permanently delete all long-term semantic memories for this project.[/yellow]")
-        
+        console.print(
+            "[yellow]Warning: This will permanently delete all long-term semantic memories for this project.[/yellow]"
+        )
+
         success = ctx.agent.memory_bank.clear_semantic_memory()
         if success:
             console.print("[green]✓[/green] Semantic memory database cleared successfully.")
@@ -209,13 +225,16 @@ class MemoryCommand(Command):
 
         scope = "all sessions" if global_search else "current session"
         console.print(f"[cyan]Searching semantic memory ({scope}) for:[/cyan] '{query}'...")
-        results = ctx.agent.memory_bank.retrieve_semantic_context(query, top_k=5, global_search=global_search)
+        results = ctx.agent.memory_bank.retrieve_semantic_context(
+            query, top_k=5, global_search=global_search
+        )
 
         if not results:
             console.print("[yellow]No semantically similar memories found.[/yellow]")
             return
 
         from rich.table import Table
+
         title_scope = "Global" if global_search else "Session"
         table = Table(title=f"🔍 {title_scope} Semantic Search Results for '{query}'")
         table.add_column("Similarity", justify="right", style="dim")
@@ -230,10 +249,10 @@ class MemoryCommand(Command):
             content = res.get("document", "")
             if len(content) > 150:
                 content = content[:147] + "..."
-            
+
             metadata = res.get("metadata", {})
             m_type = metadata.get("type", "unknown")
-            
+
             if global_search:
                 s_id = metadata.get("session_id", "unknown")
                 table.add_row(score, content, m_type, s_id)

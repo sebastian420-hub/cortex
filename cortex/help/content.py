@@ -177,7 +177,12 @@ Subcommands:
 
 Long-term memory keeps decisions, conventions, facts and summaries of solved problems, not your requests or error messages. The model can store one itself with the remember tool. It needs 'cortex[memory]' installed and semantic_memory.enabled set.""",  # noqa: E501
         category=HelpCategory.CONTEXT,
-        examples=["/memory", "/memory search 'api key'", "/memory search --global 'refactor'", "/memory clear"],
+        examples=[
+            "/memory",
+            "/memory search 'api key'",
+            "/memory search --global 'refactor'",
+            "/memory clear",
+        ],
         related=["/stats", "/summary"],
         keywords=["memory", "facts", "context", "learned", "vector", "db", "search", "clear"],
         beginner_friendly=False,

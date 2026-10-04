@@ -23,7 +23,6 @@ from ..providers import (
     ProviderFactory as LegacyProviderFactory,
 )
 
-
 # Export task analysis components
 from .task_analysis import (
     TaskAnalysisEngine,

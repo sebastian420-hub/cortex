@@ -5,7 +5,6 @@ from typing import Any, Dict, List, Optional
 
 from .base import HookEvent
 
-
 # Event type constants
 EVENT_PRE_TOOL_USE = "pre_tool_use"
 EVENT_POST_TOOL_USE = "post_tool_use"

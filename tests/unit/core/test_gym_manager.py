@@ -1,16 +1,16 @@
-
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from cortex.core.gym.manager import GymManager
 from cortex.agent import Cortex
 
+
 class TestGymLogic(unittest.TestCase):
     def setUp(self):
         self.agent = MagicMock()
         self.agent.project_dir = Path(".").resolve()
         self.agent.state_manager = MagicMock()
-        
+
     @patch("cortex.core.gym.manager.SandboxProvider")
     def test_gym_session_flow(self, mock_sandbox_provider_class):
         # Setup mocks
@@ -18,20 +18,21 @@ class TestGymLogic(unittest.TestCase):
         mock_sandbox_path = Path("/tmp/sandbox")
         mock_provider.create_sandbox.return_value = mock_sandbox_path
         mock_sandbox_provider_class.return_value = mock_provider
-        
+
         manager = GymManager(self.agent)
-        
+
         # Run practice session
         manager.run_practice_session("test_task", "test_goal")
-        
+
         # Verify sandbox was created and cleaned up
         mock_provider.create_sandbox.assert_called_once()
         mock_provider.cleanup_sandbox.assert_called_with(mock_sandbox_path)
-        
+
         # Verify agent focus was set to TRAINING
         from cortex.core.memory_layers.state import AgentFocus
+
         self.agent.state_manager.set_focus.assert_any_call(AgentFocus.TRAINING)
-        
+
         # Verify agent process_message was called with practice prompt
         self.agent._process_message.assert_called_once()
         args, _ = self.agent._process_message.call_args
@@ -91,7 +92,9 @@ class TestGymLogic(unittest.TestCase):
         from cortex.core.turn import STATUS_OK, TurnResult
 
         self.agent._process_message.return_value = TurnResult(STATUS_OK, final_text="All fixed!")
-        failing = lambda path: SimpleNamespace(passed=False, output="1 failed: test_sum")  # noqa: E731
+        failing = lambda path: SimpleNamespace(
+            passed=False, output="1 failed: test_sum"
+        )  # noqa: E731
         passing = lambda path: SimpleNamespace(passed=True, output="1 passed")  # noqa: E731
 
         bad = self._run(verifier=failing)
@@ -106,7 +109,9 @@ class TestGymLogic(unittest.TestCase):
         from types import SimpleNamespace
 
         seen = []
-        self._run(verifier=lambda path: seen.append(path) or SimpleNamespace(passed=True, output=""))
+        self._run(
+            verifier=lambda path: seen.append(path) or SimpleNamespace(passed=True, output="")
+        )
 
         self.assertEqual(seen, [Path("/tmp/sandbox")])
 
@@ -147,7 +152,9 @@ class TestGymLogic(unittest.TestCase):
         self.agent._process_message.side_effect = reflect
         self.assertTrue(self._run()["reflected"])
 
-        self.agent._tools_used = ["metacognitive_reflect"]  # from an earlier session: does not count
+        self.agent._tools_used = [
+            "metacognitive_reflect"
+        ]  # from an earlier session: does not count
         self.agent._process_message.side_effect = lambda prompt: TurnResult(STATUS_OK)
         self.assertFalse(self._run()["reflected"])
 
@@ -161,9 +168,10 @@ class TestGymCommandMessages(unittest.TestCase):
         ctx = CommandContext(
             agent=MagicMock(), config=MagicMock(), hook_manager=MagicMock(), output_format="text"
         )
-        with patch("cortex.cli_commands.commands.gym.GymManager") as manager_class, patch(
-            "cortex.cli_commands.commands.gym.console"
-        ) as console:
+        with (
+            patch("cortex.cli_commands.commands.gym.GymManager") as manager_class,
+            patch("cortex.cli_commands.commands.gym.console") as console,
+        ):
             manager_class.return_value.run_practice_session.return_value = outcome
             console.print.side_effect = lambda *a, **k: printed.append(str(a[0]))
             GymCommand().execute(ctx, '--task "t" --goal "g"')

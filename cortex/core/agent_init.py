@@ -141,19 +141,20 @@ class AgentInitializer:
         if self.enable_layered_memory:
             # Re-use the session_memory from state_manager for consistency
             memory_bank = self.state_manager.state.session_memory
-            
+
             # Configure semantic memory if enabled in config
             if self.config.semantic_memory and self.config.semantic_memory.get("enabled") is True:
-                # We need to manually initialize semantic manager since StateManager 
+                # We need to manually initialize semantic manager since StateManager
                 # doesn't know about AgentConfig.
                 try:
                     from .memory_layers.session import EnhancedMemoryBank
+
                     if isinstance(memory_bank, EnhancedMemoryBank):
                         # Re-initialize with config to ensure semantic manager is set
                         new_bank = EnhancedMemoryBank(
                             max_items=100,
                             semantic_config=self.config.semantic_memory,
-                            session_id=self.state_manager.state.session_id
+                            session_id=self.state_manager.state.session_id,
                         )
                         # Copy existing items if any
                         new_bank.items = memory_bank.items
@@ -162,9 +163,9 @@ class AgentInitializer:
                         return new_bank
                 except Exception as e:
                     logger.error(f"Failed to configure semantic memory on session bank: {e}")
-            
+
             return memory_bank
-            
+
         return create_memory_bank(max_items=50)
 
     def _init_state_manager(self) -> StateManager:

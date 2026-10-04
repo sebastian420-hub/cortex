@@ -61,9 +61,12 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         try:
             from sentence_transformers import SentenceTransformer
+
             self._model = SentenceTransformer(model_name)
             self._dimensions = self._model.get_sentence_embedding_dimension()
-            logger.info(f"Initialized LocalEmbeddingModel with {model_name}, dimensions: {self._dimensions}")
+            logger.info(
+                f"Initialized LocalEmbeddingModel with {model_name}, dimensions: {self._dimensions}"
+            )
         except ImportError:
             logger.error(
                 "sentence-transformers is not installed. Install it with: pip install 'cortex[memory]'"
@@ -89,7 +92,7 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
         """Returns the dimensionality of the embeddings."""
         return self._dimensions
 
+
 # TODO: Implement OpenAIEmbeddingModel (and other cloud models) as a pluggable option
 # class OpenAIEmbeddingModel(BaseEmbeddingModel):
 #    ...
-

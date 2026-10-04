@@ -261,4 +261,5 @@ class ASTParser:
             Language name or None
         """
         from .languages import detect_language as _detect_language
+
         return _detect_language(file_path, content)

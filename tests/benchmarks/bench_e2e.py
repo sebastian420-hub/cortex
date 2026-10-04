@@ -76,9 +76,7 @@ class TestE2EWorkflowBenchmarks:
 
         def file_analysis_workflow():
             # Step 1: Find files
-            files_result = glob.execute(
-                pattern="src/**/*", path=str(project_path), max_results=20
-            )
+            files_result = glob.execute(pattern="src/**/*", path=str(project_path), max_results=20)
 
             # Step 2: Read a few files and count tokens
             total_tokens = 0

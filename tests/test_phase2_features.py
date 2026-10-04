@@ -25,15 +25,13 @@ def temp_project():
     temp_dir = Path(tempfile.mkdtemp())
 
     # Create test files
-    (temp_dir / "main.py").write_text(
-        """
+    (temp_dir / "main.py").write_text("""
 def main():
     print("Hello, World!")
 
 if __name__ == "__main__":
     main()
-"""
-    )
+""")
 
     yield temp_dir
     shutil.rmtree(temp_dir)
