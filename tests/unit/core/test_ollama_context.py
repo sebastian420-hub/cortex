@@ -115,6 +115,8 @@ def test_limit_context_keeps_a_floor():
 
 
 class WindowProvider(ScriptedProvider):
+    window_advice = OllamaProvider.window_advice  # these tests are about Ollama's setting
+
     def __init__(self, window):
         super().__init__([])
         self._window = window

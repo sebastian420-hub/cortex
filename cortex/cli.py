@@ -92,9 +92,23 @@ def list_providers():
         openrouter_key,
     )
 
+    # OpenAI-compatible servers: a base URL is enough for a local server, a key for OpenAI itself
+    openai_setup = (
+        "No (local server)"
+        if os.getenv("OPENAI_BASE_URL")
+        else "Yes" if os.getenv("OPENAI_API_KEY") else "[red]OPENAI_BASE_URL or key (not set)[/red]"
+    )
+    table.add_row(
+        "OpenAI-compatible",
+        "any name the server knows (--provider openai)",
+        "OpenAI, or a local vLLM / llama.cpp / LM Studio server via OPENAI_BASE_URL",
+        openai_setup,
+    )
+
     console.print(table)
     console.print(
-        "\n[dim]Note: Provider is auto-detected from model name. Use --provider to override.[/dim]"
+        "\n[dim]Note: Provider is auto-detected from model name. Use --provider to override "
+        "(required for openai).[/dim]"
     )
 
 
@@ -105,7 +119,7 @@ def validate_provider_setup(model: str, provider_override: Optional[str] = None)
 
         # Check API key for cloud providers
         if not provider.validate_api_key():
-            provider_name = ProviderFactory.get_provider_name(model)
+            provider_name = ProviderFactory.get_provider_name(model, provider_override)
             if provider_name == "deepseek":
                 console.print(
                     Panel(
@@ -131,7 +145,7 @@ def validate_provider_setup(model: str, provider_override: Optional[str] = None)
             return False
 
         # Check Ollama connection if using Ollama provider
-        provider_name = ProviderFactory.get_provider_name(model)
+        provider_name = ProviderFactory.get_provider_name(model, provider_override)
         if provider_name == "ollama" and not check_ollama():
             console.print(
                 Panel(
@@ -188,7 +202,7 @@ Examples:
 
     parser.add_argument(
         "--provider",
-        choices=["ollama", "deepseek", "anthropic", "openrouter"],
+        choices=["ollama", "deepseek", "anthropic", "openrouter", "openai"],
         default=None,
         help="Override provider auto-detection (normally auto-detected from model name)",
     )

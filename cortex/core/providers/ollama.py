@@ -3,7 +3,7 @@
 import os
 from typing import Dict, Any, List, Iterator, Optional
 
-from .base import ModelProvider, ProviderError
+from .base import ModelProvider, ProviderError, positive_int
 
 # Cortex sends about 7,000 tokens (tool definitions and system prompt) before the user's first
 # word. When no window is requested Ollama applies its own small default and silently drops the
@@ -12,16 +12,10 @@ DEFAULT_NUM_CTX = 32768
 NUM_CTX_ENV = "CORTEX_OLLAMA_NUM_CTX"
 
 
-def _positive_int(value: Any) -> Optional[int]:
-    try:
-        number = int(str(value).strip())
-    except (TypeError, ValueError):
-        return None
-    return number if number > 0 else None
-
-
 class OllamaProvider(ModelProvider):
     """Provider for local Ollama models"""
+
+    config_section = "ollama"
 
     def __init__(self):
         try:
@@ -36,9 +30,7 @@ class OllamaProvider(ModelProvider):
     def _resolve_num_ctx(configured: Any) -> int:
         """Environment variable, then the config value, then the default; unusable values skipped."""
         return (
-            _positive_int(os.environ.get(NUM_CTX_ENV))
-            or _positive_int(configured)
-            or DEFAULT_NUM_CTX
+            positive_int(os.environ.get(NUM_CTX_ENV)) or positive_int(configured) or DEFAULT_NUM_CTX
         )
 
     def configure(self, options: Optional[Dict[str, Any]] = None) -> None:
@@ -47,6 +39,9 @@ class OllamaProvider(ModelProvider):
     @property
     def context_window(self) -> Optional[int]:
         return self.num_ctx
+
+    def window_advice(self, needed: int) -> str:
+        return f"Set {NUM_CTX_ENV} (or ollama.num_ctx in the config) to at least {needed}"
 
     def chat(
         self,

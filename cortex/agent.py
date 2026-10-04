@@ -437,17 +437,19 @@ class Cortex:
             return
 
         old_model = self.model
-        old_provider_name = ProviderFactory.get_provider_name(self.model)
+        old_provider_name = ProviderFactory.get_provider_name(
+            self.model, getattr(self.config, "provider", None)
+        )
 
         try:
             # Reinitialize provider for new model
             provider_override = provider_override or getattr(self.config, "provider", None)
             new_provider = ProviderFactory.get_provider(new_model, provider_override)
-            new_provider.configure(self.config.get_ollama_config())
+            new_provider.configure(self.config.get_provider_options(new_provider.config_section))
 
             # Validate API key for cloud providers
             if not new_provider.validate_api_key():
-                provider_name = ProviderFactory.get_provider_name(new_model)
+                provider_name = ProviderFactory.get_provider_name(new_model, provider_override)
                 raise ProviderError(
                     f"API key not set for {provider_name} provider. "
                     f"Please set the required environment variable."
@@ -466,7 +468,7 @@ class Cortex:
 
             # Notify user of model switch (unless silent mode)
             if not silent:
-                new_provider_name = ProviderFactory.get_provider_name(new_model)
+                new_provider_name = ProviderFactory.get_provider_name(new_model, provider_override)
                 reason_str = f" [dim]({reason})[/dim]" if reason else ""
                 if old_provider_name != new_provider_name:
                     console.print(
@@ -593,11 +595,16 @@ class Cortex:
 
         if window - tool_tokens - RESPONSE_RESERVE_TOKENS < MIN_USEFUL_HISTORY_TOKENS:
             suggested = -(-(tool_tokens + 16000) // 1024) * 1024  # round up to a multiple of 1024
+            advise = getattr(self.provider, "window_advice", None)
+            advice = (
+                advise(suggested)
+                if callable(advise)
+                else f"Give the model a context window of at least {suggested} tokens"
+            )
             message = (
                 f"The model's context window is {window} tokens, but Cortex's tool definitions "
                 f"alone take about {tool_tokens}, leaving too little room for the conversation. "
-                f"Set CORTEX_OLLAMA_NUM_CTX (or ollama.num_ctx in the config) to at least "
-                f"{suggested}, or turn tools off with tools.disabled."
+                f"{advice}, or turn tools off with tools.disabled."
             )
             logger.warning(message)
             if self._is_text_output():

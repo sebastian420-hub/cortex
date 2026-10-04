@@ -74,6 +74,11 @@ DEFAULT_CHECKPOINTS = {
 # the provider default (see core/providers/ollama.py). CORTEX_OLLAMA_NUM_CTX overrides it.
 DEFAULT_OLLAMA = {"num_ctx": None}
 
+# Default settings for OpenAI-compatible servers (vLLM, llama.cpp, LM Studio; see
+# core/providers/openai_compatible.py). base_url and context_window are None until set; the
+# OPENAI_BASE_URL and CORTEX_OPENAI_CONTEXT_WINDOW environment variables override them.
+DEFAULT_OPENAI = {"base_url": None, "context_window": None}
+
 # Default command sandbox settings (see core/command_sandbox.py). "none" means commands run with
 # the user's own permissions.
 DEFAULT_COMMAND_SANDBOX = {
@@ -249,6 +254,8 @@ class AgentConfig:
         command_sandbox: Optional[Dict[str, Any]] = None,
         # Settings for local models served by Ollama
         ollama: Optional[Dict[str, Any]] = None,
+        # Settings for OpenAI-compatible servers
+        openai: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
         # Rate limiting settings (new)
@@ -329,6 +336,7 @@ class AgentConfig:
         self.checkpoints = {**DEFAULT_CHECKPOINTS, **(checkpoints or {})}
         self.command_sandbox = {**DEFAULT_COMMAND_SANDBOX, **(command_sandbox or {})}
         self.ollama = {**DEFAULT_OLLAMA, **(ollama or {})}
+        self.openai = {**DEFAULT_OPENAI, **(openai or {})}
 
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
@@ -395,6 +403,14 @@ class AgentConfig:
     def get_ollama_config(self) -> Dict[str, Any]:
         """Get settings for the Ollama provider."""
         return self.ollama
+
+    def get_openai_config(self) -> Dict[str, Any]:
+        """Get settings for the OpenAI-compatible provider."""
+        return self.openai
+
+    def get_provider_options(self, section: Optional[str]) -> Dict[str, Any]:
+        """Settings for one provider's config section (``ollama``, ``openai``); none for others."""
+        return {"ollama": self.ollama, "openai": self.openai}.get(section or "", {})
 
     def get_command_sandbox_config(self) -> Dict[str, Any]:
         """Get configuration for command confinement."""
@@ -641,6 +657,7 @@ class AgentConfig:
             "checkpoints": self.checkpoints,
             "command_sandbox": self.command_sandbox,
             "ollama": self.ollama,
+            "openai": self.openai,
             "routing": self.routing,
             # Hybrid architecture
             "semantic_memory": self.semantic_memory,  # New

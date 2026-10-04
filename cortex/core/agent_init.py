@@ -318,11 +318,12 @@ class AgentInitializer:
         provider_override = getattr(self.config, "provider", None)
         try:
             provider = ProviderFactory.get_provider(self.model, provider_override)
-            provider.configure(self.config.get_ollama_config())
+            provider.configure(self.config.get_provider_options(provider.config_section))
             # Validate API key for cloud providers
             if not provider.validate_api_key():
                 raise ProviderError(
-                    f"API key not set for {ProviderFactory.get_provider_name(self.model)} "
+                    f"API key not set for "
+                    f"{ProviderFactory.get_provider_name(self.model, provider_override)} "
                     f"provider. Please set the required environment variable."
                 )
             return provider

@@ -43,6 +43,7 @@ SAMPLES = {
     "checkpoints": {"keep": 3},
     "command_sandbox": {"network": False},
     "ollama": {"num_ctx": 8192},
+    "openai": {"context_window": 65536},
     "routing": {"enabled": True},
     "semantic_memory": {"enabled": True},
     "profiling": {"enabled": True},
