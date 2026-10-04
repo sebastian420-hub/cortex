@@ -129,6 +129,9 @@ class Cortex:
         # Experimental: put confidence/urgency/tone into the system prompt (off by default; the
         # state is still tracked either way)
         self.enable_metacognition = bool(getattr(self.config, "enable_metacognition", False))
+        # Retrieved context for the current user message: (query, text). Looked up once per
+        # message, not once per loop iteration.
+        self._semantic_context_cache: Optional[tuple] = None
 
         # Use AgentInitializer to handle complex initialization
         initializer = AgentInitializer(
@@ -524,6 +527,49 @@ class Cortex:
         """Public method to load project context for backward compatibility."""
         return self._load_project_context()
 
+    def _get_semantic_context(self) -> Optional[str]:
+        """Memory relevant to the latest user message, looked up once per message.
+
+        The system prompt is rebuilt on every loop iteration; the lookup is cached by query so
+        a ten-step turn runs it once instead of ten times.
+        """
+        if not (self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context")):
+            return None
+
+        query = self.conversation.get_last_user_message()
+        if not query:
+            return None
+
+        cached = self._semantic_context_cache
+        if cached is not None and cached[0] == query:
+            return cached[1]
+
+        # Relevant items from the current session
+        session_results = self.memory_bank.retrieve_semantic_context(
+            query, top_k=2, global_search=False
+        )
+        # One highly relevant item from past sessions
+        global_results = self.memory_bank.retrieve_semantic_context(
+            query, top_k=1, global_search=True
+        )
+
+        context_items = []
+        if session_results:
+            context_items.append("From current session:")
+            context_items.extend([f"- {r['document']}" for r in session_results])
+
+        if global_results:
+            # Filter out if it's the same as a session result
+            session_docs = [r["document"] for r in session_results]
+            for r in global_results:
+                if r["document"] not in session_docs:
+                    context_items.append("From past sessions:")
+                    context_items.append(f"- {r['document']}")
+
+        semantic_context = "\n".join(context_items) if context_items else None
+        self._semantic_context_cache = (query, semantic_context)
+        return semantic_context
+
     def _get_system_prompt(self) -> str:
         """Generate comprehensive system prompt using PromptBuilder"""
         # Get dynamic context
@@ -539,37 +585,7 @@ class Cortex:
             else None
         )
 
-        # Get semantic context if enabled
-        semantic_context = None
-        if self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context"):
-            # Use last user message as query for semantic retrieval
-            last_user_msg = self.conversation.get_last_user_message()
-            if last_user_msg:
-                # Get relevant items from current session
-                session_results = self.memory_bank.retrieve_semantic_context(
-                    last_user_msg, top_k=2, global_search=False
-                )
-
-                # Get one highly relevant item from past sessions
-                global_results = self.memory_bank.retrieve_semantic_context(
-                    last_user_msg, top_k=1, global_search=True
-                )
-
-                context_items = []
-                if session_results:
-                    context_items.append("From current session:")
-                    context_items.extend([f"- {r['document']}" for r in session_results])
-
-                if global_results:
-                    # Filter out if it's the same as a session result
-                    session_docs = [r["document"] for r in session_results]
-                    for r in global_results:
-                        if r["document"] not in session_docs:
-                            context_items.append("From past sessions:")
-                            context_items.append(f"- {r['document']}")
-
-                if context_items:
-                    semantic_context = "\n".join(context_items)
+        semantic_context = self._get_semantic_context()
 
         # Get all tool schemas (includes base + orchestration tools)
         exclude = []
@@ -987,6 +1003,8 @@ class Cortex:
 
         # Errors from an earlier request must not count against this one
         self.loop_guard.reset()
+        # A new user message gets a fresh memory lookup
+        self._semantic_context_cache = None
 
         # Agent loop
         max_iterations = self.config.max_iterations
@@ -1297,6 +1315,7 @@ class Cortex:
 
     def clear_conversation(self) -> None:
         self.conversation.clear(keep_system=True)
+        self._semantic_context_cache = None
         self.conversation.history[0]["content"] = self._get_system_prompt()
 
     def _prepare_messages_for_api(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

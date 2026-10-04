@@ -382,3 +382,46 @@ def test_state_summary_works_with_an_active_plan(make_agent):
     summary = agent.state_manager.get_state_summary()
 
     assert "inspect" in summary
+
+
+def _count_retrievals(agent):
+    """Replace semantic retrieval with a counting stub and return the list of queries it saw."""
+    queries = []
+
+    def retrieve(query, top_k=3, global_search=False):
+        queries.append((query, global_search))
+        return []
+
+    agent.memory_bank.retrieve_semantic_context = retrieve
+    return queries
+
+
+def test_semantic_retrieval_runs_once_per_user_message(make_agent, project):
+    for name in ("b.py", "c.py"):
+        (project / name).write_text(f"# {name}\n")
+    agent = make_agent(
+        [
+            tool_call("read_file", {"path": "a.py"}, "c1"),
+            tool_call("read_file", {"path": "b.py"}, "c2"),
+            tool_call("read_file", {"path": "c.py"}, "c3"),
+            final("done"),
+        ]
+    )
+    queries = _count_retrievals(agent)
+
+    agent._process_message("look at the three files")
+
+    # One session lookup and one global lookup for the message, however many iterations ran.
+    assert len(agent.provider.seen) == 4
+    assert sorted(g for _, g in queries) == [False, True]
+
+
+def test_each_new_user_message_retrieves_again(make_agent):
+    agent = make_agent([final("one"), final("two")])
+    queries = _count_retrievals(agent)
+
+    agent._process_message("first question")
+    agent._process_message("second question")
+
+    assert [q for q, _ in queries].count("first question") == 2
+    assert [q for q, _ in queries].count("second question") == 2

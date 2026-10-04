@@ -325,17 +325,16 @@ class PromptBuilder:
         Returns:
             Complete system prompt string
         """
+        # Providers cache a prompt by its prefix, so the sections are ordered by how often they
+        # change: everything that is fixed for the session first, then the parts that move
+        # (retrieved context per user message, memory and state per step).
         sections = []
 
+        # --- Stable for the whole session -------------------------------------------------
         # 1. Core identity and instructions
         sections.append(self._build_core_section(permission_mode))
 
-        # 2. Metacognition (Internal State) - Bio-inspired "Limbic" layer
-        if metacognitive_context:
-            sections.append(f"# Internal Metacognition\n\n{metacognitive_context}\n\n"
-                           f"Use the internal monologue and tone above to guide your reasoning.")
-
-        # 3. Output schema (for models that support JSON mode)
+        # 2. Output schema (for models that support JSON mode)
         if self.profile.supports_json_mode:
             schema_section = self._build_output_schema_section()
             if schema_section:
@@ -355,12 +354,9 @@ class PromptBuilder:
         # Scaling: uses todo_write for simple, create_and_execute_plan for complex
         sections.append(self._build_planning_section(enable_planning))
 
-        # 6. Memory & State context
-        if enable_memory or memory_bank_context or semantic_context:
-            sections.append(self._build_memory_section(memory_bank_context, semantic_context))
-
-        if state_context:
-            sections.append(f"# Current State\n\n{state_context}")
+        # 6. How the memory system works (the contents come last, below)
+        if enable_memory:
+            sections.append(self._build_memory_section())
 
         # 7. Project context (if available)
         if project_context:
@@ -374,6 +370,25 @@ class PromptBuilder:
         adaptation = self._build_model_adaptation()
         if adaptation:
             sections.append(adaptation)
+
+        # --- Changes while the session runs -----------------------------------------------
+        # Retrieved context changes once per user message, session memory occasionally, state
+        # after most tool calls, mood after every outcome: slowest-changing first.
+        if semantic_context:
+            sections.append(f"# Relevant Historical Context\n\n{semantic_context}")
+
+        if memory_bank_context:
+            sections.append(f"# Session Memory\n\n{memory_bank_context}")
+
+        if state_context:
+            sections.append(f"# Current State\n\n{state_context}")
+
+        # Bio-inspired "limbic" layer (experimental, off unless enabled)
+        if metacognitive_context:
+            sections.append(
+                f"# Internal Metacognition\n\n{metacognitive_context}\n\n"
+                f"Use the internal monologue and tone above to guide your reasoning."
+            )
 
         return "\n\n---\n\n".join(sections)
 
@@ -620,16 +635,9 @@ When calling `create_and_execute_plan`, ALWAYS provide a concrete `steps` list. 
 
 **Note on todo_write:** Use `todo_write` ONLY for simple progress tracking of 2-3 basic manual steps. For anything involving coordinated codebase changes, you MUST use `create_and_execute_plan`."""  # noqa: E501
 
-    def _build_memory_section(
-        self, memory_bank_context: Optional[str], semantic_context: Optional[str] = None
-    ) -> str:
-        """Build memory system guidance section."""
+    def _build_memory_section(self) -> str:
+        """Build the memory system guidance (static; the remembered content is added separately)."""
         section = "# Memory System\n\n"
-        if memory_bank_context:
-            section += f"## Session Memory\n\n{memory_bank_context}\n\n"
-
-        if semantic_context:
-            section += f"## Relevant Historical Context\n\n{semantic_context}\n\n"
 
         if self.profile.prompt_style in (PromptStyle.EXPLICIT, PromptStyle.CONCISE):
             section += "The system tracks files read and decisions made automatically."
