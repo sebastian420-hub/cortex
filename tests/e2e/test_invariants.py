@@ -163,6 +163,34 @@ def test_message_order_is_valid_after_a_plan_runs(make_agent):
     assert tool_order_violations(agent.provider.seen[1]) == []
 
 
+def test_agent_repairs_a_broken_tool_order_before_sending(make_agent, monkeypatch):
+    monkeypatch.delenv("CORTEX_STRICT_MESSAGES")  # production behaviour: repair, do not raise
+    agent = make_agent()
+    history = [
+        {"role": "system", "content": "sys"},
+        {"role": "user", "content": "go"},
+        tool_call("read_file", {"path": "a.py"}, "c1"),
+        {"role": "assistant", "content": "interleaved note"},
+        {"role": "tool", "tool_call_id": "c1", "content": "ok"},
+    ]
+    assert tool_order_violations(history) != []
+
+    sent = agent._prepare_messages_for_api(history)
+
+    assert tool_order_violations(sent) == []
+
+
+def test_strict_mode_raises_on_a_broken_tool_order(make_agent):
+    agent = make_agent()
+    history = [
+        {"role": "system", "content": "sys"},
+        tool_call("read_file", {"path": "a.py"}, "c1"),
+        {"role": "user", "content": "interleaved"},
+    ]
+    with pytest.raises(Exception, match="tool-call message order"):
+        agent._prepare_messages_for_api(history)
+
+
 # --------------------------------------------------------------------------------------
 # Invariant 3: reversible or approved
 # --------------------------------------------------------------------------------------

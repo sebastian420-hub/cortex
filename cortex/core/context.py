@@ -5,6 +5,8 @@ import json
 import logging
 import os
 
+from ..utils.message_validation import tail_start
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -303,8 +305,8 @@ def truncate_history(
             return [system_msg] + other_messages
         return other_messages
     else:
-        # Truncate: keep only recent messages
-        recent_messages = other_messages[-keep_recent:]
+        # Truncate: keep only recent messages, without cutting a tool call from its result
+        recent_messages = other_messages[tail_start(other_messages, keep_recent) :]
 
     # Optionally summarize old messages (future enhancement)
     # For now, just drop them

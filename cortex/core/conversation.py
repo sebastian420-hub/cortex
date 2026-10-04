@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 from datetime import datetime
 from .context import truncate_history, get_conversation_tokens
+from ..utils.message_validation import tail_start
 from ..utils.encoding import sanitize_object
 from .model_context_limits import auto_configure_context, get_model_context_info
 
@@ -263,7 +264,9 @@ class ConversationManager:
             ):
                 # Get messages to summarize (skip system, keep recent)
                 # We need at least 5 messages to make summarization worthwhile
-                messages_to_summarize = self.history[1 : -self.keep_recent]
+                # Split where the recent tail starts, never inside a tool call/result pair
+                split_at = max(1, tail_start(self.history, self.keep_recent))
+                messages_to_summarize = self.history[1:split_at]
 
                 if len(messages_to_summarize) >= 5:
                     try:
@@ -279,7 +282,7 @@ class ConversationManager:
                         self.history = [
                             self.history[0],  # System prompt
                             summary_message,
-                            *self.history[-self.keep_recent :],  # Recent messages
+                            *self.history[split_at:],  # Recent messages
                         ]
 
                         new_count = len(self.history)

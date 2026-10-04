@@ -42,6 +42,9 @@ def isolated_home(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
+    # A broken tool-call order must fail the test loudly instead of being quietly repaired
+    # before it reaches the provider.
+    monkeypatch.setenv("CORTEX_STRICT_MESSAGES", "1")
     return home
 
 

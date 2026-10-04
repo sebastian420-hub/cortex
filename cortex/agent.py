@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 import time
 from datetime import datetime
@@ -45,6 +46,7 @@ from .utils.errors import (
     create_permission_denial,
     create_success_response,
 )
+from .utils.message_validation import normalize_tool_messages, tool_order_violations, trim_history
 from .utils.output_processing import process_model_output
 from .utils.result_truncation import truncate_tool_result
 
@@ -690,17 +692,8 @@ class Cortex:
 
         for attempt in range(max_retries):
             try:
-                # Pre-flight validation
-                validation = self._validate_messages_for_api(messages)
-                if not validation["valid"]:
-                    critical_issues = [
-                        i for i in validation["issues"] if i["severity"] == "critical"
-                    ]
-                    if critical_issues:
-                        messages = self._repair_messages_for_api(messages, critical_issues)
-                        logger.warning(
-                            f"Repaired {len(critical_issues)} critical issues before API call"
-                        )
+                # Pre-flight validation (and repair) of what is about to be sent
+                messages = self._prepare_messages_for_api(messages)
 
                 # Apply rate limiting
                 if self.rate_limiter:
@@ -724,10 +717,9 @@ class Cortex:
 
                     if attempt < max_retries - 1:
                         # Aggressive truncation
-                        self.conversation.history = [
-                            self.conversation.history[0],  # System prompt
-                            *self.conversation.history[-5:],  # Last 5 messages
-                        ]
+                        # System prompt + the last few messages, without splitting a tool
+                        # call from its result
+                        self.conversation.history = trim_history(self.conversation.history, 5)
 
                         # Truncate remaining tool results
                         max_tool_content_length = self.conversation._get_max_tool_result_length()
@@ -1029,6 +1021,7 @@ class Cortex:
                             and self.provider.supports_streaming()
                         ):
                             normalized_model = self.provider.normalize_model_name(self.model)
+                            messages = self._prepare_messages_for_api(messages)
                             stream = stream_model_response(
                                 self.provider, normalized_model, messages, tools
                             )
@@ -1246,6 +1239,29 @@ class Cortex:
         self.conversation.clear(keep_system=True)
         self.conversation.history[0]["content"] = self._get_system_prompt()
 
+    def _prepare_messages_for_api(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate the messages about to be sent, and repair what strict providers would reject.
+
+        With CORTEX_STRICT_MESSAGES=1 (set in the end-to-end tests) a broken tool-call order
+        raises instead of being repaired, so a regression cannot hide behind the repair.
+        """
+        validation = self._validate_messages_for_api(messages)
+        if validation["valid"]:
+            return messages
+
+        critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
+        if not critical_issues:
+            return messages
+
+        if os.environ.get("CORTEX_STRICT_MESSAGES") == "1":
+            order = [i for i in critical_issues if i["type"] == "tool_order"]
+            if order:
+                raise ModelError(f"Invalid tool-call message order: {order[0]['violations']}")
+
+        repaired = self._repair_messages_for_api(messages, critical_issues)
+        logger.warning(f"Repaired {len(critical_issues)} critical issues before API call")
+        return repaired
+
     def _validate_messages_for_api(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Validate messages for API compliance, checking for missing content keys."""
         issues = []
@@ -1261,6 +1277,18 @@ class Cortex:
                     issues.append(
                         {"index": i, "type": "invalid_assistant_message", "severity": "critical"}
                     )
+
+        # Tool calls must be answered immediately, in order (see utils/message_validation.py)
+        violations = tool_order_violations(messages)
+        if violations:
+            issues.append(
+                {
+                    "index": violations[0]["index"],
+                    "type": "tool_order",
+                    "severity": "critical",
+                    "violations": violations,
+                }
+            )
         return {"valid": len(issues) == 0, "issues": issues}
 
     def _repair_messages_for_api(
@@ -1279,4 +1307,8 @@ class Cortex:
                     ] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
                 else:
                     repaired[idx]["content"] = "[Repaired empty response]"
+        if any(issue["type"] == "tool_order" for issue in issues):
+            repaired, notes = normalize_tool_messages(repaired)
+            for note in notes:
+                logger.warning(f"Tool message repair: {note}")
         return repaired
