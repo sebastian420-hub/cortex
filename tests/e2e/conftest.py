@@ -16,20 +16,13 @@ from .scripted import ScriptedProvider
 # failure, so the suite stays green today and the moment a fix lands its test flips to
 # "unexpectedly passed" and forces the entry to be deleted. The list below is the open-bug list.
 KNOWN_BUGS = {
-    "test_failed_plan_returns_an_error": "P2-1: a failed plan is reported as a success",
-    "test_unknown_skill_step_fails_clearly": "P2-1: a failed plan is reported as a success",
-    "test_plan_without_steps_is_rejected_with_a_clear_error": "P2-4: starter plan fails in grep",
-    "test_unimplemented_plan_steps_do_not_report_success": "P2-4: placeholder steps fake success",
-    "test_skill_step_loads_a_real_skill": "P2-4: the skill loader is a stub returning {}",
     "test_mood_counts_consecutive_failures_not_total": "P2-5: mood counts total failures",
     "test_turn_returns_a_structured_result": "P2-8: turns return None, not a result",
     "test_turn_that_raises_reports_error_status": "P2-8: turn errors are swallowed",
-    "test_message_order_is_valid_after_a_plan_runs": "P2-2: plan steps break tool-call order",
     "test_edit_can_be_rolled_back_with_the_rollback_command": "P3-1: transactions not wired in",
     "test_plan_mode_does_not_run_project_code": "P3-3: run_tests runs in PLAN mode",
     "test_every_registered_tool_has_a_policy_class": "P3-3: no tool classification exists",
     "test_ast_rename_refuses_when_other_files_use_the_symbol": "P3-5: rename is single-file",
-    "test_one_failed_tool_call_is_recorded_once": "P2-3: learnings are extracted twice",
     "test_state_text_uses_real_newlines": "P2-6: state text has literal backslash-n",
     "test_state_summary_works_with_an_active_plan": "P2-6: get_state_summary reads active_goal",
 }

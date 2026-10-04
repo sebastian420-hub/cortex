@@ -54,9 +54,9 @@ class MonitorPlanTool(Tool):
         # Check if we have access to planning engine through parent agent
         if not hasattr(self, "parent_agent") or not self.parent_agent:
             return create_error_response(
-                "Planning tools require enhanced agent with planning enabled",
+                "Planning is not enabled. Restart Cortex with --planning (or enable_planning: true).",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"},
+                {"hint": "Start Cortex with --planning"},
             )
 
         # Check if planning engine is available
@@ -66,9 +66,9 @@ class MonitorPlanTool(Tool):
             or not getattr(self.parent_agent, "planning_engine", None)
         ):  # noqa: E501
             return create_error_response(
-                "Planning engine not available. Please restart with --enhanced flag.",
+                "Planning is not enabled. Restart Cortex with --planning (or enable_planning: true).",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"},
+                {"hint": "Start Cortex with --planning"},
             )
 
         try:
@@ -135,9 +135,7 @@ class MonitorPlanTool(Tool):
                 status_color = (
                     "green"
                     if plan.status == PlanStepStatus.COMPLETED
-                    else "yellow"
-                    if plan.status == PlanStepStatus.IN_PROGRESS
-                    else "dim"
+                    else "yellow" if plan.status == PlanStepStatus.IN_PROGRESS else "dim"
                 )
                 self.console.print(
                     f"[{status_color}]Plan status: {plan.status.value} ({completion_pct:.1f}%)[/{status_color}]"
@@ -194,9 +192,9 @@ class UpdatePlanTool(Tool):
         # Check if we have access to planning engine through parent agent
         if not hasattr(self, "parent_agent") or not self.parent_agent:
             return create_error_response(
-                "Planning tools require enhanced agent with planning enabled",
+                "Planning is not enabled. Restart Cortex with --planning (or enable_planning: true).",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"},
+                {"hint": "Start Cortex with --planning"},
             )
 
         # Check if planning engine is available
@@ -206,9 +204,9 @@ class UpdatePlanTool(Tool):
             or not getattr(self.parent_agent, "planning_engine", None)
         ):  # noqa: E501
             return create_error_response(
-                "Planning engine not available. Please restart with --enhanced flag.",
+                "Planning is not enabled. Restart Cortex with --planning (or enable_planning: true).",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag when starting Cortex"},
+                {"hint": "Start Cortex with --planning"},
             )
 
         try:
@@ -382,9 +380,18 @@ class CreateAndExecutePlanTool(Tool):
             or not getattr(self.parent_agent, "planning_engine", None)
         ):  # noqa: E501
             return create_error_response(
-                "Planning engine not available. Please restart with --enhanced flag.",
+                "Planning is not enabled. Restart Cortex with --planning (or enable_planning: true).",
                 ErrorType.CONFIGURATION,
-                {"hint": "Use --enhanced flag to enable planning features"},
+                {"hint": "Start Cortex with --planning"},
+            )
+
+        if not steps:
+            return create_error_response(
+                "create_and_execute_plan needs concrete `steps`. Provide a list of steps, each "
+                "with a description, a step_type of 'tool_call', a tool_name and tool_arguments "
+                "(and optional dependencies).",
+                ErrorType.VALIDATION,
+                {"goal": goal},
             )
 
         try:
@@ -407,21 +414,35 @@ class CreateAndExecutePlanTool(Tool):
                 stop_on_failure=True,
             )
 
-            # Get plan summary
             plan_summary = planning_engine.get_plan_summary(plan)
+
+            # A plan that did not succeed must not be reported as a success: the loop guard and
+            # the agent's confidence both read this result's success flag.
+            if not execution_result.get("success", False):
+                return create_error_response(
+                    execution_result.get("error", "Plan execution failed"),
+                    ErrorType.EXECUTION,
+                    {
+                        **(execution_result.get("error_context") or {}),
+                        "plan_id": plan.id,
+                        "plan_status": plan.status.value,
+                        "plan_summary": plan_summary,
+                    },
+                )
 
             result_data = {
                 "plan_id": plan.id,
                 "goal": plan.goal,
                 "status": plan.status.value,
                 "plan_summary": plan_summary,
-                "execution_success": execution_result.get("success", False),
-                "message": execution_result.get("message", ""),
-                "steps_executed": len(execution_result.get("step_results", [])),
+                "execution_success": True,
+                "message": execution_result.get("data", {}).get("message", ""),
+                "steps_executed": len(execution_result.get("data", {}).get("step_results", [])),
+                "steps": execution_result.get("data", {}).get("steps", []),
             }
-
-            if "progress" in execution_result:
-                result_data["progress"] = execution_result["progress"]
+            progress = execution_result.get("data", {}).get("progress")
+            if progress:
+                result_data["progress"] = progress
 
             return create_success_response(result_data)
 

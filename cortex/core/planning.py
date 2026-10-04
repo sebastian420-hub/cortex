@@ -13,6 +13,34 @@ from ..ui.plan_progress import PlanProgressDisplay
 
 logger = logging.getLogger(__name__)
 
+# How much of a step's output / error is kept in the summary returned to the model.
+STEP_OUTPUT_LIMIT = 800
+SKILL_OUTPUT_LIMIT = 6000
+
+
+def _clip(text: str, limit: int) -> str:
+    text = str(text)
+    return (
+        text if len(text) <= limit else text[:limit] + f"... [truncated {len(text) - limit} chars]"
+    )
+
+
+def result_excerpt(result: Dict[str, Any], limit: int = STEP_OUTPUT_LIMIT) -> str:
+    """A short, readable excerpt of a tool result (its output, or its error)."""
+    if not isinstance(result, dict):
+        return _clip(result, limit)
+    if not result.get("success", False):
+        return _clip(result.get("error") or result.get("reason") or "failed", limit)
+    data = result.get("data")
+    if isinstance(data, str):
+        return _clip(data, limit)
+    if isinstance(data, dict):
+        for key in ("content", "output", "stdout", "instructions", "message", "outcome"):
+            if isinstance(data.get(key), str) and data[key]:
+                return _clip(data[key], limit)
+        return _clip(json.dumps(data, default=str), limit)
+    return _clip(json.dumps(data, default=str), limit) if data is not None else ""
+
 
 class PlanStepStatus(str, Enum):
     """Status of a plan step."""
@@ -364,60 +392,7 @@ class PlanningEngine:
                     metadata=step_data.get("metadata", {}),
                 )
                 plan.add_step(step)
-        else:
-            # Generate a more robust auto-skeleton based on common patterns in the goal
-            goal_lower = goal.lower()
-
-            # Step 1: Initial Research/Discovery (Always needed)
-            discovery_desc = f"Discover relevant files and structures for: {goal}"
-            if "research" in goal_lower or "understand" in goal_lower:
-                discovery_desc = "Map codebase structure and identify key entry points"
-            elif "fix" in goal_lower or "bug" in goal_lower:
-                discovery_desc = "Locate bug origin and identify related components"
-
-            step1 = PlanStep(
-                id=f"{plan_id}_step_1",
-                description=discovery_desc,
-                step_type=PlanStepType.TOOL_CALL,
-                tool_name="glob",
-                tool_arguments={"pattern": "**/*.py"},
-                expected_outcome="List of relevant files identified",
-            )
-            plan.add_step(step1)
-
-            # Step 2: Context Gathering
-            step2 = PlanStep(
-                id=f"{plan_id}_step_2",
-                description=f"Identify core classes and functions related to the goal",
-                step_type=PlanStepType.TOOL_CALL,
-                tool_name="grep",
-                tool_arguments={"pattern": "class |def ", "include": "*.py"},
-                dependencies=[step1.id],
-                expected_outcome="Architecture and entry points identified",
-            )
-            plan.add_step(step2)
-
-            # Step 3: Deep Dive
-            step3 = PlanStep(
-                id=f"{plan_id}_step_3",
-                description="Read entry point files to understand data flow",
-                step_type=PlanStepType.SUBTASK,
-                dependencies=[step2.id],
-                expected_outcome="Detailed understanding of logic",
-            )
-            plan.add_step(step3)
-
-            # If skill hints provided, add skill application steps
-            if skill_hints:
-                for i, skill in enumerate(skill_hints[:2]):
-                    skill_step = PlanStep(
-                        id=f"{plan_id}_skill_{i+1}",
-                        description=f"Apply {skill} skill to verify results",
-                        step_type=PlanStepType.SKILL_APPLICATION,
-                        skill_name=skill,
-                        dependencies=[step3.id],
-                    )
-                    plan.add_step(skill_step)
+        # With no steps the plan is empty: callers add steps (the model writes them).
 
         self.active_plan = plan
         self.plans[plan.id] = plan
@@ -547,15 +522,12 @@ class PlanningEngine:
             # Get ready steps
             ready_steps = plan.get_ready_steps()
 
-            # If no ready steps, check if plan is complete
+            # If no ready steps, the plan is over: either it finished, or something is stuck
             if not ready_steps:
-                # Check if all steps are completed
-                all_completed = all(
-                    step.status
-                    in [PlanStepStatus.COMPLETED, PlanStepStatus.SKIPPED, PlanStepStatus.FAILED]
-                    for step in plan.steps
-                )
-                if all_completed:
+                failed = [s for s in plan.steps if s.status == PlanStepStatus.FAILED]
+                pending = [s for s in plan.steps if s.status == PlanStepStatus.PENDING]
+
+                if not failed and not pending:
                     plan.mark_completed()
                     # Show plan completion summary
                     self.progress_display.stop_progress_bar()
@@ -567,21 +539,38 @@ class PlanningEngine:
                             "message": "Plan execution completed",
                             "plan_id": plan.id,
                             "progress": plan.get_progress(),
+                            "steps": self.summarize_steps(plan),
                             "step_results": step_results,
                         }
                     )
-                else:
-                    # Some steps are still pending but dependencies not met
-                    # This shouldn't happen if dependency graph is correct
-                    logger.warning(f"Plan {plan.id} has pending steps but none are ready")
-                    return create_error_response(
-                        "Plan stuck: pending steps but dependencies not satisfied",
-                        ErrorType.EXECUTION,
-                        context={
-                            "plan_id": plan.id,
-                            "progress": plan.get_progress(),
-                        },
+
+                # A failed step (or steps blocked behind one) means the plan did NOT succeed.
+                plan.mark_failed()
+                self.progress_display.stop_progress_bar()
+                if failed:
+                    first = failed[0]
+                    message = (
+                        f"Plan failed: step {first.id} ({first.description}) failed: "
+                        f"{first.error}"
                     )
+                    if pending:
+                        message += (
+                            f". {len(pending)} step(s) were not run because they depend on it"
+                        )
+                else:
+                    # Pending steps whose dependencies can never be satisfied
+                    logger.warning(f"Plan {plan.id} has pending steps but none are ready")
+                    message = "Plan stuck: pending steps whose dependencies are not satisfied"
+                self.progress_display.show_plan_failed(plan, message)
+                return create_error_response(
+                    message,
+                    ErrorType.EXECUTION,
+                    context={
+                        "plan_id": plan.id,
+                        "progress": plan.get_progress(),
+                        "steps": self.summarize_steps(plan),
+                    },
+                )
 
             # Execute the first ready step
             step = ready_steps[0]
@@ -593,11 +582,17 @@ class PlanningEngine:
 
             try:
                 result = self._execute_step(step, plan)
+                limit = (
+                    SKILL_OUTPUT_LIMIT
+                    if step.step_type == PlanStepType.SKILL_APPLICATION
+                    else STEP_OUTPUT_LIMIT
+                )
+                step.metadata["result_excerpt"] = result_excerpt(result, limit)
 
                 if result["success"]:
-                    step.mark_completed(result.get("content"))
+                    step.mark_completed(step.metadata["result_excerpt"])
                     logger.info(f"Step {step.id} completed: {step.description}")
-                    outcome = result.get("content") or result.get("outcome") or "Completed"
+                    outcome = step.metadata["result_excerpt"] or "Completed"
                     self.progress_display.show_step_complete(step, outcome)
                     self.progress_display.update_progress(1)
                 else:
@@ -615,12 +610,13 @@ class PlanningEngine:
                     self.progress_display.stop_progress_bar()
                     self.progress_display.show_plan_failed(plan, error_msg)
                     return create_error_response(
-                        f"Step {step.id} failed: {result.get('error')}",
+                        f"Step {step.id} ({step.description}) failed: {error_msg}",
                         ErrorType.EXECUTION,
                         context={
                             "plan_id": plan.id,
                             "failed_step": step.id,
                             "progress": plan.get_progress(),
+                            "steps": self.summarize_steps(plan),
                         },
                     )
 
@@ -629,6 +625,9 @@ class PlanningEngine:
                 logger.exception(f"Exception executing step {step.id}")
                 self.progress_display.show_step_failed(step, f"Exception: {str(e)}")
 
+                result = create_error_response(
+                    f"Exception executing step {step.id}: {str(e)}", ErrorType.EXECUTION
+                )
                 if stop_on_failure:
                     plan.mark_failed()
                     self.progress_display.stop_progress_bar()
@@ -640,6 +639,7 @@ class PlanningEngine:
                             "plan_id": plan.id,
                             "failed_step": step.id,
                             "progress": plan.get_progress(),
+                            "steps": self.summarize_steps(plan),
                         },
                     )
 
@@ -653,6 +653,7 @@ class PlanningEngine:
                 "message": f"Plan execution paused after {steps_executed} steps",
                 "plan_id": plan.id,
                 "progress": plan.get_progress(),
+                "steps": self.summarize_steps(plan),
             }
         )
 
@@ -663,54 +664,38 @@ class PlanningEngine:
             # Execute tool call
             return self.tool_executor(step.tool_name, step.tool_arguments or {})
 
-        elif (
-            step.step_type == PlanStepType.SKILL_APPLICATION
-            and step.skill_name
-            and self.skill_loader
-        ):
-            # Apply a skill
+        elif step.step_type == PlanStepType.SKILL_APPLICATION:
+            if not step.skill_name or not self.skill_loader:
+                return create_error_response(
+                    "A skill_application step needs a skill_name and a skill loader",
+                    ErrorType.VALIDATION,
+                )
             skill = self.skill_loader(step.skill_name)
             if not skill:
                 return create_error_response(
                     f"Skill not found: {step.skill_name}", ErrorType.NOT_FOUND
                 )
-
-            # For now, just return success
-            # In a real implementation, this would execute the skill workflow
+            # Hand the playbook to the model: it is applied by the steps that follow.
             return create_success_response(
                 {
-                    "outcome": f"Applied skill: {step.skill_name}",
-                    "skill": step.skill_name,
+                    "outcome": f"Loaded skill: {skill.get('name', step.skill_name)}",
+                    "skill": skill.get("name", step.skill_name),
+                    "instructions": skill.get("content", ""),
                 }
             )
 
-        elif step.step_type == PlanStepType.SUBTASK:
-            # For subtask steps, we need to generate a sub-plan
-            # This is a placeholder for now
-            return create_success_response(
-                {
-                    "outcome": f"Analyzed: {step.description}",
-                    "subtask": step.description,
-                }
-            )
-
-        elif step.step_type == PlanStepType.CHECKPOINT:
-            # Checkpoint steps verify progress
-            return create_success_response(
-                {
-                    "outcome": f"Checkpoint '{step.checkpoint_name}' reached",
-                    "checkpoint": step.checkpoint_name,
-                }
-            )
-
-        elif step.step_type == PlanStepType.DECISION:
-            # Decision points require user input or rule-based decision
-            # This is a placeholder
-            return create_success_response(
-                {
-                    "outcome": f"Decision made at: {step.decision_point}",
-                    "decision": step.decision_point,
-                }
+        elif step.step_type in (
+            PlanStepType.SUBTASK,
+            PlanStepType.DECISION,
+            PlanStepType.CHECKPOINT,
+        ):
+            # These used to report success without doing anything. Fail loudly instead, so a
+            # plan can never claim work that was not done.
+            return create_error_response(
+                f"Step type '{step.step_type.value}' is not implemented yet. "
+                "Use tool_call steps (or skill_application) instead.",
+                ErrorType.NOT_IMPLEMENTED,
+                {"step_id": step.id, "step_type": step.step_type.value},
             )
 
         elif step.step_type == PlanStepType.REFLECTION:
@@ -730,6 +715,26 @@ class PlanningEngine:
                 f"Cannot execute step type: {step.step_type}",
                 ErrorType.EXECUTION,
             )
+
+    @staticmethod
+    def summarize_steps(plan: Plan) -> List[Dict[str, Any]]:
+        """What happened in each step, for the model: status, error and a short output excerpt."""
+        summaries = []
+        for step in plan.steps:
+            entry: Dict[str, Any] = {
+                "id": step.id,
+                "description": step.description,
+                "type": step.step_type.value,
+                "status": step.status.value,
+            }
+            if step.tool_name:
+                entry["tool"] = step.tool_name
+            if step.error:
+                entry["error"] = _clip(step.error, STEP_OUTPUT_LIMIT)
+            elif step.metadata.get("result_excerpt"):
+                entry["output"] = step.metadata["result_excerpt"]
+            summaries.append(entry)
+        return summaries
 
     def reflect_on_plan(
         self,
@@ -865,6 +870,9 @@ class PlanningEngine:
                 PlanStepStatus.SKIPPED: "[S]",
             }.get(step.status, "[?]")
 
-            summary_lines.append(f"{status_icon} [{step.step_type.value}] {step.description}")
+            line = f"{status_icon} [{step.step_type.value}] {step.description}"
+            if step.status == PlanStepStatus.FAILED and step.error:
+                line += f" -- error: {_clip(step.error, 200)}"
+            summary_lines.append(line)
 
         return "\n".join(summary_lines)

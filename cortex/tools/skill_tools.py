@@ -358,24 +358,35 @@ class SkillLoaderTool(Tool):
             }
         )
 
+    @staticmethod
+    def _normalize(name: str) -> str:
+        """Compare names ignoring case, spaces, underscores and punctuation."""
+        return re.sub(r"[\W_]+", "", name).lower()
+
+    def find_skill(self, skill_name: str) -> Optional[Skill]:
+        """Find a skill by its title ("TDD Workflow") or its file name ("TDD_WORKFLOW")."""
+        if not self.skills_loaded:
+            self._load_skills()
+
+        skill = self.skills.get(skill_name)
+        if skill:
+            return skill
+
+        wanted = self._normalize(skill_name)
+        if not wanted:
+            return None
+        for name, sk in self.skills.items():
+            if wanted in (self._normalize(name), self._normalize(sk.file_path.stem)):
+                return sk
+        # Partial match, e.g. "tdd" for "TDD Workflow"
+        for name, sk in self.skills.items():
+            if wanted in self._normalize(name) or wanted in self._normalize(sk.file_path.stem):
+                return sk
+        return None
+
     def _load_skill(self, skill_name: str) -> Dict[str, Any]:
         """Load a specific skill by name."""
-        # Try exact match first
-        skill = self.skills.get(skill_name)
-
-        # Try case-insensitive match
-        if not skill:
-            for name, sk in self.skills.items():
-                if name.lower() == skill_name.lower():
-                    skill = sk
-                    break
-
-        # Try partial match
-        if not skill:
-            for name, sk in self.skills.items():
-                if skill_name.lower() in name.lower():
-                    skill = sk
-                    break
+        skill = self.find_skill(skill_name)
 
         if not skill:
             return create_error_response(

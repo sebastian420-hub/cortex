@@ -1103,12 +1103,8 @@ class Cortex:
 
                             self._output_tool_result(tool_name, result)
 
-                            # Update state and memory
+                            # Update state and memory (this also records learnings, once)
                             self.state_manager.record_tool_execution(tool_name, arguments, result)
-                            if self.enable_layered_memory and isinstance(
-                                self.memory_bank, EnhancedMemoryBank
-                            ):
-                                self.memory_bank.extract_learnings_from_tool_results([result])
 
                             # Delegation
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
@@ -1201,7 +1197,19 @@ class Cortex:
             return {"success": False, "error": str(e)}
 
     def _load_skill(self, skill_name: str) -> Dict[str, Any]:
-        return {}
+        """Load a skill playbook for a plan step. Returns {} when there is no such skill."""
+        from .tools.skill_tools import SkillLoaderTool
+
+        loader = SkillLoaderTool(self.project_dir, self.permission_mode, None)
+        skill = loader.find_skill(skill_name)
+        if skill is None:
+            return {}
+        return {
+            "name": skill.name,
+            "description": skill.description,
+            "content": skill.content,
+            "workflow_steps": skill.get_workflow_steps(),
+        }
 
     def _execute_tool_for_planning(
         self, tool_name: str, arguments: Dict[str, Any]
@@ -1216,39 +1224,16 @@ class Cortex:
         """
         Callback triggered when a plan step completes.
 
-        This records the step execution in history and memory so the agent
-        stays informed of what happened during planning execution.
+        Records the step in agent state and memory. It must NOT add messages to the
+        conversation: the plan was requested by a pending tool call, and chat APIs require that
+        call's result to come immediately after it. The outcome of every step reaches the model
+        inside the plan tool's own result instead (see PlanningEngine.summarize_steps).
         """
-        if self.enable_layered_memory and isinstance(self.memory_bank, EnhancedMemoryBank):
-            self.memory_bank.extract_learnings_from_tool_results([result])
-
-        # Record the tool execution in conversation history if it was a tool call
         if step.step_type == PlanStepType.TOOL_CALL and step.tool_name:
-            # We don't have the original tool_call_id from the model here,
-            # so we use the step ID as a reference.
-            tool_call_id = f"plan_{step.id}"
-
-            # Add a synthetic assistant message showing the tool call that was executed
-            # This helps the model maintain context of the conversation flow
-            self.conversation.add_assistant_message(
-                content=f"Executing plan step: {step.description}",
-                tool_calls=[
-                    {
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {
-                            "name": step.tool_name,
-                            "arguments": json.dumps(step.tool_arguments or {}),
-                        },
-                    }
-                ],
+            # One record per step, with the tool name, so learnings are attributed correctly.
+            self.state_manager.record_tool_execution(
+                step.tool_name, step.tool_arguments or {}, result
             )
-
-            # Add the result
-            truncated_result = truncate_tool_result(
-                step.tool_name, result, max_length=self.conversation._get_max_tool_result_length()
-            )
-            self.conversation.add_tool_result(tool_call_id, truncated_result)
 
             if self._is_text_output():
                 status = "success" if result.get("success", False) else "failed"
