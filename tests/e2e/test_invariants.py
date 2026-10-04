@@ -269,6 +269,119 @@ def test_edit_can_be_rolled_back_with_the_rollback_command(make_agent, project):
     assert (project / "a.py").read_text() == original
 
 
+def _rollback(agent):
+    from cortex.cli_commands.commands.base import CommandContext
+    from cortex.cli_commands.commands.transaction import RollbackCommand
+
+    ctx = CommandContext(
+        agent=agent, config=agent.config, hook_manager=agent.hook_manager, output_format="text"
+    )
+    RollbackCommand().execute(ctx)
+
+
+def test_rollback_removes_a_file_the_agent_created(make_agent, project):
+    agent = make_agent(
+        [tool_call("write_file", {"path": "new.txt", "content": "hi"}), final("done")],
+        planning=False,
+    )
+    agent._process_message("create new.txt")
+    assert (project / "new.txt").exists()
+
+    _rollback(agent)
+
+    assert not (project / "new.txt").exists()
+
+
+def test_rollback_undoes_every_change_of_the_turn(make_agent, project):
+    (project / "b.py").write_text("B0\n")
+    original_a = (project / "a.py").read_text()
+    agent = make_agent(
+        [
+            tool_call(
+                "edit",
+                {"file_path": "a.py", "old_string": "return 1", "new_string": "return 2"},
+                "c1",
+            ),
+            tool_call("write_file", {"path": "b.py", "content": "B1\n"}, "c2"),
+            tool_call(
+                "edit",
+                {"file_path": "a.py", "old_string": "return 2", "new_string": "return 3"},
+                "c3",
+            ),
+            final("done"),
+        ],
+        planning=False,
+    )
+    agent._process_message("change things")
+    assert "return 3" in (project / "a.py").read_text()
+
+    _rollback(agent)
+
+    assert (project / "a.py").read_text() == original_a
+    assert (project / "b.py").read_text() == "B0\n"
+
+
+def test_rollback_restores_the_exact_bytes(make_agent, project):
+    original = b"def hello():\r\n    return 1\r\n"  # CRLF: a text round trip would change it
+    (project / "crlf.py").write_bytes(original)
+    agent = make_agent(
+        [tool_call("write_file", {"path": "crlf.py", "content": "replaced\n"}), final("ok")],
+        planning=False,
+    )
+    agent._process_message("overwrite crlf.py")
+    assert (project / "crlf.py").read_bytes() != original
+
+    _rollback(agent)
+
+    assert (project / "crlf.py").read_bytes() == original
+
+
+def test_rollback_only_undoes_the_latest_message(make_agent, project):
+    agent = make_agent(
+        [
+            tool_call(
+                "edit", {"file_path": "a.py", "old_string": "return 1", "new_string": "return 2"}
+            ),
+            final("first done"),
+            tool_call("write_file", {"path": "later.txt", "content": "x"}, "c2"),
+            final("second done"),
+        ],
+        planning=False,
+    )
+    agent._process_message("first")
+    agent._process_message("second")
+
+    _rollback(agent)
+
+    assert not (project / "later.txt").exists()
+    assert "return 2" in (project / "a.py").read_text()
+
+
+def test_rollback_with_nothing_to_undo_is_harmless(make_agent, project):
+    agent = make_agent([final("nothing to change")], planning=False)
+    original = (project / "a.py").read_text()
+    agent._process_message("just talk")
+
+    _rollback(agent)
+    _rollback(agent)
+
+    assert (project / "a.py").read_text() == original
+
+
+def test_ending_the_session_finishes_the_open_transaction(make_agent, project):
+    agent = make_agent(
+        [tool_call("write_file", {"path": "kept.txt", "content": "x"}), final("done")],
+        planning=False,
+    )
+    agent._process_message("create kept.txt")
+    assert agent.transaction_manager.has_active_transaction()
+
+    agent._cleanup()
+
+    assert not agent.transaction_manager.has_active_transaction()
+    assert (project / "kept.txt").exists()
+
+
 def test_plan_mode_does_not_run_project_code(make_agent, project):
     agent = make_agent(mode=PermissionMode.PLAN, planning=False)
     agent.execute_tool("run_tests", {})

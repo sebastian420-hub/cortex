@@ -7,8 +7,13 @@ from .base import Command, CommandContext
 from ...ui.console import console
 
 
+def _transaction_manager(ctx: CommandContext):
+    """The session's transaction manager (the one the tools actually back up through)."""
+    return ctx.agent.transaction_manager
+
+
 class RollbackCommand(Command):
-    """Rollback active transaction"""
+    """Undo the file changes of the last request"""
 
     @property
     def name(self) -> str:
@@ -16,25 +21,32 @@ class RollbackCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Rollback active transaction"
+        return "Undo the file changes made by the last request"
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the rollback command"""
-        from ...core.transaction import get_transaction_manager
+        tm = _transaction_manager(ctx)
 
-        tm = get_transaction_manager(ctx.agent.config.get_transactions_config())
+        if not tm.enabled:
+            console.print(
+                "[yellow]Transactions are disabled, so there is nothing to roll back.[/yellow]"
+            )
+            return
 
-        if tm.has_active_transaction():
-            tx = tm.get_current_transaction()
-            files = tx.get_files_modified()
+        transaction = tm.get_current_transaction()
+        if transaction is not None and transaction.get_backup_count():
+            # The same file may be changed several times in one request: list it once
+            files = list(dict.fromkeys(transaction.get_files_modified()))
             if tm.rollback():
                 console.print(f"[green]✓[/green] Rolled back {len(files)} file(s)")
                 for f in files:
                     console.print(f"  [dim]- {f}[/dim]")
             else:
-                console.print("[red]Error:[/red] Rollback failed")
+                console.print("[red]Error:[/red] Rollback failed for at least one file")
         else:
-            console.print("[yellow]No active transaction to rollback[/yellow]")
+            console.print(
+                "[yellow]The last request changed no files; nothing to roll back[/yellow]"
+            )
             # Show last transaction info
             last_tx = tm.get_last_transaction()
             if last_tx:
@@ -54,9 +66,7 @@ class TransactionsCommand(Command):
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the transactions command"""
-        from ...core.transaction import get_transaction_manager
-
-        tm = get_transaction_manager(ctx.agent.config.get_transactions_config())
+        tm = _transaction_manager(ctx)
         stats = tm.get_stats()
         info = f"""
 [bold]Transaction Statistics[/bold]

@@ -25,6 +25,7 @@ from .core.prompts.builder import PromptBuilder
 from .core.providers import ProviderError, ProviderFactory
 from .core.security import SecurityError
 from .core.streaming import display_streaming_response, stream_model_response
+from .core.transaction import TransactionManager
 from .core.turn import (
     STATUS_BLOCKED,
     STATUS_ERROR,
@@ -197,6 +198,15 @@ class Cortex:
         self.prompt_generator = PromptGenerator(self)
         self.prompt_builder = PromptBuilder(self.model, project_dir=self.project_dir)
         self.permission_manager = PermissionManager(self)
+        # One transaction manager per session: every file-changing tool backs up through it, and
+        # /rollback restores the files the latest user message changed.
+        transactions_config = self.config.get_transactions_config()
+        backup_dir = transactions_config.get("backup_dir")
+        self.transaction_manager = TransactionManager(
+            backup_dir=Path(backup_dir).expanduser() if backup_dir else None,
+            max_backups=transactions_config.get("max_backups", 10),
+            enabled=transactions_config.get("enabled", True),
+        )
         self.tool_executor = ToolExecutor(self)
         self.message_processor = MessageProcessor(self)
 
@@ -533,7 +543,9 @@ class Cortex:
         The system prompt is rebuilt on every loop iteration; the lookup is cached by query so
         a ten-step turn runs it once instead of ten times.
         """
-        if not (self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context")):
+        if not (
+            self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context")
+        ):
             return None
 
         query = self.conversation.get_last_user_message()
@@ -826,6 +838,14 @@ class Cortex:
                 context={"tool_name": tool_name, "permission_mode": self.permission_mode},
             )
 
+        # A tool that runs outside a user turn (a slash command, a direct call) still needs an open
+        # transaction, or its file changes would silently have no backup
+        if (
+            self.transaction_manager.enabled
+            and not self.transaction_manager.has_active_transaction()
+        ):
+            self._begin_turn_transaction(f"direct call: {tool_name}")
+
         # Track tool usage
         self._tools_used.append(tool_name)
 
@@ -843,6 +863,7 @@ class Cortex:
                 console,
                 parent_agent=self,
                 timeout_config=self._timeout_config,
+                transaction_manager=self.transaction_manager,
             )
 
             # Execute tool
@@ -949,14 +970,54 @@ class Cortex:
     def _cleanup(self) -> None:
         """Cleanup resources on shutdown."""
         try:
+            self._finish_turn_transaction()
             self._dispatch_session_end()
             if self.parallel_executor:
                 self.parallel_executor.shutdown()
         except Exception as e:
             logger.warning(f"Error during cleanup: {e}", exc_info=True)
 
+    def _finish_turn_transaction(self) -> None:
+        """Make the previous turn's changes permanent (drops its undo information)."""
+        try:
+            if self.transaction_manager.has_active_transaction():
+                self.transaction_manager.commit()
+        except Exception as e:
+            logger.warning(f"Could not finish the previous transaction: {e}")
+
+    def _begin_turn_transaction(self, user_message: str) -> None:
+        """Open the transaction that records this turn's file changes.
+
+        The previous turn is committed first, so /rollback always means "undo my last request".
+        """
+        self._finish_turn_transaction()
+        try:
+            self.transaction_manager.begin(metadata={"request": user_message[:200]})
+        except Exception as e:
+            logger.warning(f"Could not start a transaction; changes will not be undoable: {e}")
+
+    def _announce_undo(self) -> None:
+        """Tell the user, once a turn ends, that its file changes can be undone."""
+        if not self._is_text_output():
+            return
+        transaction = self.transaction_manager.get_current_transaction()
+        count = len({str(f) for f in transaction.get_files_modified()}) if transaction else 0
+        if count:
+            plural = "s" if count != 1 else ""
+            console.print(
+                f"[dim]{count} file{plural} changed. /rollback undoes this request.[/dim]"
+            )
+
     def _process_message(self, user_message: str, use_streaming: bool = False) -> TurnResult:
         """Run one user message to completion and report how it ended."""
+        self._begin_turn_transaction(user_message)
+        result = self._run_turn(user_message, use_streaming)
+        # The transaction stays open on purpose: it is what /rollback restores
+        self._announce_undo()
+        return result
+
+    def _run_turn(self, user_message: str, use_streaming: bool = False) -> TurnResult:
+        """The agent loop for one user message."""
 
         if self._shutdown_requested:
             return TurnResult(STATUS_INTERRUPTED)

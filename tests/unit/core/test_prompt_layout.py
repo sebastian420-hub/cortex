@@ -13,7 +13,12 @@ from cortex.core.prompts.builder import PromptBuilder
 from cortex.tools import get_registry
 
 TOOLS = get_registry().get_all_schemas()
-STABLE_MARKERS = ("PROJECT-CONTEXT-TEXT", "CUSTOM-INSTRUCTIONS-TEXT", "read_file", "# Memory System")
+STABLE_MARKERS = (
+    "PROJECT-CONTEXT-TEXT",
+    "CUSTOM-INSTRUCTIONS-TEXT",
+    "read_file",
+    "# Memory System",
+)
 
 
 def _build(**dynamic):

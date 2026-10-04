@@ -486,7 +486,9 @@ def _segment_is_dangerous(
 
     # curl ... | sh   (stdin is run as code: no script, no -c, no -m)
     if operator == "|" and previous:
-        previous_name = posixpath.basename(_unwrap(previous)[0]).lower() if _unwrap(previous) else ""
+        previous_name = (
+            posixpath.basename(_unwrap(previous)[0]).lower() if _unwrap(previous) else ""
+        )
         if previous_name in _FETCHERS and name in _INTERPRETERS:
             reads_stdin = not (targets and targets != ["-"]) and not (short & {"c", "m"})
             if reads_stdin:
