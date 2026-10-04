@@ -5,12 +5,12 @@ import platform
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 from .runner import RunConfig, TaskResult
 
 
-def _mean(values: List[float]) -> Optional[float]:
+def _mean(values: Sequence[float]) -> Optional[float]:
     return round(sum(values) / len(values), 2) if values else None
 
 
@@ -19,8 +19,11 @@ def summarize(results: List[TaskResult]) -> Dict[str, Any]:
     by_config: Dict[str, Dict[str, Any]] = {}
     for label in dict.fromkeys(r.config for r in results):
         rows = [r for r in results if r.config == label]
-        tokens = [r.input_tokens + r.output_tokens for r in rows if r.input_tokens is not None]
+        tokens = [
+            r.input_tokens + (r.output_tokens or 0) for r in rows if r.input_tokens is not None
+        ]
         costs = [r.cost_usd for r in rows]
+        known_costs = [c for c in costs if c is not None]
         by_config[label] = {
             "runs": len(rows),
             "passed": sum(r.passed for r in rows),
@@ -34,7 +37,7 @@ def summarize(results: List[TaskResult]) -> Dict[str, Any]:
             "mean_tokens": _mean(tokens),
             "tokens_estimated": any(r.tokens_estimated for r in rows),
             "total_cost_usd": (
-                round(sum(costs), 4) if costs and all(c is not None for c in costs) else None
+                round(sum(known_costs), 4) if costs and len(known_costs) == len(costs) else None
             ),
             "mean_seconds": _mean([r.seconds for r in rows]),
             "crashed": sum(r.status == "crashed" for r in rows),

@@ -524,7 +524,6 @@ def invalidate_file(path: Path) -> bool:
     Returns:
         True if entry was found and removed
     """
-    global _file_cache
     if _file_cache is not None:
         return _file_cache.invalidate(path)
     return False
@@ -532,7 +531,6 @@ def invalidate_file(path: Path) -> bool:
 
 def clear_cache() -> None:
     """Clear global file cache."""
-    global _file_cache
     if _file_cache is not None:
         _file_cache.clear()
 

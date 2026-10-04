@@ -106,7 +106,7 @@ class EditTool(Tool):
             # Provide helpful hint about potential whitespace issues
             hint = self._get_match_hint(content, old_string)
             return create_error_response(
-                f"String not found in file",
+                "String not found in file",
                 ErrorType.VALIDATION,
                 {"file_path": file_path, "hint": hint, "old_string_preview": old_string[:100]},
             )

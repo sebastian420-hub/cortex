@@ -303,7 +303,7 @@ class TestParallelToolExecutor:
             ToolCall(id="1", name="read_file", arguments={}, index=0),
             ToolCall(id="2", name="write_file", arguments={}, index=1),
         ]
-        batch_result1 = executor.execute_batch(tool_calls1)
+        executor.execute_batch(tool_calls1)
 
         assert executor._total_batches == 1
         assert executor._total_parallel == 1  # read_file
@@ -314,7 +314,7 @@ class TestParallelToolExecutor:
             ToolCall(id="3", name="read_file", arguments={}, index=0),
             ToolCall(id="4", name="read_file", arguments={}, index=1),
         ]
-        batch_result2 = executor.execute_batch(tool_calls2)
+        executor.execute_batch(tool_calls2)
 
         assert executor._total_batches == 2
         assert executor._total_parallel == 3  # 1 + 2

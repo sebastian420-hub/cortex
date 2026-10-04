@@ -165,7 +165,7 @@ HELP_ENTRIES: List[HelpEntry] = [
         command="/memory",
         short_desc="Manage semantic memory",
         long_desc="""Manage the semantic memory (Vector Database).
-        
+
 Subcommands:
 - list: Show everything stored for future sessions, with its confidence and when it was last confirmed.
 - add <text>: Remember something as your own instruction (it does not fade over time).

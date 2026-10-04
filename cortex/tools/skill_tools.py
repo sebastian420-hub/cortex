@@ -77,7 +77,7 @@ class Skill:
 
     def get_tool_patterns(self) -> Dict[str, List[str]]:
         """Extract tool usage patterns from skill content."""
-        patterns = {}
+        patterns: Dict[str, List[str]] = {}
         current_tool = None
 
         for line in self.content.split("\n"):

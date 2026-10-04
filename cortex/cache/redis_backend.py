@@ -470,7 +470,6 @@ class RedisFileCache(FileCache):
             for key, entry in self._local_cache._cache.items():
                 try:
                     # Get filepath from key
-                    _filepath = Path(key)
 
                     # Prepare entry data
                     entry_data = {

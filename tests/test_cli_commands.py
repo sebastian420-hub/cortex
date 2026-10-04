@@ -92,7 +92,7 @@ def test_handle_model_switch_provider_error(mock_agent, mock_repl):
 
         mock_agent.switch_model.assert_called_once_with(new_model_name, mock_agent.config.provider)
         mock_console_print.assert_any_call(
-            f"[red]Error switching model:[/red] API key not set for provider."
+            "[red]Error switching model:[/red] API key not set for provider."
         )  # noqa: E501
         # System prompt should not be updated on error
         mock_agent._get_system_prompt.assert_not_called()
@@ -110,7 +110,7 @@ def test_handle_model_switch_unexpected_error(mock_agent, mock_repl):
 
         mock_agent.switch_model.assert_called_once_with(new_model_name, mock_agent.config.provider)
         mock_console_print.assert_any_call(
-            f"[red]An unexpected error occurred:[/red] Some unexpected issue."
+            "[red]An unexpected error occurred:[/red] Some unexpected issue."
         )  # noqa: E501
         # System prompt should not be updated on error
         mock_agent._get_system_prompt.assert_not_called()

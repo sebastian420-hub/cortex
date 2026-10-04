@@ -579,9 +579,10 @@ class Cortex:
 
         # Relevant items from the current session
         floor = float(self.config.semantic_memory.get("min_similarity", 0.3))
-        relevant = lambda results: [
-            r for r in results if r.get("similarity", 1.0) >= floor
-        ]  # noqa: E731
+
+        def relevant(results):
+            return [r for r in results if r.get("similarity", 1.0) >= floor]
+
         session_results = relevant(
             self.memory_bank.retrieve_semantic_context(query, top_k=2, global_search=False)
         )

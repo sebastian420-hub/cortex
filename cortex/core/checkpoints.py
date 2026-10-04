@@ -139,6 +139,12 @@ class GitCheckpointStore:
             return self._available
 
     @property
+    def _top(self) -> Path:
+        """The repository root (known once available() has said yes)."""
+        assert self._toplevel is not None, "available() must be checked first"
+        return self._toplevel
+
+    @property
     def _pathspec(self) -> str:
         return self._prefix.rstrip("/") or "."
 
@@ -156,7 +162,7 @@ class GitCheckpointStore:
             index = Path(tmp) / "index"
             real = Path(self._text("rev-parse", "--git-path", "index"))
             if not real.is_absolute():
-                real = self._toplevel / real
+                real = self._top / real
             if real.exists():
                 shutil.copyfile(real, index)
             env = {"GIT_INDEX_FILE": str(index)}
@@ -358,7 +364,7 @@ class GitCheckpointStore:
 
     def _remove_paths(self, paths: List[str], result: RestoreResult) -> None:
         for path in paths:
-            full = self._toplevel / path
+            full = self._top / path
             try:
                 if full.is_symlink() or full.is_file():
                     full.unlink()

@@ -223,7 +223,7 @@ class RoutingOrchestrator:
             provider_name = (
                 provider_type.value if hasattr(provider_type, "value") else str(provider_type)
             )
-            _provider = self.provider_factory.get_provider(model_name, provider_name)
+            self.provider_factory.get_provider(model_name, provider_name)
 
             # Step 4: Estimate cost
             cost_estimate = self._estimate_cost(

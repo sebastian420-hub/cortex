@@ -11,12 +11,15 @@ Each test drives the real agent loop with a scripted model (no network):
 """
 
 import json
+import sys
 
 import pytest
 
 from cortex.models import PermissionMode
 
 from .scripted import final, tool_call, tool_calls, tool_order_violations
+
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="runs POSIX shell commands")
 
 
 def _text(result) -> str:
@@ -404,6 +407,7 @@ def _checkpoint_refs(project):
     ).stdout.split()
 
 
+@posix_only
 def test_undo_reverses_what_a_shell_command_did(make_agent, project):
     (project / "sub").mkdir()
     (project / "sub" / "x.txt").write_text("precious\n")
@@ -423,6 +427,7 @@ def test_undo_reverses_what_a_shell_command_did(make_agent, project):
     assert not (project / "made.txt").exists()
 
 
+@posix_only
 def test_redo_puts_the_undone_changes_back(make_agent, project):
     agent = make_agent(
         [tool_call("execute_command", {"command": "touch made.txt"}), final("done")],

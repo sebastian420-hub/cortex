@@ -250,10 +250,8 @@ def test_anthropic_provider_streaming_tool_arguments():
                 assert len(results) > 0
 
                 # Check if tool calls are present in results
-                tool_calls_found = False
                 for result in results:
                     if "message" in result and "tool_calls" in result["message"]:
-                        tool_calls_found = True
                         for tool_call in result["message"]["tool_calls"]:
                             arguments = tool_call["function"]["arguments"]
                             # If arguments are present, they should be JSON

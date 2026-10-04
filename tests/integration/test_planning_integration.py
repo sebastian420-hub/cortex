@@ -67,7 +67,6 @@ def test_planning_with_skill_loader(planning_engine_fixture, tmp_path):
     )
 
     # Check that we have skill application steps
-    skill_steps = [s for s in plan.steps if s.step_type == PlanStepType.SKILL_APPLICATION]
     # The current implementation of create_plan does not generate steps from skill_hints
     # This assertion will fail until the create_plan logic is updated
     # assert len(skill_steps) > 0

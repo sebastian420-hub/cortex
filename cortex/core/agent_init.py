@@ -147,8 +147,6 @@ class AgentInitializer:
                 # We need to manually initialize semantic manager since StateManager
                 # doesn't know about AgentConfig.
                 try:
-                    from .memory_layers.session import EnhancedMemoryBank
-
                     if isinstance(memory_bank, EnhancedMemoryBank):
                         # Re-initialize with config to ensure semantic manager is set
                         new_bank = EnhancedMemoryBank(

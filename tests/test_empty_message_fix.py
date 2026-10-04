@@ -17,7 +17,7 @@ class TestStreamingResponseHandling:
             yield {"message": {"reasoning_content": "Let me think about this..."}}
             yield {"message": {"reasoning_content": " The answer is 42."}}
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(mock_stream())
 
         # Should have content from reasoning
@@ -37,7 +37,7 @@ class TestStreamingResponseHandling:
                 }
             }  # noqa: E501
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             with patch(
                 "cortex.core.streaming._extract_kimi_native_tool_calls_from_streaming"
             ) as mock_extract:  # noqa: E501
@@ -63,7 +63,7 @@ class TestStreamingResponseHandling:
         def mock_stream():
             yield {"message": {}}
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(mock_stream())
 
         # Should have empty content at minimum
@@ -78,7 +78,7 @@ class TestStreamingResponseHandling:
             yield {"message": {"content": "Hello "}}
             yield {"message": {"content": "world!"}}
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(mock_stream())
 
         assert result["content"] == "Hello world!"
@@ -92,7 +92,7 @@ class TestStreamingResponseHandling:
             yield {"message": {"content": "The answer is ", "reasoning_content": "Thinking..."}}
             yield {"message": {"content": "42", "reasoning_content": "Done"}}
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(mock_stream())
 
         assert result["content"] == "The answer is 42"
@@ -223,7 +223,7 @@ class TestEdgeCases:
             yield {"message": {"reasoning_content": "Actual content"}}
             yield {"message": {"reasoning_content": ""}}
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(mock_stream())
 
         # Should have content from non-empty reasoning
@@ -265,7 +265,7 @@ class TestRegressionScenarios:
                 }
             }  # noqa: E501
 
-        with patch("cortex.core.streaming.console") as mock_console:
+        with patch("cortex.core.streaming.console"):
             result = display_streaming_response(mock_stream())
 
         assert result["content"] == "I'll help"

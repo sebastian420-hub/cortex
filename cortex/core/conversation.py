@@ -210,7 +210,8 @@ class ConversationManager:
         """
         for msg in reversed(self.history):
             if msg.get("role") == "user":
-                return msg.get("content")
+                content = msg.get("content")
+                return content if isinstance(content, str) else None
         return None
 
     def clear(self, keep_system: bool = True) -> None:

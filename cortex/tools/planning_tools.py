@@ -317,7 +317,7 @@ class UpdatePlanTool(Tool):
                 )
 
             if self.console:
-                self.console.print(f"[green]Plan updated successfully[/green]")
+                self.console.print("[green]Plan updated successfully[/green]")
 
             return create_success_response(result)
 

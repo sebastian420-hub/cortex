@@ -336,7 +336,7 @@ class TestCountMessageTokens:
 
         with patch("cortex.core.context.TIKTOKEN_AVAILABLE", True):
             # Patch estimate_tokens inside the context module
-            with patch("cortex.core.context.estimate_tokens", return_value=3) as mock_est:
+            with patch("cortex.core.context.estimate_tokens", return_value=3):
                 token_count = count_message_tokens(message, model="gpt-4")
 
                 # base(3) + role(3) + content(3) = 9

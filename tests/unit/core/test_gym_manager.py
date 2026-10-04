@@ -92,10 +92,12 @@ class TestGymLogic(unittest.TestCase):
         from cortex.core.turn import STATUS_OK, TurnResult
 
         self.agent._process_message.return_value = TurnResult(STATUS_OK, final_text="All fixed!")
-        failing = lambda path: SimpleNamespace(
-            passed=False, output="1 failed: test_sum"
-        )  # noqa: E731
-        passing = lambda path: SimpleNamespace(passed=True, output="1 passed")  # noqa: E731
+
+        def failing(path):
+            return SimpleNamespace(passed=False, output="1 failed: test_sum")
+
+        def passing(path):
+            return SimpleNamespace(passed=True, output="1 passed")
 
         bad = self._run(verifier=failing)
         good = self._run(verifier=passing)

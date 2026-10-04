@@ -122,7 +122,7 @@ class ReadFileTool(Tool):
                 header = f.read(16)
                 for sig in self.BINARY_SIGNATURES:
                     if header.startswith(sig):
-                        return True, f"Binary signature detected"
+                        return True, "Binary signature detected"
 
                 # Check for null bytes (common in binaries)
                 if b"\x00" in header:
@@ -371,7 +371,7 @@ class ReadFileTool(Tool):
             # Check if chunking is needed
             if not should_chunk_file(raw_content, path):
                 if self.console:
-                    self.console.print(f"[dim]File is small, chunking not needed[/dim]")
+                    self.console.print("[dim]File is small, chunking not needed[/dim]")
                 return create_success_response(
                     {
                         "path": path,

@@ -5,6 +5,7 @@ The snapshot must never disturb the user's own git state (HEAD, branches, index,
 """
 
 import os
+import sys
 import stat
 import subprocess
 from pathlib import Path
@@ -12,6 +13,10 @@ from pathlib import Path
 import pytest
 
 from cortex.core.checkpoints import GitCheckpointStore
+
+posix_only = pytest.mark.skipif(
+    sys.platform == "win32", reason="file modes and file names that Windows does not allow"
+)
 
 
 def git(repo: Path, *args: str) -> str:
@@ -144,6 +149,7 @@ def test_restore_does_not_move_head_or_touch_the_index(repo):
     assert git(repo, "diff", "--cached") == staged
 
 
+@posix_only
 def test_restore_keeps_the_executable_bit(repo):
     script = repo / "run.sh"
     script.write_text("#!/bin/sh\necho hi\n")
@@ -173,6 +179,7 @@ def test_a_restore_can_itself_be_undone(repo):
     assert (repo / "extra.txt").read_text() == "extra\n"
 
 
+@posix_only
 def test_unusual_file_names_survive_a_round_trip(repo):
     names = ["with space.txt", "star*.txt", "ünïcode.txt", "[bracket].txt", "dir with space/a.txt"]
     for name in names:

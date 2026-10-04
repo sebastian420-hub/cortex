@@ -118,7 +118,7 @@ class MemoryCommand(Command):
                 f"[red]'{reference}' matches {len(matches)} memories;[/red] use more of the id."
             )
             return None
-        return matches[0]
+        return str(matches[0])
 
     def _handle_list(self, ctx: CommandContext) -> None:
         bank = self._long_term(ctx)

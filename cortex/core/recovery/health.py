@@ -268,7 +268,6 @@ class SessionHealthMonitor:
             }
 
             unmatched_calls = tool_call_ids - tool_result_ids
-            _unmatched_results = tool_result_ids - tool_call_ids
 
             if unmatched_calls:
                 issues.append(

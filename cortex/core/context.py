@@ -111,7 +111,7 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
 
             if NATIVE_AVAILABLE and native_count_tokens is not None:
                 try:
-                    return native_count_tokens(text, model)
+                    return int(native_count_tokens(text, model))
                 except Exception:
                     pass
     except ImportError:

@@ -62,7 +62,7 @@ class TestWebFetchToolBasics:
             console=None,
         )
 
-        result = tool.execute(url="not-a-valid-url-at-all")
+        tool.execute(url="not-a-valid-url-at-all")
         # Should either fail validation or try to fetch and fail
         # The tool adds https:// prefix, so it may try to fetch
 

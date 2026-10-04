@@ -125,7 +125,7 @@ class TestRedisCache:
                 test_file.write_text(test_content)
 
                 # Try to set
-                result = cache.set(test_file, test_content)
+                cache.set(test_file, test_content)
                 # May fail if Redis not running, but shouldn't crash
 
                 # Try to get

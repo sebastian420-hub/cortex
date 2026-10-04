@@ -107,7 +107,6 @@ def test_trim_history_never_splits_a_tool_exchange(keep_last):
 def test_trim_history_keeps_the_assistant_message_of_a_leading_tool_result():
     history = _long_history(3)
     # Cut so that the window would start on the second tool result of an exchange.
-    cut = len(history) - 1  # last assistant "done"
     trimmed = trim_history(history, keep_last=len(history) - 1 - 3)
     first = trimmed[1]
     assert first["role"] != "tool"

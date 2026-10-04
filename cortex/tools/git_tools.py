@@ -695,7 +695,7 @@ class GitCheckoutTool(Tool):
             output = result.stderr or result.stdout
             if self.console:
                 self.console.print(
-                    Panel(output, title=f"? Git Checkout Successful", border_style="green")
+                    Panel(output, title="? Git Checkout Successful", border_style="green")
                 )
 
             return create_success_response(
@@ -757,7 +757,7 @@ class GitResetTool(Tool):
                 self.console.print(
                     Panel(
                         f"Unstaged {', '.join(files)}",
-                        title=f"? Git Reset Successful",
+                        title="? Git Reset Successful",
                         border_style="green",
                     )
                 )

@@ -185,7 +185,6 @@ class RecoveryOrchestrator:
         """
         score = health_report.overall_score
         critical_issues = [i for i in health_report.issues if i.get("severity") == "critical"]
-        _high_issues = [i for i in health_report.issues if i.get("severity") == "high"]
 
         # Check if checkpoints are available for rollback
         has_checkpoints = len(self.checkpoint_manager.list_checkpoints(session_id)) > 0

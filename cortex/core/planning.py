@@ -507,7 +507,7 @@ class PlanningEngine:
 
         plan.mark_started()
         steps_executed = 0
-        step_results = []
+        step_results: List[Dict[str, Any]] = []
 
         # Show plan overview using progress display
         self.progress_display.show_plan_overview(plan)

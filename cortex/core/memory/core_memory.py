@@ -310,7 +310,7 @@ class MemoryBank:
 
         lines = ["# Memory Bank Contents", ""]
 
-        type_groups = {}
+        type_groups: Dict[MemoryType, List[MemoryItem]] = {}
         for item in self.items:
             if item.type not in type_groups:
                 type_groups[item.type] = []
