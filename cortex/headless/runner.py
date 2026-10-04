@@ -26,7 +26,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 
 from ..config import AgentConfig
 from ..core.command_sandbox import SandboxConfig, SandboxUnavailable, confine
@@ -49,6 +49,18 @@ CRASHED = "crashed"  # an unexpected error in the runner
 SETUP_ERROR = "setup_error"  # could not start; the agent never ran
 
 _SUCCESS = (PASSED, UNVERIFIED)
+
+# Tools an unattended agent does not get. Nobody can answer a question, and a worktree isolates
+# files but not the repository: branches and remotes are shared with your own checkout, so the
+# agent can neither publish (push, pull, fetch) nor create or switch branches.
+UNATTENDED_DISABLED_TOOLS = (
+    "ask_user_question",
+    "git_push",
+    "git_pull",
+    "git_fetch",
+    "git_branch",
+    "git_checkout",
+)
 
 
 @dataclass
@@ -86,6 +98,7 @@ class RunResult:
     head: Optional[str] = None
     files_changed: List[str] = field(default_factory=list)
     diff_stat: str = ""
+    new_branches: List[str] = field(default_factory=list)  # appeared during the run, not deleted
     verify_command: Optional[str] = None
     attempts: List[Dict[str, Any]] = field(default_factory=list)
     usage: Dict[str, Any] = field(default_factory=dict)
@@ -115,6 +128,7 @@ class RunResult:
             "head": self.head,
             "files_changed": self.files_changed,
             "diff_stat": self.diff_stat,
+            "new_branches": self.new_branches,
             "verify_command": self.verify_command,
             "attempts": self.attempts,
             "usage": self.usage,
@@ -231,6 +245,7 @@ class _Run:
         self.sandbox: Optional[SandboxConfig] = None
         self.signalled = False
         self.tool_calls = 0
+        self.branches_before: Set[str] = set()
 
     # -- setup ---------------------------------------------------------------------------
 
@@ -268,7 +283,7 @@ class _Run:
         # The worktree is thrown away on failure, which is the undo; no refs in your repository
         cfg.checkpoints = {**cfg.checkpoints, "enabled": False}
         cfg.transactions = {**cfg.transactions, "enabled": False}
-        cfg.tools_disabled = sorted(set(cfg.tools_disabled) | {"ask_user_question"})
+        cfg.tools_disabled = sorted(set(cfg.tools_disabled) | set(UNATTENDED_DISABLED_TOOLS))
         return None
 
     def _build_agent(self) -> Any:
@@ -442,6 +457,10 @@ class _Run:
         config = self.config
         success = status in _SUCCESS
 
+        workspace.settle()
+        self.result.new_branches = sorted(
+            workspace.branches() - self.branches_before - {workspace.branch}
+        )
         workspace.stage()
         changed = workspace.files_changed()
         self.result.files_changed = changed
@@ -459,11 +478,8 @@ class _Run:
                 }
             )
             if protected:
-                return (
-                    FAILED,
-                    "changed protected path(s): " + ", ".join(protected),
-                    config.keep_failed,
-                )
+                status, reason = FAILED, "changed protected path(s): " + ", ".join(protected)
+                success = False
         keep = success or (config.keep_failed and bool(changed))
         if keep:
             workspace.commit(commit_message(config, self.result.run_id, status, reason, success))
@@ -515,6 +531,7 @@ class _Run:
             return self._setup_error(str(e))
         workspace = self.workspace
         result.repo, result.base = str(workspace.repo), workspace.base
+        self.branches_before = workspace.branches()
 
         keep = False
         try:

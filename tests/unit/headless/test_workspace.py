@@ -85,6 +85,26 @@ def test_an_explicit_branch_name_is_used(repo):
         workspace.remove(keep_branch=False)
 
 
+@pytest.mark.parametrize(
+    "task,expected",
+    [
+        ("Fix the failing test in test_calc.py", "cortex/fix-the-failing-test-in-test-"),
+        ("fix the parser", "cortex/fix-the-parser-"),
+        ("   \n  ", "cortex/task-"),
+        ("!!! ???", "cortex/task-"),
+        ("Überprüfe alles", "cortex/berpr-fe-alles-"),
+        ("a" * 80, "cortex/" + "a" * 30 + "-"),  # one long word is cut, since there is no gap
+    ],
+)
+def test_the_branch_name_is_made_of_the_first_words_of_the_task(repo, task, expected):
+    workspace = Workspace.create(repo, task=task)
+    try:
+        assert workspace.branch.startswith(expected), workspace.branch
+        assert len(workspace.branch) <= len("cortex/") + 30 + 7
+    finally:
+        workspace.remove(keep_branch=False)
+
+
 def test_two_runs_of_the_same_task_get_different_branches(repo):
     first = Workspace.create(repo, task="same task")
     second = Workspace.create(repo, task="same task")
@@ -273,3 +293,64 @@ def test_removing_twice_is_harmless(repo):
     workspace.remove(keep_branch=False)
 
     workspace.remove(keep_branch=False)
+
+
+# ---- branches are shared with your checkout -----------------------------------------------
+
+
+def test_the_branches_of_the_repository_are_listed(repo):
+    workspace = Workspace.create(repo, task="t")
+    try:
+        assert workspace.branch in workspace.branches()
+        assert "main" in workspace.branches()
+    finally:
+        workspace.remove(keep_branch=False)
+
+
+def test_settling_moves_work_done_on_another_branch_onto_the_task_branch(repo):
+    workspace = Workspace.create(repo, task="t")
+    try:
+        git(workspace.path, "checkout", "-q", "-b", "elsewhere")
+        (workspace.path / "committed.py").write_text("a\n")
+        git(workspace.path, "add", ".")
+        git(workspace.path, "commit", "-qm", "on elsewhere")
+        (workspace.path / "uncommitted.py").write_text("b\n")
+
+        workspace.settle()
+
+        assert git(workspace.path, "branch", "--show-current") == workspace.branch
+        assert (workspace.path / "uncommitted.py").exists()  # not lost
+        workspace.commit_all("all of it")
+        assert set(workspace.files_changed()) == {"committed.py", "uncommitted.py"}
+        assert "elsewhere" in workspace.branches()  # left for you to see, never deleted
+    finally:
+        workspace.remove(keep_branch=False)
+
+
+def test_settling_handles_a_detached_head(repo):
+    workspace = Workspace.create(repo, task="t")
+    try:
+        git(workspace.path, "checkout", "-q", "--detach")
+        (workspace.path / "x.py").write_text("x\n")
+        git(workspace.path, "add", ".")
+        git(workspace.path, "commit", "-qm", "detached")
+
+        workspace.settle()
+
+        assert git(workspace.path, "branch", "--show-current") == workspace.branch
+        assert workspace.files_changed() == ["x.py"]
+    finally:
+        workspace.remove(keep_branch=False)
+
+
+def test_settling_when_already_on_the_task_branch_changes_nothing(repo):
+    workspace = Workspace.create(repo, task="t")
+    try:
+        (workspace.path / "x.py").write_text("x\n")
+        head = workspace.head()
+
+        workspace.settle()
+
+        assert workspace.head() == head and (workspace.path / "x.py").exists()
+    finally:
+        workspace.remove(keep_branch=False)

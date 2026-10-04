@@ -312,6 +312,36 @@ def test_the_agent_cannot_ask_questions_nobody_will_answer(task_repo):
     assert "ask_user_question" not in provider.tool_names[0]
 
 
+def test_the_agent_cannot_publish_or_move_between_branches(task_repo):
+    """A worktree isolates files, not the repository: branches and remotes are shared."""
+    provider = Recording(list(GOOD))
+
+    execute(task_repo, provider=provider)
+
+    offered = set(provider.tool_names[0])
+    for tool in ("git_push", "git_pull", "git_fetch", "git_branch", "git_checkout"):
+        assert tool not in offered, tool
+    assert {"git_status", "git_diff", "git_add", "git_commit"} <= offered  # local work is fine
+
+
+def test_a_publishing_tool_is_refused_even_if_the_model_asks_for_it(task_repo):
+    script = [tool_call("git_push", {"remote": "origin"}), final("pushed")]
+
+    result, provider = execute(task_repo, script, verify=None)
+
+    tool_message = [m for m in provider.seen[-1] if m["role"] == "tool"][-1]["content"]
+    assert "disabled" in tool_message
+
+
+def test_the_tools_you_disable_in_the_config_stay_disabled_too(task_repo):
+    provider = Recording(list(GOOD))
+    config = AgentConfig(model="llama3.2", provider="ollama", tools_disabled=["web_search"])
+
+    execute(task_repo, provider=provider, agent_config=config)
+
+    assert "web_search" not in provider.tool_names[0]
+
+
 def test_the_agent_is_told_it_is_unattended_and_how_it_will_be_checked(task_repo):
     result, provider = execute(task_repo, GOOD, task="Make out.txt say good")
 
@@ -440,7 +470,7 @@ def test_the_result_is_json_with_a_stable_set_of_fields(task_repo):
 
     assert set(data) == {
         "schema", "run_id", "status", "reason", "task", "repo", "base", "branch", "head",
-        "files_changed", "diff_stat", "verify_command", "attempts", "usage", "budget", "model",
+        "files_changed", "diff_stat", "new_branches", "verify_command", "attempts", "usage", "budget", "model",
         "provider", "sandbox", "seconds",
     }  # fmt: skip
     assert data["schema"] == 1
@@ -607,3 +637,66 @@ def test_the_import_path_is_put_back_after_the_run(task_repo, monkeypatch):
     monkeypatch.delenv("PYTHONPATH")
     execute(task_repo, GOOD)
     assert "PYTHONPATH" not in os.environ
+
+
+# ---- the repository is shared with your checkout ------------------------------------------
+
+
+def test_an_agent_that_moves_to_its_own_branch_still_delivers_on_the_task_branch(task_repo):
+    """Through the shell the agent can still `git checkout -b`. What was verified is the state of
+    the worktree, so that state goes on the task branch."""
+    script = [
+        tool_call("execute_command", {"command": "git checkout -q -b agents-own-branch"}, "c1"),
+        write("out.txt", "good\n", "w1"),
+        final("done"),
+    ]
+    before = branches(task_repo)
+
+    result, _ = execute(task_repo, script)
+
+    assert result.status == "passed", result.reason
+    assert result.branch not in before
+    assert git(task_repo, "show", f"{result.branch}:out.txt") == "good"
+    assert result.files_changed == ["out.txt"]
+
+
+def test_a_branch_that_appeared_during_the_run_is_reported_and_left_alone(task_repo):
+    """It might be the agent's, or one you made while the job ran: never delete it."""
+    script = [
+        tool_call("execute_command", {"command": "git branch stray-from-agent"}, "c1"),
+        write("out.txt", "good\n", "w1"),
+        final("done"),
+    ]
+
+    result, _ = execute(task_repo, script)
+
+    assert result.status == "passed"
+    assert result.new_branches == ["stray-from-agent"]
+    assert "stray-from-agent" in branches(task_repo)  # not deleted
+
+
+def test_the_task_branch_itself_is_not_listed_as_new(task_repo):
+    result, _ = execute(task_repo, GOOD)
+
+    assert result.new_branches == []
+
+
+def test_a_protected_path_failure_can_be_kept_for_a_look_with_the_work_in_it(task_repo):
+    script = [
+        write("out.txt", "good\n", "w1"),
+        tool_call(
+            "write_file", {"path": "tests/test_a.py", "content": "def test_a(): pass\n"}, "w2"
+        ),
+        final("done"),
+    ]
+
+    result, _ = execute(task_repo, script, protect=("tests/*",), keep_failed=True)
+
+    assert result.status == "failed" and "protected" in result.reason
+    assert result.branch in branches(task_repo)
+    # the branch holds what the agent did (including the change that failed it), not nothing
+    assert set(git(task_repo, "diff", "--name-only", result.base, result.branch).split()) == {
+        "out.txt",
+        "tests/test_a.py",
+    }
+    assert git(task_repo, "log", "-1", "--format=%s", result.branch).startswith("cortex [failed]:")

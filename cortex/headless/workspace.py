@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Set
 
 # Used for the commit when git has no identity of its own (a fresh scheduled-job machine)
 FALLBACK_IDENTITY = ("Cortex", "cortex@localhost")
@@ -34,8 +34,14 @@ class WorkspaceError(RuntimeError):
 
 
 def _slug(text: str, limit: int = 30) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:limit].strip("-")
-    return slug or "task"
+    """The first words of ``text`` as a branch-name fragment, cut between words, not in one."""
+    slug = ""
+    for word in re.findall(r"[a-z0-9]+", text.lower()):
+        candidate = f"{slug}-{word}" if slug else word
+        if len(candidate) > limit:
+            break
+        slug = candidate
+    return slug or re.sub(r"[^a-z0-9]+", "", text.lower())[:limit] or "task"
 
 
 def _subcommand(args: Sequence[str]) -> str:
@@ -123,6 +129,23 @@ class Workspace:
         return cls(repo, path, parent, branch, base)
 
     # ---- looking ----------------------------------------------------------------------
+
+    def branches(self) -> Set[str]:
+        """The repository's local branches. Branches are shared by every worktree, so this is how
+        a run notices one that appeared while it ran."""
+        out = _git(self.repo, "for-each-ref", "--format=%(refname:short)", "refs/heads").stdout
+        return {name for name in out.splitlines() if name}
+
+    def settle(self) -> None:
+        """Put the worktree back on the task branch, with the state it is in.
+
+        The agent can leave the branch (``git checkout -b ...`` through the shell, or a detached
+        HEAD). What was verified is the state of the worktree, so the work is moved onto the task
+        branch, commits and uncommitted changes alike, rather than lost or filed somewhere else.
+        """
+        current = _git(self.path, "symbolic-ref", "-q", "--short", "HEAD", check=False).stdout
+        if current.strip() != self.branch:
+            _git(self.path, "checkout", "-q", "-B", self.branch)
 
     def head(self) -> str:
         return _git(self.path, "rev-parse", "HEAD").stdout.strip()
