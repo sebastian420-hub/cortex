@@ -16,7 +16,6 @@ from .scripted import ScriptedProvider
 # failure, so the suite stays green today and the moment a fix lands its test flips to
 # "unexpectedly passed" and forces the entry to be deleted. The list below is the open-bug list.
 KNOWN_BUGS = {
-    "test_ast_rename_refuses_when_other_files_use_the_symbol": "P3-5: rename is single-file",
 }
 
 

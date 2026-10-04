@@ -462,6 +462,82 @@ def test_ast_rename_with_file_scope_is_explicit_opt_in(make_agent, project):
     assert "def calc" in (project / "m.py").read_text()
 
 
+def _rename(agent, **overrides):
+    args = {
+        "file_path": "m.py",
+        "action": "rename_symbol",
+        "symbol_name": "compute",
+        "new_name": "calc",
+    }
+    args.update(overrides)
+    return agent.execute_tool("ast_refactor", args)
+
+
+def test_ast_rename_ignores_files_that_only_share_a_prefix(make_agent, project):
+    (project / "m.py").write_text("def compute(x):\n    return x + 1\n")
+    (project / "n.py").write_text("def compute_all(xs):\n    return [x for x in xs]\n")
+    agent = make_agent(planning=False)
+
+    result = _rename(agent)
+
+    assert result["success"] is True
+    assert "def calc(" in (project / "m.py").read_text()
+
+
+def test_ast_rename_ignores_vendored_and_cache_directories(make_agent, project):
+    (project / "m.py").write_text("def compute(x):\n    return x + 1\n")
+    for folder in ("node_modules/pkg", ".venv/lib", "__pycache__", "build"):
+        (project / folder).mkdir(parents=True)
+        (project / folder / "x.py").write_text("compute(1)\n")
+    agent = make_agent(planning=False)
+
+    assert _rename(agent)["success"] is True
+
+
+def test_ast_rename_refusal_names_every_file_and_the_way_out(make_agent, project):
+    (project / "m.py").write_text("def compute(x):\n    return x + 1\n")
+    for name in ("n.py", "o.py"):
+        (project / name).write_text("from m import compute\n")
+    (project / "sub").mkdir()
+    (project / "sub" / "p.py").write_text("import m\nm.compute(1)\n")
+    agent = make_agent(planning=False)
+
+    result = _rename(agent)
+
+    text = _text(result)
+    assert result["success"] is False
+    for name in ("n.py", "o.py", "p.py"):
+        assert name in text
+    assert "scope" in text and "file" in text
+
+
+def test_ast_rename_refusal_caps_a_long_list_but_gives_the_count(make_agent, project):
+    (project / "m.py").write_text("def compute(x):\n    return x + 1\n")
+    for i in range(25):
+        (project / f"user_{i:02d}.py").write_text("from m import compute\n")
+    agent = make_agent(planning=False)
+
+    result = _rename(agent)
+
+    text = _text(result)
+    assert result["success"] is False
+    assert "25" in text  # the real total is stated
+    assert "user_00.py" in text
+    assert "user_24.py" not in text  # past the cap, not listed
+    assert "5 more" in text
+
+
+def test_ast_rename_rejects_an_unknown_scope(make_agent, project):
+    (project / "m.py").write_text("def compute(x):\n    return x + 1\n")
+    agent = make_agent(planning=False)
+
+    result = _rename(agent, scope="everywhere")
+
+    assert result["success"] is False
+    assert "scope" in _text(result)
+    assert "def compute(" in (project / "m.py").read_text()
+
+
 # --------------------------------------------------------------------------------------
 # Invariant 5: useful memory
 # --------------------------------------------------------------------------------------

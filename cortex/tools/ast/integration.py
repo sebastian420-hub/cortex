@@ -299,6 +299,16 @@ def register_ast_tools(registry: ToolRegistry) -> None:
                     "description": "New name (required for rename_symbol)",
                 },
                 {
+                    "name": "scope",
+                    "type": "string",
+                    "description": (
+                        "rename_symbol only. A rename is refused when other files mention the "
+                        "symbol, because renaming one file would break them. Pass 'file' to "
+                        "rename in this file only, after you have dealt with the other files."
+                    ),
+                    "enum": ["file"],
+                },
+                {
                     "name": "new_content",
                     "type": "string",
                     "description": "New content (required for replace_block)",
