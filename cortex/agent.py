@@ -28,6 +28,8 @@ from .core.security import SecurityError
 from .core.streaming import display_streaming_response, stream_model_response
 from .core.checkpoints import GitCheckpointStore
 from .core.command_sandbox import SandboxConfig
+from .core.context import estimate_tokens
+from .core.conversation import RESPONSE_RESERVE_TOKENS
 from .core.tool_policy import PLAN_MODE_CLASSES, classify_tool
 from .core.transaction import TransactionManager
 from .core.turn import (
@@ -85,6 +87,9 @@ logger = logging.getLogger(__name__)
 
 # Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
 SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
+
+# Below this much room for the conversation (after tools and the reply reserve) Cortex warns
+MIN_USEFUL_HISTORY_TOKENS = 4000
 
 
 class Cortex:
@@ -230,6 +235,7 @@ class Cortex:
         self._turn_checkpoint = None
         self.tool_executor = ToolExecutor(self)
         self.message_processor = MessageProcessor(self)
+        self._apply_provider_limits()
 
         # Enhanced metrics
         self.plans_generated = 0
@@ -437,6 +443,7 @@ class Cortex:
             # Reinitialize provider for new model
             provider_override = provider_override or getattr(self.config, "provider", None)
             new_provider = ProviderFactory.get_provider(new_model, provider_override)
+            new_provider.configure(self.config.get_ollama_config())
 
             # Validate API key for cloud providers
             if not new_provider.validate_api_key():
@@ -455,6 +462,7 @@ class Cortex:
 
             # Update conversation manager's model reference for token counting
             self.conversation.update_model(new_model)
+            self._apply_provider_limits()
 
             # Notify user of model switch (unless silent mode)
             if not silent:
@@ -558,6 +566,43 @@ class Cortex:
         """Public method to load project context for backward compatibility."""
         return self._load_project_context()
 
+    def _enabled_tool_schemas(self) -> List[Dict[str, Any]]:
+        """The tool definitions offered to the model (planning tools only with --planning)."""
+        exclude: List[str] = []
+        if not self.enable_planning:
+            exclude = [
+                "monitor_plan",
+                "update_plan",
+                "create_and_execute_plan",
+                "metacognitive_reflect",
+            ]
+        return get_registry().get_all_schemas(exclude_names=exclude)
+
+    def _apply_provider_limits(self) -> None:
+        """Fit the history to the context window the provider really gives the model.
+
+        The tool definitions are sent next to the history, not in it, and can be a large part of a
+        small window (about 6,000 tokens for the full tool set). A window that is smaller than the
+        model table assumes would otherwise be overflowed silently by the server.
+        """
+        window = getattr(self.provider, "context_window", None)
+        if not isinstance(window, int) or isinstance(window, bool):
+            return
+        tool_tokens = estimate_tokens(json.dumps(self._enabled_tool_schemas()), self.model)
+        self.conversation.limit_context(window - tool_tokens)
+
+        if window - tool_tokens - RESPONSE_RESERVE_TOKENS < MIN_USEFUL_HISTORY_TOKENS:
+            suggested = -(-(tool_tokens + 16000) // 1024) * 1024  # round up to a multiple of 1024
+            message = (
+                f"The model's context window is {window} tokens, but Cortex's tool definitions "
+                f"alone take about {tool_tokens}, leaving too little room for the conversation. "
+                f"Set CORTEX_OLLAMA_NUM_CTX (or ollama.num_ctx in the config) to at least "
+                f"{suggested}, or turn tools off with tools.disabled."
+            )
+            logger.warning(message)
+            if self._is_text_output():
+                console.print(f"[yellow]{message}[/yellow]")
+
     def _get_semantic_context(self) -> Optional[str]:
         """Memory relevant to the latest user message, looked up once per message.
 
@@ -626,16 +671,7 @@ class Cortex:
         semantic_context = self._get_semantic_context()
 
         # Get all tool schemas (includes base + orchestration tools)
-        exclude = []
-        if not self.enable_planning:
-            exclude = [
-                "monitor_plan",
-                "update_plan",
-                "create_and_execute_plan",
-                "metacognitive_reflect",
-            ]
-
-        tool_schemas = get_registry().get_all_schemas(exclude_names=exclude)
+        tool_schemas = self._enabled_tool_schemas()
 
         # Build using PromptBuilder
         return self.prompt_builder.build_system_prompt(
@@ -1156,15 +1192,7 @@ class Cortex:
                     self.conversation.update_system_prompt(new_system_prompt)
                     messages = self.conversation.get_history()
 
-                    exclude = []
-                    if not self.enable_planning:
-                        exclude = [
-                            "monitor_plan",
-                            "update_plan",
-                            "create_and_execute_plan",
-                            "metacognitive_reflect",
-                        ]
-                    tools = get_registry().get_all_schemas(exclude_names=exclude)
+                    tools = self._enabled_tool_schemas()
 
                     with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
                         if (

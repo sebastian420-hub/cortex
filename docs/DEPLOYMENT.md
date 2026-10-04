@@ -40,6 +40,20 @@ cortex --help
 Cortex has no OpenAI provider. For a fully offline machine use Ollama and set `CORTEX_OFFLINE=1`
 so it never tries to download tokenizer data.
 
+### Local models: the context window
+
+Before your first word Cortex sends roughly 7,000 tokens: the definitions of its tools (about
+6,000 with every tool, fewer without `--planning`) and its system prompt. A server that gives the
+model a smaller window than that silently drops the start of the conversation, system prompt
+first, and the model then behaves as if it had never been told what it is.
+
+So with Ollama, Cortex always asks for a window explicitly: 32,768 tokens by default, or
+whatever `ollama.num_ctx` in the config file or the `CORTEX_OLLAMA_NUM_CTX` environment variable
+says (the environment wins). It also sizes its conversation history to that window minus the tool
+definitions, and warns if the window leaves too little room (below about 14,000 tokens). A larger
+window costs memory on the machine running the model; raise it for long tasks if you have the
+room.
+
 ## Configure
 
 Settings come from, in increasing priority: built-in defaults, a YAML file given with

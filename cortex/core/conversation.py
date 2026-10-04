@@ -341,6 +341,15 @@ class ConversationManager:
         """Get current token count"""
         return get_conversation_tokens(self.history, self.model)
 
+    def limit_context(self, window_tokens: int) -> None:
+        """Keep the history within a window the server really gives the model.
+
+        ``window_tokens`` is what is left of the server's window after the tool definitions (which
+        are sent separately from the history). Only ever lowers the budget; room is kept for the
+        model's reply.
+        """
+        self.max_tokens = max(2000, min(self.max_tokens, window_tokens - RESPONSE_RESERVE_TOKENS))
+
     def update_model(self, new_model: str) -> None:
         """
         Update the model reference for token counting.

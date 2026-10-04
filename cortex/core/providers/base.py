@@ -70,6 +70,17 @@ class ModelProvider(ABC):
         """Validate that API key is set (for cloud providers)"""
         pass
 
+    @property
+    def context_window(self) -> Optional[int]:
+        """Tokens of context the server really gives the model, when the provider fixes it.
+
+        None means the provider does not fix a window (a cloud API with its own limits).
+        """
+        return None
+
+    def configure(self, options: Optional[Dict[str, Any]] = None) -> None:
+        """Apply provider-specific settings from the configuration (default: none to apply)."""
+
     def _sanitize_request(self, messages, tools=None):
         """Sanitize messages and tools to remove invalid UTF-8 characters."""
         sanitized_messages = sanitize_object(messages)

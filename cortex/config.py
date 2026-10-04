@@ -70,6 +70,10 @@ DEFAULT_CHECKPOINTS = {
     "stale_days": 7,  # snapshots left behind by sessions that never exited cleanly
 }
 
+# Default Ollama settings. num_ctx is the context window requested from the server; None means
+# the provider default (see core/providers/ollama.py). CORTEX_OLLAMA_NUM_CTX overrides it.
+DEFAULT_OLLAMA = {"num_ctx": None}
+
 # Default command sandbox settings (see core/command_sandbox.py). "none" means commands run with
 # the user's own permissions.
 DEFAULT_COMMAND_SANDBOX = {
@@ -243,6 +247,8 @@ class AgentConfig:
         checkpoints: Optional[Dict[str, Any]] = None,
         # Confinement for shell commands
         command_sandbox: Optional[Dict[str, Any]] = None,
+        # Settings for local models served by Ollama
+        ollama: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
         # Rate limiting settings (new)
@@ -322,6 +328,7 @@ class AgentConfig:
         self.transactions = {**DEFAULT_TRANSACTIONS, **(transactions or {})}
         self.checkpoints = {**DEFAULT_CHECKPOINTS, **(checkpoints or {})}
         self.command_sandbox = {**DEFAULT_COMMAND_SANDBOX, **(command_sandbox or {})}
+        self.ollama = {**DEFAULT_OLLAMA, **(ollama or {})}
 
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
@@ -384,6 +391,10 @@ class AgentConfig:
     def get_transactions_config(self) -> Dict[str, Any]:
         """Get configuration for TransactionManager."""
         return self.transactions
+
+    def get_ollama_config(self) -> Dict[str, Any]:
+        """Get settings for the Ollama provider."""
+        return self.ollama
 
     def get_command_sandbox_config(self) -> Dict[str, Any]:
         """Get configuration for command confinement."""
@@ -629,6 +640,7 @@ class AgentConfig:
             "transactions": self.transactions,
             "checkpoints": self.checkpoints,
             "command_sandbox": self.command_sandbox,
+            "ollama": self.ollama,
             "routing": self.routing,
             # Hybrid architecture
             "semantic_memory": self.semantic_memory,  # New

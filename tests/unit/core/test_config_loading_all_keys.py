@@ -42,6 +42,7 @@ SAMPLES = {
     "transactions": {"max_backups": 2},
     "checkpoints": {"keep": 3},
     "command_sandbox": {"network": False},
+    "ollama": {"num_ctx": 8192},
     "routing": {"enabled": True},
     "semantic_memory": {"enabled": True},
     "profiling": {"enabled": True},

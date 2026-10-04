@@ -58,6 +58,13 @@ Providers (`core/providers/`): OpenRouter (default), Anthropic, DeepSeek, Ollama
 `{"message": ..., "usage": {"input_tokens", "output_tokens"}}`; `usage` is omitted when the API
 reported none (`providers/usage.py`). There is no OpenAI provider.
 
+Ollama is always sent an explicit context window (`options.num_ctx`: 32,768 by default,
+`ollama.num_ctx` or `CORTEX_OLLAMA_NUM_CTX` to change it), because its own default is smaller
+than Cortex's tool definitions and system prompt and would silently truncate them. A provider
+that fixes a window reports it as `context_window`, and the agent limits its history budget to
+that window minus the tool definitions (`ConversationManager.limit_context`), warning when too
+little is left.
+
 ### The system prompt
 
 Built by `PromptBuilder` in two parts so provider prompt caches (which match on the start of the

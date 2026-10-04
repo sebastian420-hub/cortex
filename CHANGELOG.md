@@ -71,6 +71,11 @@ each claim was either made true, with a test, or removed. Nothing here has a ver
 - Documentation rewritten so every claim is true or labelled; Python 3.9 or newer (older docs said 3.8).
 
 ### Fixed
+- Local models served by Ollama were never told their context window, so Ollama's small default
+  silently dropped the start of the conversation, system prompt first, since Cortex sends about
+  7,000 tokens before the user's first word. Cortex now requests 32,768 tokens (configurable with
+  `ollama.num_ctx` or `CORTEX_OLLAMA_NUM_CTX`), sizes its history to the window minus the tool
+  definitions, and warns when the window is too small.
 - Tool-call and result messages are kept in the order chat APIs require, through truncation and
   summarisation (a strict provider rejected the old order).
 - The loop guard is fed by the agent loop, so it can stop a runaway turn.
