@@ -38,8 +38,6 @@ API keys are read from environment variables:
      - API key for OpenRouter (multiple models)
    * - ``DEEPSEEK_API_KEY``
      - API key for DeepSeek models
-   * - ``OPENAI_API_KEY``
-     - API key for OpenAI models
 
 Command-Line Arguments
 ----------------------

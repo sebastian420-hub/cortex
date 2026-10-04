@@ -1,60 +1,57 @@
-# Cortex Roadmap
+# Roadmap
 
-**Vision:** High-performance multi-agent orchestration for autonomous software engineering.
+Only things that are not done yet are listed as plans. What has been done is in
+[CHANGELOG.md](../CHANGELOG.md); what works today is in [STATUS.md](STATUS.md). Items are ordered
+by how much they help a user for the effort, not by date; none has a promised release.
 
----
+## Next: finish what is half done
 
-## 1. Phase 1: Latency Reduction & Core Polish
-**Status:** Current Focus
+1. **Run the ablation.** The benchmark can switch planning, memory and metacognition on and off
+   and repeat each setting ([BENCHMARK.md](BENCHMARK.md)). It has not been run, because it takes
+   about 480 real model runs. Until it has, the defaults (all three off) are a conservative guess,
+   and the retrieval threshold (`semantic_memory.min_similarity`) is a starting value. The result
+   decides what stays, what is made default, and what is removed.
+2. **Grow the type-checked set.** `mypy` blocks on a list of modules in `pyproject.toml`; the
+   rest of `cortex/` has known type errors. Move files into the list as they are fixed.
+3. **Audit routing, delegation and subagents,** which the recent work did not cover.
+4. **Decide the Go and Rust layers' future.** The Go services have no Python client; the Rust
+   layer's speed-up is unmeasured and its AST parser is unused. Either measure and wire them in,
+   or archive them.
 
-### Latency Optimizations
-*   **Lazy Component Initialization**: Background load `SentenceTransformer` and `ChromaDB` clients. Target startup time: `< 0.5s`.
-*   **Rust Logic Migration**: Port `ContextManager` token-budgeting and history truncation to `cortex-native` (Rust).
-*   **LLM Response Caching**: Implement tiered caching (RAM/Redis) for model outputs to reduce redundant API latency and cost.
-*   ✅ **Delivered**: `ParallelToolExecutor` for concurrent read-only operations.
-*   ✅ **Delivered**: `FileCache` with Redis backend and git-history pre-warming.
+## Then: things users would notice
 
-### Execution Fluidity
-*   **Asynchronous Tool Streaming**: Refactor `GrepTool` and `TestTool` to stream stdout/stderr directly to the CLI using `asyncio` instead of blocking subprocess calls.
-*   **Optimistic State Updates**: Render reasoning blocks and plan transitions immediately during LLM generation.
-*   ✅ **Delivered**: Provider-agnostic LLM response streaming.
+Ranked by value for effort; rough sizes are in working days.
 
----
+| Idea | What it gives you | Size |
+|------|-------------------|------|
+| Verify after every edit | After each change the agent runs your project's tests, lint or type check and reads the result, and stops only when they pass, configured by a file in the repo | 3 to 4 |
+| Trace and replay | Every model call and tool result written to a file that can be replayed against the fake provider, so any bug report becomes a reproducible test | 2 to 3 |
+| Task branches and `/diff` | Each task on its own git branch, with every change shown before you accept it | 2 |
+| An OpenAI-compatible provider | One provider that takes a base URL and a key, covering OpenAI and local servers (vLLM, LM Studio, llama.cpp). Would make the old OpenAI claim true | 1 to 2 |
+| Cost meter | Tokens, cache hits and dollars per turn (token usage is already reported by providers) | 1 to 2 |
+| Headless mode with a structured result | `cortex run --task ... --json` with budgets and a diff or pull request as output, so CI can use it | 4 to 5 |
+| Repo map | A token-limited outline of the project's files and symbols, so the agent finds code in a large repository without reading files | 5 to 7 |
+| Offline bundle | One command that downloads the tokenizer and embedding model so air-gapped use works from the first run | 1 to 2 |
+| Secrets redaction and an audit log | Mask keys in tool output, ask before reading `.env` files, keep an append-only log of every action | 2 to 3 |
+| An MCP client, then server | Use existing tool servers; expose Cortex's refactoring and memory to other tools | 9 to 12 |
 
-## 2. Phase 2: Multi-Agent Swarms
-**Status:** Next Milestone
+## Later: more than one agent
 
-### Orchestration
-*   **Parallel Sub-tasking**: Update the `PlanningEngine` to execute independent plan branches using multiple concurrent agent threads.
-*   **Specialized Agent Roles**:
-    *   `@architect`: Goal decomposition and system-wide logic verification.
-    *   `@coder`: Optimized for high-speed implementation and refactoring.
-    *   `@security`: Dedicated logic for vulnerability scanning and permission auditing.
-*   **Shared Knowledge Bus**: Use the Vector Database as a shared memory space for agents to exchange insights without increasing context window pressure.
+Only if the benchmark shows a gain; a single agent with good tools and tests is the baseline to
+beat, and most coding tasks have little that can safely run in parallel.
 
----
+1. **Prerequisites**: agent state that is not global, cheap construction, per-agent budgets.
+2. **Read-only helpers**: several explore, search and review helpers at once, each with a tool
+   allowlist, a timeout and a token cap, returning findings. Success: the same pass rate with
+   less main-context use or time.
+3. **Isolated writers**: one worker per independent branch of a plan, each in its own git
+   worktree with a declared file scope, merged one at a time behind a test gate.
+4. **Roles as configuration** (architect, coder, security): a prompt, a tool allowlist and a model
+   in a file, not new code.
+5. **Shared notes**: a per-task notebook of distilled findings, not raw transcripts.
 
-## 3. Phase 3: Unsupervised Autonomy
-**Status:** Long-term Research
+## Not planned
 
-### Autonomous Workflows
-*   **Headless Mode**: "Night shift" execution for large-scale refactors with automated logging and rollback safety.
-*   **Self-Healing Planning**: Algorithmic backtracking when plans encounter consistent regressions or environmental failures.
-
-### Integration
-*   **Language Server Protocol (LSP)**: Expose agent capabilities to IDEs (VS Code, Neovim) via standard LSP.
-*   **CI/CD Integration**: Headless deployment for automated PR review and dependency remediation.
-
----
-
-## 📊 Technical Targets
-
-| Metric | v1.1 (Current) | v2.0 (Target) |
-|:---|:---:|:---:|
-| **Cold Startup** | ~9.0s | **< 0.5s** |
-| **Core Overhead** | ~150ms | **< 10ms** |
-| **Tool Execution** | Sequential/Parallel | **Parallel Swarm** |
-| **Agent Topology** | Sequential Chain | **Concurrent Mesh** |
-
----
-*Last Updated: February 21, 2026*
+IDE integrations and an LSP server, a web UI, and "unsupervised autonomy" are not on this list.
+Earlier versions of this file included them with performance targets (such as a startup time)
+that nothing measured.

@@ -1,128 +1,73 @@
 # Cortex Developer Guide
 
-This guide is for developers who want to contribute to Cortex or understand its internals.
+For contributors and anyone who wants to understand the internals. Start with
+[CONTRIBUTING.md](../CONTRIBUTING.md) for setup and how changes are made; the design is in
+[CORTEX_TECHNICAL_SPEC.md](CORTEX_TECHNICAL_SPEC.md) and the safety model in [SECURITY.md](SECURITY.md).
 
-## Table of Contents
-1. [Architecture Overview](#architecture-overview)
-2. [Project Structure](#project-structure)
-3. [Development Setup](#development-setup)
-4. [Cognitive Core (Limbic System)](#cognitive-core-limbic-system)
-5. [Multi-Layered Memory](#multi-layered-memory)
-6. [Testing & Research](#testing--research)
-7. [Code Style](#code-style)
-
----
-
-## Architecture Overview
-
-Cortex follows a bio-inspired layered architecture:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                      CLI Layer                          │
-│   (cli.py, cli_commands/, argument parsing)             │
-├─────────────────────────────────────────────────────────┤
-│                     Agent Layer                         │
-│   (agent.py - unified loop, tool orchestration)         │
-├─────────────────────────────────────────────────────────┤
-│                   Cognitive Core Layer                  │
-│   ┌─────────────┬──────────────┬────────────────────┐  │
-│   │ Metacognition│   Planning   │   Routing          │  │
-│   │  (Limbic)   │   (Atomic)   │ (model selection)  │  │
-│   ├─────────────┼──────────────┼────────────────────┤  │
-│   │ Memory Stack│  Orchestration│   Recovery         │  │
-│   │ (Layered)   │ (multi-model) │ (transactions)     │  │
-│   └─────────────┴──────────────┴────────────────────┘  │
-├─────────────────────────────────────────────────────────┤
-│                     Tools Layer                         │
-│   (file, git, web, ast/, metacognition/, etc.)          │
-├─────────────────────────────────────────────────────────┤
-│                   Native/Service Layer                  │
-│   (Rust: AST/Regex, Go: Cache, ChromaDB)                │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Data Flow (The Reasoning Loop)
-
-1. **Recall**: Prompt is embedded to query **Semantic Memory** for relevant "Synthetic Experiences".
-2. **Assemble**: `PromptBuilder` combines goal, retrieved context, and **Limbic State** (Confidence/Tone).
-3. **Inference**: LLM generates a plan or tool call.
-4. **Execute**: Surgical tools (AST, File, Git) interact with the codebase.
-5. **Appraise**: `StateManager` updates confidence based on tool success/failure.
-6. **Consolidate**: `metacognitive_reflect` summarizes the session into long-term memory.
-
----
-
-## Project Structure
+## The shape of the code
 
 ```
 cortex/
-├── agent.py              # Unified Agent Orchestrator
-├── core/                 # Core Cognitive Logic
-│   ├── memory_layers/    # Metacognitive State & Layered Memory
-│   ├── planning.py       # Atomic Planning Engine
-│   ├── prompts/          # Dynamic Prompt Building (Limbic Injection)
-│   ├── routing/          # Intelligent Model Router
-│   └── security.py       # Surgical path validation
-├── tools/                # Surgical Tooling
-│   ├── ast/              # Rust-powered AST refactoring
-│   ├── search_tools.py   # Robust multi-OS search
-│   └── metacognition.py  # Reflection & Experience generation
-├── native/               # High-performance Rust bindings
-└── cache/                # Go-based caching services
-
-research/                 # Scientific Benchmarking Framework
-├── challenges.py         # Standardized engineering benchmarks
-└── orchestrator.py       # Sandbox-isolated experiment runner
+├── agent.py                  # the agent loop (one user request = one turn)
+├── cli.py, cli_commands/     # command line, REPL commands (/undo, /memory, /gym, ...)
+├── core/
+│   ├── turn.py               # TurnResult: how a turn ended
+│   ├── agent_permissions.py  # approval prompts, PLAN mode
+│   ├── tool_policy.py        # every tool's class (read-only, bookkeeping, mutating, runs code)
+│   ├── security.py           # path checks and the command blocklist
+│   ├── command_sandbox.py    # optional bubblewrap confinement
+│   ├── transaction.py        # per-request file backups (/rollback)
+│   ├── checkpoints.py        # git snapshots (/undo, /redo)
+│   ├── planning.py           # the planning engine (--planning)
+│   ├── memory/               # long-term memory: contract, ranking, vector store
+│   ├── memory_layers/        # working, session and state memory
+│   ├── prompts/              # PromptBuilder
+│   ├── providers/            # OpenRouter, Anthropic, DeepSeek, Ollama; token usage
+│   └── gym/                  # practice sessions
+├── tools/                    # the tools the model can call
+├── utils/message_validation.py   # keeps tool-call messages valid for chat APIs
+├── native/, cache/           # optional Rust bindings and file cache
+bench/                        # the benchmark (python -m bench)
+tests/                        # the offline test suite; tests/e2e drives the real loop
 ```
 
----
+## One turn, in order
 
-## Cognitive Core (Limbic System)
+1. A transaction opens, and a git checkpoint is marked as due.
+2. The system prompt is rebuilt (fixed part first, changing part last); long-term memory is looked
+   up once for this request.
+3. The model is called with validated messages. Its tool calls are checked by the permission
+   layer, the first one that could change anything triggers the checkpoint, and each runs through
+   a tool created with the session's transaction manager.
+4. Results go back in strict order after their requests. The loop guard watches for repeats.
+5. The turn ends with a `TurnResult`. The transaction stays open so `/rollback` works.
 
-The Limbic System (`cortex/core/memory_layers/state.py`) regulates the agent's behavior through internal metrics:
+## Adding a tool
 
-- **Confidence Score (0.0-1.0)**: Certainty in the current path. Dropping confidence triggers strategy pivots.
-- **Urgency Score (0.0-1.0)**: Drive to escalate or conclude a task.
-- **Internal Monologue**: Persistent self-reflection injected into every prompt.
+1. Write the tool class in `cortex/tools/` and register it (schema and class) in
+   `cortex/tools/registry.py`.
+2. Add it to `cortex/core/tool_policy.py` with the right class. Do not skip this: PLAN mode
+   refuses a tool that has none, and a test fails.
+3. If it writes files, call `self.backup_file(path, operation)` before writing so `/rollback` can
+   restore them.
+4. If it runs commands or tests, go through `core/command_sandbox.confine` so the sandbox applies.
+5. Add a test. A tool that can change things needs a test for the case that must be refused.
 
----
+## Testing
 
-## Multi-Layered Memory
-
-Cortex implements a hierarchical memory stack:
-
-1. **Working Memory**: Immediate context (active files, recent tool outputs).
-2. **Session Memory**: Records **Failed Approaches** and **Successful Patterns**.
-3. **Semantic Memory**: Persistent vector storage (ChromaDB) with:
-    - **Belief Verification**: Reinforcing memories confirmed by tools.
-    - **Memory Decay**: Natural forgetting of unverified information over time.
-
----
-
-## Testing & Research
-
-### Running the Test Suite
-Cortex maintains a 100% pass rate across 950+ tests.
 ```bash
-pytest tests/ -v
+pytest tests -q               # offline: no model, no network, a throwaway git identity
+python -m bench verify        # the benchmark tasks are sound
 ```
 
-### Running Research Experiments
-Use the Research Framework to benchmark agent intelligence:
-```bash
-python run_research.py
-```
-This clones the project into a **Sandbox**, injects a challenge (e.g., corrupted config), and measures **Correction Latency**.
+`tests/e2e/scripted.py` is a fake provider that replays a fixed list of model messages. Use it to
+test agent behaviour end to end. Open bugs live in `KNOWN_BUGS` in `tests/e2e/conftest.py` as
+strict expected failures, so fixing one forces its entry to be deleted.
 
----
+## Code style
 
-## Code Style
-
-- **Strict Path Validation**: Always use `validate_path` from `cortex.core.security` for file operations.
-- **Atomic Tooling**: Prefer one-shot tools like `create_and_execute_plan` for complex operations.
-- **Metacognitive Logging**: Ensure tool results provide enough context for the Limbic appraisal system.
-
----
-
-*Last updated: February 25, 2026 (v1.2.0)*
+- Black, line length 100 (the version is pinned); flake8; the files listed under
+  `[tool.mypy] files` in `pyproject.toml` must type-check.
+- Use `validate_path` from `cortex.core.security` for any path that comes from the model.
+- Say only what is true in comments, docs and messages: if a feature is off by default, partial or
+  unmeasured, the text says so.
