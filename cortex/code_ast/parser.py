@@ -114,22 +114,8 @@ class ASTParser:
         Returns:
             Tree-sitter Tree object or None if parsing fails
         """
-        # Try native Rust parser first (Phase 2 hybrid)
-        try:
-            from ..core.feature_flags import FeatureFlag, FeatureManager
-
-            fm = FeatureManager.get_instance()
-            if fm.is_enabled(FeatureFlag.RUST_AST):
-                from ..native import native_parse_code, NATIVE_AVAILABLE
-
-                if NATIVE_AVAILABLE and native_parse_code is not None:
-                    try:
-                        result = native_parse_code(source_code, language)
-                        return result
-                    except Exception:
-                        pass  # Fall through to Python parser
-        except ImportError:
-            pass
+        # The Rust parser is deliberately not used here: it returns its own summary object, not a
+        # tree-sitter Tree, and everything that calls parse() reads `tree.root_node`.
 
         if not self.available:
             logger.error("AST parsing not available (tree-sitter not installed)")
