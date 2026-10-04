@@ -456,7 +456,7 @@ class WorkingMemory:
             ]
             if len(files) > 3:
                 file_list.append(f"... and {len(files) - 3} more files")
-            summary_parts.append("Files in context:\\n" + "\\n".join(file_list))
+            summary_parts.append("Files in context:\n" + "\n".join(file_list))
 
         # Tools
         tools = self.get_tools()
@@ -471,7 +471,7 @@ class WorkingMemory:
             ]
             if len(tools) > 2:
                 tool_list.append(f"... and {len(tools) - 2} more tools")
-            summary_parts.append("Recent tools:\\n" + "\\n".join(tool_list))
+            summary_parts.append("Recent tools:\n" + "\n".join(tool_list))
 
         # Insights
         insights = self.get_insights()
@@ -479,7 +479,7 @@ class WorkingMemory:
             insight_list = [f"- {i[:80]}..." if len(i) > 80 else f"- {i}" for i in insights[:2]]
             if len(insights) > 2:
                 insight_list.append(f"... and {len(insights) - 2} more insights")
-            summary_parts.append("Recent insights:\\n" + "\\n".join(insight_list))
+            summary_parts.append("Recent insights:\n" + "\n".join(insight_list))
 
         # Questions
         questions = self.get_questions()
@@ -487,9 +487,9 @@ class WorkingMemory:
             question_list = [f"- {q[:80]}..." if len(q) > 80 else f"- {q}" for q in questions[:2]]
             if len(questions) > 2:
                 question_list.append(f"... and {len(questions) - 2} more questions")
-            summary_parts.append("Open questions:\\n" + "\\n".join(question_list))
+            summary_parts.append("Open questions:\n" + "\n".join(question_list))
 
-        return "\\n\\n".join(summary_parts)
+        return "\n\n".join(summary_parts)
 
     def clear(self) -> None:
         """Clear all working memory."""

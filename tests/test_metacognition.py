@@ -42,8 +42,8 @@ class TestMetacognition(unittest.TestCase):
 
     def test_frustration_and_urgency(self):
         print("\n--- Testing Frustration and Urgency ---")
-        # Simulate multiple failures
-        self.state_manager.state.failed_tools = 3
+        # Two failures in a row
+        self.state_manager.update_metacognition("read_file", {"success": False})
         self.state_manager.update_metacognition("read_file", {"success": False})
         
         tone = self.state_manager.state.metacognition.emotional_tone
@@ -57,6 +57,26 @@ class TestMetacognition(unittest.TestCase):
         self.assertEqual(tone, "frustrated")
         self.assertGreater(urgency, 0.1)
         self.assertIn("repeated obstacles", monologue)
+
+    def test_one_failure_after_successes_is_only_cautious(self):
+        for _ in range(10):
+            self.state_manager.update_metacognition("read_file", {"success": True})
+        self.state_manager.update_metacognition("read_file", {"success": False})
+
+        meta = self.state_manager.state.metacognition
+        self.assertEqual(meta.emotional_tone, "cautious")
+        self.assertEqual(meta.consecutive_failures, 1)
+
+    def test_success_resets_the_failure_streak_and_relaxes_urgency(self):
+        self.state_manager.update_metacognition("read_file", {"success": False})
+        self.state_manager.update_metacognition("read_file", {"success": False})
+        spiked = self.state_manager.state.metacognition.urgency_score
+
+        self.state_manager.update_metacognition("read_file", {"success": True})
+
+        meta = self.state_manager.state.metacognition
+        self.assertEqual(meta.consecutive_failures, 0)
+        self.assertLess(meta.urgency_score, spiked)
 
     def test_memory_verification(self):
         print("\n--- Testing Memory Verification ---")

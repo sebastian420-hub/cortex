@@ -541,7 +541,7 @@ class EnhancedMemoryBank(MemoryBank):
                 if fa.alternative_suggested:
                     failed_list.append(f"   → Try: {fa.alternative_suggested}")
 
-            sections.append("Recent Failed Approaches:\\n" + "\\n".join(failed_list))
+            sections.append("Recent Failed Approaches:\n" + "\n".join(failed_list))
 
         # Successful patterns
         if self.successful_patterns:
@@ -549,7 +549,7 @@ class EnhancedMemoryBank(MemoryBank):
             for i, sp in enumerate(self.successful_patterns[:3], 1):
                 pattern_list.append(f"{i}. {sp.pattern} (used {sp.applications} times)")
 
-            sections.append("Successful Patterns:\\n" + "\\n".join(pattern_list))
+            sections.append("Successful Patterns:\n" + "\n".join(pattern_list))
 
         # Session insights
         if self.session_insights:
@@ -557,7 +557,7 @@ class EnhancedMemoryBank(MemoryBank):
             for i, insight in enumerate(self.session_insights[-3:], 1):
                 insight_list.append(f"{i}. {insight.content}")
 
-            sections.append("Session Insights:\\n" + "\\n".join(insight_list))
+            sections.append("Session Insights:\n" + "\n".join(insight_list))
 
         # Progress markers
         if self.progress_markers:
@@ -565,9 +565,9 @@ class EnhancedMemoryBank(MemoryBank):
             for task_id, progress in list(self.progress_markers.items())[-3:]:
                 progress_list.append(f"- {task_id}: {progress}")
 
-            sections.append("Recent Progress:\\n" + "\\n".join(progress_list))
+            sections.append("Recent Progress:\n" + "\n".join(progress_list))
 
-        return "\\n\\n".join(sections)
+        return "\n\n".join(sections)
 
     def get_failed_approaches_for_context(self, context: str) -> List[FailedApproach]:
         """

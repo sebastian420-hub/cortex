@@ -40,6 +40,7 @@ class MetacognitiveState:
     urgency_score: float = 0.1  # 0.0 - 1.0, drive to act/refactor/complete
     emotional_tone: str = "analytical"  # "analytical", "confident", "cautious", "frustrated"
     internal_monologue: str = ""  # Brief internal thought injected into prompt
+    consecutive_failures: int = 0  # failures in a row; any success resets it
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -47,6 +48,7 @@ class MetacognitiveState:
             "urgency_score": round(self.urgency_score, 3),
             "emotional_tone": self.emotional_tone,
             "internal_monologue": self.internal_monologue,
+            "consecutive_failures": self.consecutive_failures,
         }
 
     @classmethod
@@ -56,6 +58,7 @@ class MetacognitiveState:
             urgency_score=d.get("urgency_score", 0.1),
             emotional_tone=d.get("emotional_tone", "analytical"),
             internal_monologue=d.get("internal_monologue", ""),
+            consecutive_failures=d.get("consecutive_failures", 0),
         )
 
 
@@ -372,49 +375,53 @@ class StateManager:
     def update_metacognition(self, tool_name: str, result: Dict[str, Any]) -> None:
         """
         Appraise the result of an action and update internal cognitive metrics.
-        This makes the agent feel more reactive to its own performance.
+
+        The mood follows *consecutive* failures, not the lifetime total: one failure after a long
+        run of successes is "cautious", and it takes two failures in a row to become
+        "frustrated". A success resets the streak and relaxes urgency.
         """
         success = result.get("success", False)
         meta = self.state.metacognition
 
         if success:
+            meta.consecutive_failures = 0
+
             # Positive appraisal: boost confidence, shift toward confident tone
             meta.confidence_score = min(1.0, meta.confidence_score + 0.1)
-            
-            if meta.confidence_score > 0.8:
-                meta.emotional_tone = "confident"
-            else:
-                meta.emotional_tone = "analytical"
-                
-            # Reduce urgency if a major tool succeeded
-            if tool_name in ["write_file", "edit"]:
-                meta.urgency_score = max(0.0, meta.urgency_score - 0.2)
+            meta.emotional_tone = "confident" if meta.confidence_score > 0.8 else "analytical"
+
+            # Urgency relaxes with every success, and more when a change was made
+            relax = 0.2 if tool_name in ["write_file", "edit"] else 0.05
+            meta.urgency_score = max(0.0, meta.urgency_score - relax)
         else:
+            meta.consecutive_failures += 1
+
             # Negative appraisal: drop confidence, shift toward cautious or frustrated
             meta.confidence_score = max(0.1, meta.confidence_score - 0.15)
-            
-            # Use >= 2 here because failed_tools is incremented AFTER this appraisal
-            # in record_tool_execution, so 2 existing failures + this one = 3.
-            if self.state.failed_tools >= 2:
+
+            if meta.consecutive_failures >= 2:
                 meta.emotional_tone = "frustrated"
-                meta.urgency_score = min(1.0, meta.urgency_score + 0.2) # Spike urgency to fix it
+                meta.urgency_score = min(1.0, meta.urgency_score + 0.2)  # push to fix it
             else:
                 meta.emotional_tone = "cautious"
 
         # Generate internal monologue based on state
         if meta.emotional_tone == "frustrated":
-            meta.internal_monologue = "I'm hitting repeated obstacles. I need to rethink my assumptions and be more meticulous."
+            meta.internal_monologue = (
+                "I'm hitting repeated obstacles. I need to rethink my assumptions and be more "
+                "meticulous."
+            )
         elif meta.emotional_tone == "confident":
-            meta.internal_monologue = "My current approach is working well. I should maintain this momentum."
+            meta.internal_monologue = (
+                "My current approach is working well. I should maintain this momentum."
+            )
         elif meta.emotional_tone == "cautious":
-            meta.internal_monologue = "That didn't go as expected. I should double-check the environment before trying again."
+            meta.internal_monologue = (
+                "That didn't go as expected. I should double-check the environment before "
+                "trying again."
+            )
         else:
             meta.internal_monologue = "I am processing the results and adjusting my strategy."
-
-        # Environmental urgency (Drive)
-        # If there are many failed approaches, urgency increases
-        if len(self.state.session_memory.failed_approaches) > 2:
-            meta.urgency_score = min(1.0, meta.urgency_score + 0.1)
 
     def get_metacognitive_context(self) -> str:
         """Get internal state context for prompt injection."""
@@ -565,7 +572,7 @@ class StateManager:
         if self.state.active_plan:
             progress = self.state.active_plan.get_progress()
             summary_parts.append(
-                f"Active Plan: {self.state.active_goal} "
+                f"Active Plan: {self.state.active_plan.goal} "
                 f"({progress['completed']}/{progress['total']} steps, "
                 f"{progress['completion_percentage']:.0f}% complete)"
             )
@@ -582,7 +589,7 @@ class StateManager:
         session_summary = self.state.session_memory.get_session_summary()
         if session_summary:
             # Take first few sections to avoid being too verbose
-            sections = session_summary.split("\\n\\n")
+            sections = session_summary.split("\n\n")
             if sections:
                 summary_parts.append(sections[0])  # First section only
 
@@ -596,7 +603,7 @@ class StateManager:
         ]
         summary_parts.append("Statistics: " + ", ".join(stats))
 
-        return "\\n\\n".join(summary_parts)
+        return "\n\n".join(summary_parts)
 
     def get_llm_context(self) -> str:
         """
@@ -620,20 +627,20 @@ class StateManager:
         # Working memory
         wm_summary = self.state.working_memory.get_summary()
         if wm_summary and wm_summary != "Working memory is empty.":
-            context_parts.append("WORKING CONTEXT:\\n" + wm_summary)
+            context_parts.append("WORKING CONTEXT:\n" + wm_summary)
 
         # Session memory highlights
         failed_approaches = self.state.session_memory.failed_approaches[-2:]
         if failed_approaches:
-            failed_text = "\\n".join([f"- {fa.approach}: {fa.error}" for fa in failed_approaches])
-            context_parts.append("RECENT FAILED APPROACHES:\\n" + failed_text)
+            failed_text = "\n".join([f"- {fa.approach}: {fa.error}" for fa in failed_approaches])
+            context_parts.append("RECENT FAILED APPROACHES:\n" + failed_text)
 
         successful_patterns = self.state.session_memory.successful_patterns[:2]
         if successful_patterns:
-            success_text = "\\n".join(
+            success_text = "\n".join(
                 [f"- {sp.pattern} (used {sp.applications}x)" for sp in successful_patterns]
             )
-            context_parts.append("SUCCESSFUL PATTERNS:\\n" + success_text)
+            context_parts.append("SUCCESSFUL PATTERNS:\n" + success_text)
 
         # Active plan
         if self.state.active_plan:
@@ -650,7 +657,7 @@ class StateManager:
                     f"EXPECTED OUTCOME: {self.state.current_plan_step.expected_outcome}"
                 )
 
-        return "\\n\\n".join(context_parts)
+        return "\n\n".join(context_parts)
 
     def clear(self) -> None:
         """Clear all state (except session ID)."""

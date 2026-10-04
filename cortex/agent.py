@@ -123,9 +123,12 @@ class Cortex:
         self.hook_manager = hook_manager or HookManager()
         self.output_format = output_format
 
-        # Enhanced features configuration
+        # Optional features configuration
         self.enable_planning = enable_planning
         self.enable_layered_memory = enable_layered_memory
+        # Experimental: put confidence/urgency/tone into the system prompt (off by default; the
+        # state is still tracked either way)
+        self.enable_metacognition = bool(getattr(self.config, "enable_metacognition", False))
 
         # Use AgentInitializer to handle complex initialization
         initializer = AgentInitializer(
@@ -532,7 +535,7 @@ class Cortex:
         )
         metacognitive_context = (
             self.state_manager.get_metacognitive_context()
-            if hasattr(self, "state_manager")
+            if hasattr(self, "state_manager") and self.enable_metacognition
             else None
         )
 

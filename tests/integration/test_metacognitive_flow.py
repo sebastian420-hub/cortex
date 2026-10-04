@@ -71,10 +71,11 @@ class TestMetacognitiveFlow(unittest.TestCase):
         mock_provider.validate_api_key.return_value = True
         mock_get_provider.return_value = mock_provider
         
+        self.config.enable_metacognition = True  # experimental feature: off unless enabled
         agent = Cortex(model="test-model", config=self.config)
         
-        # Manually spike failures to trigger frustration
-        agent.state_manager.state.failed_tools = 3
+        # Two failures in a row trigger frustration
+        agent.state_manager.update_metacognition("test_tool", {"success": False})
         agent.state_manager.update_metacognition("test_tool", {"success": False})
         
         self.assertEqual(agent.state_manager.state.metacognition.emotional_tone, "frustrated")

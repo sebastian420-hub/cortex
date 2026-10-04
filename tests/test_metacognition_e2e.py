@@ -143,6 +143,7 @@ class TestMetacognitionE2E(unittest.TestCase):
 
     def test_prompt_injection_e2e(self):
         """Verify that metacognitive context is actually injected into the system prompt."""
+        self.config.enable_metacognition = True  # experimental feature: off unless enabled
         agent = Cortex(
             model="test-model",
             project_dir=str(self.project_dir),
@@ -169,6 +170,20 @@ class TestMetacognitionE2E(unittest.TestCase):
         self.assertIn("Internal Metacognition", system_prompt)
         self.assertIn("frustrated", system_prompt)
         self.assertIn("TEST_MONOLOGUE_X", system_prompt)
+
+    def test_metacognition_is_not_injected_unless_enabled(self):
+        """The feature is experimental and off by default: the prompt must not carry it."""
+        agent = Cortex(
+            model="test-model",
+            project_dir=str(self.project_dir),
+            config=self.config
+        )
+        agent.state_manager.state.metacognition.internal_monologue = "TEST_MONOLOGUE_X"
+
+        system_prompt = agent._get_system_prompt()
+
+        self.assertNotIn("Internal Metacognition", system_prompt)
+        self.assertNotIn("TEST_MONOLOGUE_X", system_prompt)
 
     def test_insight_confidence_boost(self):
         """Test that recording an insight boosts confidence."""
