@@ -19,7 +19,7 @@ import uuid
 
 from ..memory.contract import should_index
 from ..memory.core_memory import MemoryBank, MemoryItem, MemoryType, MemorySource
-from ..memory.semantic import ChromaMemoryManager
+from ..memory.semantic import ChromaMemoryManager, content_id
 from ..memory.embeddings import LocalEmbeddingModel
 
 
@@ -210,6 +210,34 @@ class EnhancedMemoryBank(MemoryBank):
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Failed to index memory item semantically: {e}")
+
+    def _persisted_id(self, text: str) -> Optional[str]:
+        if not self.semantic_manager:
+            return None
+        try:
+            doc_id = content_id(text)
+            return doc_id if self.semantic_manager.get_document(doc_id) else None
+        except Exception:
+            return None
+
+    def list_memories(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Everything in long-term memory, most recently confirmed first."""
+        if not self.semantic_manager:
+            return []
+        return self.semantic_manager.list_documents(limit)
+
+    def edit_memory(self, memory_id: str, new_text: str) -> str:
+        """Replace an entry's text (keeping its history); returns its new id."""
+        if not self.semantic_manager:
+            raise KeyError(f"No memory with id {memory_id}")
+        return self.semantic_manager.update_document(memory_id, new_text.strip())
+
+    def forget(self, memory_id: str) -> bool:
+        """Delete an entry from long-term memory. False if there is no such entry."""
+        if not self.semantic_manager or not self.semantic_manager.get_document(memory_id):
+            return False
+        self.semantic_manager.delete_document(memory_id)
+        return True
 
     def add_decision(
         self, decision: str, source: MemorySource = MemorySource.INFERRED, confidence: float = 0.8

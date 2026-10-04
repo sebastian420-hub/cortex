@@ -30,6 +30,7 @@ from .edit_tool import EditTool
 
 # Metacognition tools
 from .metacognition import MetacognitiveReflectorTool, REFLECT_SCHEMA
+from .memory_tools import RememberTool, REMEMBER_SCHEMA
 
 # Phase 3 web tools
 from .web_tools import WebFetchTool, WebSearchTool, clear_fetch_cache
@@ -307,6 +308,7 @@ TOOLS: List[Dict[str, Any]] = [
         },
     },
     REFLECT_SCHEMA,
+    REMEMBER_SCHEMA,
     {
         "type": "function",
         "function": {
@@ -837,6 +839,8 @@ __all__ = [
     # Metacognition
     "MetacognitiveReflectorTool",
     "REFLECT_SCHEMA",
+    "RememberTool",
+    "REMEMBER_SCHEMA",
     # Phase 3 web tools
     "WebFetchTool",
     "WebSearchTool",

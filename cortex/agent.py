@@ -578,12 +578,14 @@ class Cortex:
             return cached[1]
 
         # Relevant items from the current session
-        session_results = self.memory_bank.retrieve_semantic_context(
-            query, top_k=2, global_search=False
+        floor = float(self.config.semantic_memory.get("min_similarity", 0.3))
+        relevant = lambda results: [r for r in results if r.get("similarity", 1.0) >= floor]  # noqa: E731
+        session_results = relevant(
+            self.memory_bank.retrieve_semantic_context(query, top_k=2, global_search=False)
         )
         # One highly relevant item from past sessions
-        global_results = self.memory_bank.retrieve_semantic_context(
-            query, top_k=1, global_search=True
+        global_results = relevant(
+            self.memory_bank.retrieve_semantic_context(query, top_k=1, global_search=True)
         )
 
         context_items = []

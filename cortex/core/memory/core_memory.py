@@ -107,6 +107,67 @@ class MemoryBank:
         self.items.append(item)
         self._prune()
 
+    # What the remember tool may store, and how each kind is filed
+    REMEMBER_KINDS = {
+        "convention": (MemoryType.PREFERENCE, {}),
+        "decision": (MemoryType.DECISION, {}),
+        "fact": (MemoryType.FACT, {}),
+        "solution": (MemoryType.CONTEXT, {"solved_problem": True}),
+    }
+
+    def remember(
+        self, content: str, kind: str = "convention", user_requested: bool = False
+    ) -> Dict[str, Any]:
+        """Keep something on purpose and report honestly whether it outlives the session.
+
+        What the user asked to be remembered is filed as their own instruction (it does not fade);
+        what the model chose to keep is slightly less certain.
+        """
+        if kind not in self.REMEMBER_KINDS:
+            raise ValueError(f"Unknown kind '{kind}'")
+        memory_type, extra = self.REMEMBER_KINDS[kind]
+        text = content.strip()
+        self.add(
+            MemoryItem(
+                type=memory_type,
+                content=text,
+                source=MemorySource.USER if user_requested else MemorySource.INFERRED,
+                confidence=1.0 if user_requested else 0.8,
+                metadata={"remembered": True, "kind": kind, **extra},
+            )
+        )
+        stored = self._persisted_id(text)
+        if stored:
+            return {
+                "stored": True,
+                "persistent": True,
+                "id": stored,
+                "message": f"Remembered for future sessions: {text}",
+            }
+        return {
+            "stored": True,
+            "persistent": False,
+            "id": None,
+            "message": (
+                "Remembered for this session only: long-term memory is off. To keep it across "
+                "sessions, install 'cortex[memory]' and set semantic_memory.enabled to true."
+            ),
+        }
+
+    def _persisted_id(self, text: str) -> Optional[str]:
+        """The long-term id of ``text`` if it is really in long-term memory (base bank: never)."""
+        return None
+
+    def list_memories(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Entries in long-term memory (base bank: none)."""
+        return []
+
+    def edit_memory(self, memory_id: str, new_text: str) -> str:
+        raise KeyError(f"No memory with id {memory_id}")
+
+    def forget(self, memory_id: str) -> bool:
+        return False
+
     def add_decision(
         self, decision: str, source: MemorySource = MemorySource.INFERRED, confidence: float = 0.8
     ) -> None:

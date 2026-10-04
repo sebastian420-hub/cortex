@@ -646,7 +646,10 @@ When calling `create_and_execute_plan`, ALWAYS provide a concrete `steps` list. 
 - **Working Memory**: Current files, recently identified symbols.
 - **Session Memory**: Successful patterns, failed approaches, key decisions.
 
-Use this to avoid repeating mistakes and reuse proven patterns."""
+Use this to avoid repeating mistakes and reuse proven patterns.
+
+Use the `remember` tool for what a later session should know and could not easily rediscover:
+a project convention, a decision and its reason, how a hard problem was solved."""
 
         return section
 

@@ -255,6 +255,7 @@ class ToolRegistry:
 
         # Metacognition tools
         from .metacognition import MetacognitiveReflectorTool, REFLECT_SCHEMA
+        from .memory_tools import RememberTool, REMEMBER_SCHEMA
 
         # Phase 3 web tools
         from .web_tools import WebFetchTool, WebSearchTool
@@ -318,6 +319,7 @@ class ToolRegistry:
             "glob": GlobTool,
             "edit": EditTool,
             "metacognitive_reflect": MetacognitiveReflectorTool,
+            "remember": RememberTool,
             # Phase 3 web tools
             "web_fetch": WebFetchTool,
             "web_search": WebSearchTool,
@@ -805,6 +807,7 @@ class ToolRegistry:
                 },
             },
             "metacognitive_reflect": REFLECT_SCHEMA,
+            "remember": REMEMBER_SCHEMA,
             # Phase 3 web tools
             "web_fetch": {
                 "type": "function",

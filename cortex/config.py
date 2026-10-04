@@ -183,6 +183,10 @@ DEFAULT_SEMANTIC_MEMORY = {
     "collection_name": "cortex_semantic_memory",
     "clear_on_init": False,
     "persist_directory": ".cortex/semantic_db",  # Relative to project root
+    # Retrieved memories less similar to the request than this are not put in the prompt: a
+    # memory about something else costs tokens and misleads. This is a starting value, not a
+    # tuned one; the benchmark ablation is where it should be set.
+    "min_similarity": 0.3,
 }
 
 

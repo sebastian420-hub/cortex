@@ -44,6 +44,7 @@ _CLASSES: Dict[str, ToolClass] = {
     "update_plan": ToolClass.AGENT_STATE,
     "create_and_execute_plan": ToolClass.AGENT_STATE,
     "metacognitive_reflect": ToolClass.AGENT_STATE,
+    "remember": ToolClass.AGENT_STATE,
     "delegate_to_model": ToolClass.AGENT_STATE,
     "return_to_coordinator": ToolClass.AGENT_STATE,
     # Writes

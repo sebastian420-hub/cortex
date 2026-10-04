@@ -87,7 +87,7 @@ class REPL:
   /plan              Enter read-only planning mode
   /reset-context     Clear history but keep memory
   /focus <path>      Focus on a directory
-  /memory            Show memory bank contents
+  /memory            Show memory bank contents (list, add, edit, delete, search)
   /stats             Show session statistics
 
 [bold cyan]Display Commands:[/bold cyan]

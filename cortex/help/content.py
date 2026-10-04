@@ -167,11 +167,15 @@ HELP_ENTRIES: List[HelpEntry] = [
         long_desc="""Manage the semantic memory (Vector Database).
         
 Subcommands:
+- list: Show everything stored for future sessions, with its confidence and when it was last confirmed.
+- add <text>: Remember something as your own instruction (it does not fade over time).
+- edit <id> <text>: Change a stored memory. An id prefix is enough.
+- delete <id>: Forget one memory (also: forget <id>).
 - search <query>: Search for similar memories in the current session.
 - search --global <query>: Search across all past sessions in this project.
 - clear: Permanently delete the entire semantic database for this project.
 
-The memory bank stores facts, decisions, and context learned during interactions.""",  # noqa: E501
+Long-term memory keeps decisions, conventions, facts and summaries of solved problems, not your requests or error messages. The model can store one itself with the remember tool. It needs 'cortex[memory]' installed and semantic_memory.enabled set.""",  # noqa: E501
         category=HelpCategory.CONTEXT,
         examples=["/memory", "/memory search 'api key'", "/memory search --global 'refactor'", "/memory clear"],
         related=["/stats", "/summary"],
