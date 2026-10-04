@@ -3,6 +3,7 @@
 from typing import List, Dict, Any, Optional
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +14,52 @@ try:
 except ImportError:
     TIKTOKEN_AVAILABLE = False
 
-# Cache for encodings to avoid recreating them
-_ENCODING_CACHE = {}
+# Loaded tiktoken encodings by encoding name. A *failed* load is cached too (as None): tiktoken
+# downloads its vocabulary on first use, so on an offline machine every token count used to
+# retry that download. Now it is attempted once per process.
+_ENCODING_CACHE: Dict[str, Optional[Any]] = {}
+
+# Approximate encodings for model families that tiktoken does not know by name.
+_FAMILY_ENCODINGS = (
+    (("claude-", "anthropic"), "cl100k_base"),
+    (("deepseek-",), "cl100k_base"),
+    (("llama", "mistral", "mixtral", "codestral", "qwen"), "o200k_base"),
+    (("command-r", "command-r-plus"), "cl100k_base"),
+    (("gemini",), "cl100k_base"),
+)
+_DEFAULT_ENCODING = "cl100k_base"
+
+
+def offline_mode() -> bool:
+    """True when CORTEX_OFFLINE is set: never try to download tokenizer data."""
+    return os.environ.get("CORTEX_OFFLINE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _encoding_name_for(model: str) -> str:
+    """Name of the tiktoken encoding to use for ``model`` (no network access)."""
+    try:
+        # Exact answer for models tiktoken knows (the OpenAI models).
+        return tiktoken.encoding_name_for_model(model)
+    except (KeyError, ValueError):
+        pass
+    model_lower = model.lower()
+    for prefixes, encoding_name in _FAMILY_ENCODINGS:
+        if any(prefix in model_lower for prefix in prefixes):
+            return encoding_name
+    return _DEFAULT_ENCODING
+
+
+def _load_encoding(encoding_name: str) -> Optional[Any]:
+    """Load an encoding once; remember a failure so it is not retried."""
+    if encoding_name in _ENCODING_CACHE:
+        return _ENCODING_CACHE[encoding_name]
+    try:
+        encoding = tiktoken.get_encoding(encoding_name)
+    except Exception as e:  # network down, no cache, unknown name: fall back to approximation
+        logger.debug(f"Tokenizer {encoding_name} unavailable, using approximation: {e}")
+        encoding = None
+    _ENCODING_CACHE[encoding_name] = encoding
+    return encoding
 
 
 def get_encoding_for_model(model: str) -> Optional[Any]:
@@ -25,60 +70,12 @@ def get_encoding_for_model(model: str) -> Optional[Any]:
         model: Model name
 
     Returns:
-        tiktoken.Encoding or None if not available
+        tiktoken.Encoding, or None if tiktoken is missing, offline mode is on, or the
+        vocabulary could not be loaded. Callers then fall back to a character estimate.
     """
-    if not TIKTOKEN_AVAILABLE:
+    if not TIKTOKEN_AVAILABLE or offline_mode():
         return None
-
-    # Check cache first
-    if model in _ENCODING_CACHE:
-        return _ENCODING_CACHE[model]
-
-    try:
-        # Try to get encoding directly for the model
-        # This works for OpenAI models
-        encoding = tiktoken.encoding_for_model(model)
-        _ENCODING_CACHE[model] = encoding
-        return encoding
-    except (KeyError, ValueError):
-        # Model not found in tiktoken's registry
-        # Map model families to appropriate encodings
-        model_lower = model.lower()
-
-        # Determine encoding based on model family
-        if any(prefix in model_lower for prefix in ["claude-", "anthropic"]):
-            # Claude models - Anthropic uses different tokenizer
-            # cl100k_base is a reasonable approximation for modern Claude models
-            encoding_name = "cl100k_base"
-        elif any(prefix in model_lower for prefix in ["deepseek-"]):
-            # DeepSeek models use OpenAI-compatible tokenizer
-            encoding_name = "cl100k_base"
-        elif any(
-            prefix in model_lower for prefix in ["llama", "mistral", "mixtral", "codestral", "qwen"]
-        ):
-            # Llama/Mistral family - these use SentencePiece tokenizers
-            # o200k_base is a reasonable approximation for modern models
-            try:
-                encoding_name = "o200k_base"
-            except KeyError:
-                encoding_name = "cl100k_base"
-        elif any(prefix in model_lower for prefix in ["command-r", "command-r-plus"]):
-            # Cohere models - use cl100k_base as approximation
-            encoding_name = "cl100k_base"
-        elif any(prefix in model_lower for prefix in ["gemini"]):
-            # Gemini models - Google's tokenizer, cl100k_base approximation
-            encoding_name = "cl100k_base"
-        else:
-            # Default to cl100k_base for unknown models
-            encoding_name = "cl100k_base"
-
-        try:
-            encoding = tiktoken.get_encoding(encoding_name)
-            _ENCODING_CACHE[model] = encoding
-            return encoding
-        except Exception as e:
-            logger.debug(f"Failed to get encoding {encoding_name} for model {model}: {e}")
-            return None
+    return _load_encoding(_encoding_name_for(model))
 
 
 def estimate_tokens(text: str, model: str = "gpt-4") -> int:

@@ -375,14 +375,14 @@ class TestGetEncodingForModel:
             # Clear cache before test
             context_mod._ENCODING_CACHE.clear()
 
-            with patch("tiktoken.encoding_for_model") as mock_enc_for_model:
+            with patch("tiktoken.get_encoding") as mock_get_enc:
                 mock_encoding = MagicMock()
-                mock_enc_for_model.return_value = mock_encoding
+                mock_get_enc.return_value = mock_encoding
 
                 result = context_mod.get_encoding_for_model("gpt-4")
 
-                assert result is not None
-                mock_enc_for_model.assert_called_once_with("gpt-4")
+                assert result is mock_encoding
+                mock_get_enc.assert_called_once_with("cl100k_base")
 
     def test_get_encoding_for_claude_model(self):
         """Test getting encoding for Claude model."""
