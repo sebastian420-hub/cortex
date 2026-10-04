@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import stat
+import tempfile
 import sys
 import time
 from pathlib import Path
@@ -115,7 +116,12 @@ class SessionManager:
 
     def _atomic_write(self, file_path: Path, data: Dict[str, Any]) -> bool:
         """
-        Atomically write session data to file with locking and secure permissions.
+        Atomically write session data to file with secure permissions.
+
+        Each call writes to its *own* uniquely named temp file in the target directory and then
+        swaps it into place with ``os.replace``, which is atomic on POSIX and Windows. Readers
+        therefore see either the old or the new complete file, never a partial one, and
+        concurrent writers cannot delete each other's temp files (the last writer wins).
 
         Args:
             file_path: Target file path
@@ -124,77 +130,49 @@ class SessionManager:
         Returns:
             True if successful, False otherwise
         """
-        temp_file = file_path.with_suffix(".tmp")
-        lock_file = file_path.with_suffix(".lock")
-
         # Set restrictive umask before creating files (Unix only)
         old_umask = None
         if sys.platform != "win32":
             old_umask = os.umask(0o077)
 
+        temp_file: Optional[Path] = None
         try:
-            # Write to temporary file first
-            with open(temp_file, "w", encoding="utf-8") as f:
+            fd, temp_name = tempfile.mkstemp(
+                dir=str(file_path.parent), prefix=f".{file_path.name}.", suffix=".tmp"
+            )
+            temp_file = Path(temp_name)
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
                 f.flush()
                 os.fsync(f.fileno())  # Force write to disk
 
-            # Set secure permissions on temp file
             self._secure_file(temp_file)
 
-            # Acquire exclusive lock on lock file
-            start_time = time.time()
-
-            while (time.time() - start_time) < self._lock_timeout:
+            # On Windows, replace can fail briefly while a reader has the file open: retry.
+            deadline = time.time() + self._lock_timeout
+            while True:
                 try:
-                    with open(lock_file, "w") as lock_f:
-                        if self._acquire_lock(lock_f, exclusive=True, blocking=False):
-                            # Atomic rename (works on both Unix and Windows)
-                            # On Windows, this can still fail if the file is open elsewhere,
-                            # so we catch OSError and retry within the loop.
-                            try:
-                                temp_file.replace(file_path)
-                                # Set secure permissions on final file
-                                self._secure_file(file_path)
-                                return True
-                            except OSError:
-                                # Replace failed, release lock and retry
-                                pass
-                except (IOError, OSError):
-                    pass  # Ignore lock file errors and retry
-                time.sleep(0.1)  # Brief wait before retry
-
-            # If we reached here, we timed out
-            raise TimeoutError(f"Timed out trying to atomically write {file_path.name}")
+                    os.replace(temp_file, file_path)
+                    self._secure_file(file_path)
+                    return True
+                except OSError as e:
+                    if time.time() >= deadline:
+                        raise TimeoutError(f"Timed out atomically writing {file_path.name}") from e
+                    time.sleep(0.05)
 
         except Exception as e:
-            logger.warning(f"Could not acquire lock for {file_path.name}: {e}")
-            # Fallback: try direct write without locking
-            try:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2, ensure_ascii=False)
-                self._secure_file(file_path)
-                return True
-            except Exception as write_error:
-                logger.error(f"Failed to write session file: {write_error}")
-                return False
+            logger.error(f"Failed to write session file {file_path.name}: {e}")
+            return False
         finally:
             # Restore umask
             if old_umask is not None:
                 os.umask(old_umask)
-            # Clean up temp file if it still exists
-            if temp_file.exists():
+            # Remove the temp file if it was not moved into place
+            if temp_file is not None and temp_file.exists():
                 try:
                     temp_file.unlink()
                 except OSError:
                     pass
-            if lock_file.exists():
-                try:
-                    lock_file.unlink()
-                except OSError:
-                    pass
-
-        return False
 
     def save_session(
         self,
