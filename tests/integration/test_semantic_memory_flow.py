@@ -12,6 +12,8 @@ from cortex.core.memory_layers import EnhancedMemoryBank
 from cortex.models import PermissionMode
 
 
+pytestmark = pytest.mark.usefixtures("stub_sentence_transformers")
+
 class TestSemanticMemoryIntegration:
     """Tests the integration of semantic memory into the Agent and MemoryBank."""
 

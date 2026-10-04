@@ -274,31 +274,21 @@ class TestWebSearchToolBasics:
 class TestWebSearchMocked:
     """Mocked tests for WebSearchTool (no actual network calls)."""
 
-    @patch("cortex.tools.web_tools.requests")
-    def test_web_search_success(self, mock_requests, temp_project):
-        """Test successful web search with mocked requests."""
-        from cortex.tools.web_tools import WebSearchTool, HAS_REQUESTS, HAS_BS4
+    @patch("cortex.tools.web_tools.DDGS")
+    def test_web_search_success(self, mock_ddgs, temp_project):
+        """Test successful web search with a mocked search backend."""
+        from cortex.tools.web_tools import WebSearchTool, HAS_DUCKDUCKGO_SEARCH
 
-        if not HAS_REQUESTS:
-            pytest.skip("requests not installed")
+        if not HAS_DUCKDUCKGO_SEARCH:
+            pytest.skip("ddgs not installed")
 
-        # Mock search response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = """
-        <html>
-        <div class="result">
-            <a class="result__a" href="https://example.com/page1">Result 1</a>
-            <span class="result__snippet">This is snippet 1</span>
-        </div>
-        <div class="result">
-            <a class="result__a" href="https://example.com/page2">Result 2</a>
-            <span class="result__snippet">This is snippet 2</span>
-        </div>
-        </html>
-        """
-        mock_response.raise_for_status = Mock()
-        mock_requests.post.return_value = mock_response
+        instance = Mock()
+        instance.text.return_value = [
+            {"title": "Result 1", "href": "https://example.com/page1", "body": "Snippet 1"},
+            {"title": "Result 2", "href": "https://example.com/page2", "body": "Snippet 2"},
+        ]
+        mock_ddgs.return_value.__enter__.return_value = instance
+        mock_ddgs.return_value.__exit__.return_value = None
 
         tool = WebSearchTool(
             project_dir=temp_project,
@@ -309,7 +299,8 @@ class TestWebSearchMocked:
         result = tool.execute(query="test search")
 
         assert result["success"] is True
-        assert "results" in result["data"]
+        assert result["data"]["result_count"] == 2
+        assert result["data"]["results"][0]["url"] == "https://example.com/page1"
 
     @patch("cortex.tools.web_tools.DDGS")
     def test_web_search_no_results(self, mock_ddgs, temp_project):
@@ -336,29 +327,21 @@ class TestWebSearchMocked:
         assert result["success"] is True
         assert result["data"]["result_count"] == 0
 
-    @patch("cortex.tools.web_tools.requests")
-    def test_web_search_domain_filter(self, mock_requests, temp_project):
+    @patch("cortex.tools.web_tools.DDGS")
+    def test_web_search_domain_filter(self, mock_ddgs, temp_project):
         """Test web search with domain filtering."""
-        from cortex.tools.web_tools import WebSearchTool, HAS_REQUESTS
+        from cortex.tools.web_tools import WebSearchTool, HAS_DUCKDUCKGO_SEARCH
 
-        if not HAS_REQUESTS:
-            pytest.skip("requests not installed")
+        if not HAS_DUCKDUCKGO_SEARCH:
+            pytest.skip("ddgs not installed")
 
-        # Mock search response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = """
-        <html>
-        <div class="result">
-            <a class="result__a" href="https://docs.python.org/page1">Python Docs</a>
-        </div>
-        <div class="result">
-            <a class="result__a" href="https://stackoverflow.com/q/123">SO Question</a>
-        </div>
-        </html>
-        """
-        mock_response.raise_for_status = Mock()
-        mock_requests.post.return_value = mock_response
+        instance = Mock()
+        instance.text.return_value = [
+            {"title": "Python Docs", "href": "https://docs.python.org/page1", "body": ""},
+            {"title": "SO Question", "href": "https://stackoverflow.com/q/123", "body": ""},
+        ]
+        mock_ddgs.return_value.__enter__.return_value = instance
+        mock_ddgs.return_value.__exit__.return_value = None
 
         tool = WebSearchTool(
             project_dir=temp_project,
@@ -366,10 +349,11 @@ class TestWebSearchMocked:
             console=None,
         )
 
-        # Test with allowed_domains filter
         result = tool.execute(query="python documentation", allowed_domains=["docs.python.org"])
 
         assert result["success"] is True
+        assert result["data"]["result_count"] == 1
+        assert "docs.python.org" in result["data"]["results"][0]["url"]
 
 
 class TestToolRegistration:

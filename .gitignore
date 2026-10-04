@@ -119,3 +119,6 @@ yarn-error.log*
 .pnpm-debug.log*
 lerna-debug.log*
 
+
+# Created by tests that pass a placeholder object as a path
+MagicMock/

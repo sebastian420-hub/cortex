@@ -11,6 +11,8 @@ from cortex.agent import Cortex
 from cortex.config import AgentConfig
 
 
+pytestmark = pytest.mark.usefixtures("stub_sentence_transformers")
+
 class TestSemanticSessionIsolation:
     """Tests that semantic memory correctly filters and isolates sessions."""
 

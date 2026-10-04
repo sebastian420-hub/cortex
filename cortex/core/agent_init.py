@@ -143,7 +143,7 @@ class AgentInitializer:
             memory_bank = self.state_manager.state.session_memory
             
             # Configure semantic memory if enabled in config
-            if self.config.semantic_memory and self.config.semantic_memory.get("enabled"):
+            if self.config.semantic_memory and self.config.semantic_memory.get("enabled") is True:
                 # We need to manually initialize semantic manager since StateManager 
                 # doesn't know about AgentConfig.
                 try:

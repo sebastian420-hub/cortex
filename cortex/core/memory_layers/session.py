@@ -138,9 +138,15 @@ class EnhancedMemoryBank(MemoryBank):
         
         # Initialize semantic memory manager if enabled
         self.semantic_manager: Optional[ChromaMemoryManager] = None
-        if semantic_config and semantic_config.get("enabled", False):
+        # The flag must be a real boolean and the directory a real path: a truthy placeholder
+        # (such as a Mock) must never switch the vector database on or choose where it lives.
+        if semantic_config and semantic_config.get("enabled", False) is True:
             try:
                 persist_dir = semantic_config.get("persist_directory", ".cortex/semantic_db")
+                if not isinstance(persist_dir, (str, Path)):
+                    raise TypeError(
+                        f"semantic_memory.persist_directory must be a path, got {type(persist_dir)}"
+                    )
                 # Ensure persist_dir is a Path object
                 persist_path = Path(persist_dir)
                 if not persist_path.is_absolute():

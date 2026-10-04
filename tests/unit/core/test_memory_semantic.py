@@ -10,6 +10,8 @@ from cortex.core.memory.embeddings import LocalEmbeddingModel, BaseEmbeddingMode
 from cortex.core.memory.semantic import ChromaMemoryManager
 
 
+pytestmark = pytest.mark.usefixtures("stub_sentence_transformers")
+
 class TestEmbeddingModels:
     """Tests for embedding model abstraction."""
 

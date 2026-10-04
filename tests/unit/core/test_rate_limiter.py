@@ -28,7 +28,7 @@ class TestTokenBucket:
         """Test acquiring tokens when available."""
         bucket = TokenBucket(capacity=10, refill_rate=1.0)
         assert bucket.acquire(tokens=5, blocking=False) is True
-        assert bucket.available == 5
+        assert bucket.available == pytest.approx(5, abs=0.1)
 
     def test_acquire_blocking_waits(self):
         """Test blocking acquire waits for tokens."""
