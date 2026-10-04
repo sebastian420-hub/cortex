@@ -179,6 +179,7 @@ Examples:
   cortex --model llama3.3:70b         # Use different model
   cortex --auto-approve               # Skip permissions (dangerous!)
   cortex -p "your task"               # One-shot mode
+  cortex run --task "fix the parser" --verify "pytest -q" --json   # Unattended, on its own branch
   cortex --config config.yaml         # Use config file
   cortex --save-session mywork         # Save session
   cortex --load-session mywork        # Load session
@@ -329,8 +330,33 @@ def resolve_permission_mode(args: argparse.Namespace, config: AgentConfig) -> st
     return config.permission_mode or PermissionMode.NORMAL
 
 
+def load_agent_config(config_arg: Optional[str] = None) -> Tuple[AgentConfig, Optional[Path]]:
+    """The configuration to use: the file given, else config/default.yaml next to the package
+    (in a source checkout), else the built-in defaults. Also returns the file used, if any."""
+    config_path = None
+    if config_arg:
+        config_path = Path(config_arg)
+        if not config_path.is_file():
+            # Quietly using the defaults instead would run with settings you did not choose,
+            # command_sandbox among them
+            raise FileNotFoundError(f"The configuration file '{config_arg}' does not exist.")
+    else:
+        default_config = Path(__file__).parent.parent / "config" / "default.yaml"
+        if default_config.exists():
+            config_path = default_config
+    if config_path:
+        return AgentConfig.load(config_path), config_path
+    return AgentConfig(), None
+
+
 def main():
     """Main CLI entry point"""
+    # `cortex run ...` is the unattended mode; it has its own arguments
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
+        from .headless.cli import main as run_main
+
+        sys.exit(run_main(sys.argv[2:]))
+
     args = build_parser().parse_args()
 
     # Handle list-providers command
@@ -338,21 +364,14 @@ def main():
         list_providers()
         sys.exit(0)
 
-    # Load configuration - try default config/default.yaml first, then CLI arg
-    config_path = None
-    if args.config:
-        config_path = Path(args.config)
-    else:
-        # Auto-load config/default.yaml if it exists
-        default_config = Path(__file__).parent.parent / "config" / "default.yaml"
-        if default_config.exists():
-            config_path = default_config
-
+    # Load configuration: --config if given, else config/default.yaml if it exists
+    try:
+        config, config_path = load_agent_config(args.config)
+    except FileNotFoundError as e:
+        console.print(Panel(f"[red]Error:[/red] {e}", title="Configuration", border_style="red"))
+        sys.exit(1)
     if config_path:
-        config = AgentConfig.load(config_path)
         console.print(f"[dim]Loaded config from {config_path}[/dim]")
-    else:
-        config = AgentConfig()
 
     # Initialize FeatureManager with loaded config
     FeatureManager.get_instance(config.get_feature_flags_config())

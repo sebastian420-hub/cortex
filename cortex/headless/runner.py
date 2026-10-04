@@ -506,6 +506,27 @@ class _Run:
         return self._finish()
 
 
+def setup_error(task: str, project_dir: Path, reason: str) -> RunResult:
+    """The result for a run that could not start before the runner was reached (an unreadable task
+    file or configuration, a provider that is not set up). It has the same shape as any other."""
+    return RunResult(
+        run_id=_new_run_id(),
+        task=task.strip()[:200],
+        repo=str(project_dir),
+        status=SETUP_ERROR,
+        reason=reason,
+        usage={
+            "steps": 0,
+            "tool_calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "estimated": False,
+            "cost_usd": None,
+        },
+        budget={"max_steps": None, "max_tokens": None, "timeout_s": None, "exceeded": None},
+    )
+
+
 def run(
     config: HeadlessConfig,
     agent_config: Optional[AgentConfig] = None,
