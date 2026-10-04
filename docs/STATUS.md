@@ -60,6 +60,7 @@ badges in the [README](../README.md)), so they cannot go stale here.
 | Docker image | Works | CI builds it and checks it starts, runs as non-root and has git and ripgrep |
 | Rust native layer (`rust/`) | Optional | Its tests run in CI. Off by default and the speed-up is unmeasured. The Python AST parser does not use the Rust parser (it returns a summary, not the tree the Python code reads); search and tokenizing have Python fallbacks |
 | Go services (`go/`) | Optional | Built and tested in CI. Cortex has no client for them and does not use them |
+| Unattended runs (`cortex run`): a task on its own git worktree and branch, a verify command as the gate, retries with the failure shown, budgets, a JSON result, discard on failure | Works in tests | Tested in-process with a scripted model and real git, and as a real process over HTTP to a stand-in OpenAI-style server (the wrapper script against a fake `cortex`). Not yet run with a real model. Linux and macOS in practice; Windows untested; see [HEADLESS.md](HEADLESS.md) for what it does not protect |
 | OpenAI-compatible provider (OpenAI, vLLM, llama.cpp, LM Studio) | Works in tests | Tests stand in for the SDK client: connection settings, tool calls (including untidy ones from local models), usage, streaming, errors, the configured context window. Not yet run against a live server |
 | An MCP server; an HTTP API or webhooks; a research framework | Not implemented | Older documents said otherwise; those claims were removed |
 

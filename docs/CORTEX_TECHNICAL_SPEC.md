@@ -17,6 +17,7 @@ safety model in full.
   │ Memory        core/memory/, core/memory_layers/                       │
   │ Planning      core/planning.py        Prompts   core/prompts/         │
   │ Providers     core/providers/         Hooks     hooks/                │
+  │ Unattended    headless/ (cortex run): worktree, verify gate, budgets  │
   └─────┬───────────────────────────────────────────────────────────────┘
         │
   Tools  (cortex/tools/): files, edit, git, search, AST, web, commands, tests, plan, memory
@@ -153,6 +154,16 @@ prompt. Off by default; nothing measures whether it helps.
 ## 10. Practice and measurement
 
 - **Benchmark** (`bench/`, [BENCHMARK.md](BENCHMARK.md)): 20 tasks judged by their own tests.
+- **Unattended runs** (`headless/`, [HEADLESS.md](HEADLESS.md)): `cortex run` does one task on
+  its own git worktree and branch, with a shell command as the verdict. `workspace.py` makes and
+  removes the worktree and commits what the agent left; `verify.py` runs the command (through the
+  command sandbox when one is configured, and not at all if it was asked for and is unavailable);
+  `meter.py` wraps the provider to count tokens and stop the run when a budget is used up, by
+  requesting the agent's shutdown rather than raising; `runner.py` ties them together and decides
+  the status; `cli.py` is the command line. A run keeps its branch only if it verified. The agent
+  runs with `ask_user_question` and the git tools that reach outside the worktree removed, and with
+  the worktree first on `PYTHONPATH`, so tests do not import the checkout the project was installed
+  from.
 - **Cognitive Gym** (`core/gym/`): the agent works in a scratch copy of a project. With a
   verifier (`/gym --bench <task>`) the result is the verifier's verdict; without one the outcome
   is reported as unchecked.
@@ -163,13 +174,17 @@ Priority, lowest to highest: built-in defaults, a YAML file (`--config`), `CORTE
 variables, command-line flags. Every key in the YAML file is applied (a test fails when a setting
 is added without one proving it takes effect). Main sections: `model`, `provider`,
 `permission_mode`, `max_iterations`, `transactions`, `checkpoints`, `command_sandbox`,
-`semantic_memory`, `session_retention`, `timeouts`, `hooks`, `routing`, `parallel_execution`.
+`semantic_memory`, `session_retention`, `timeouts`, `hooks`, `routing`, `parallel_execution`,
+`ollama`, `openai`, and `tools` (`disabled` hides tools from the model and refuses them, per agent;
+`plugins` loads tool modules). A `--config` file that does not exist is an error.
 
 ## 12. Storage
 
 `~/.cortex/sessions/` (saved conversations), `~/.cortex/backups/` (file backups while a request
 is open), `.cortex/semantic_db/` (long-term memory, if enabled), `refs/cortex/*` in your git
-repository (checkpoints, while the session runs). Session files are written atomically.
+repository (checkpoints, while the session runs). Session files are written atomically. An
+unattended run (`cortex run`) uses a temporary `cortex-run-*` directory for its worktree, removed
+when the run ends, and a `cortex/<task>-<id>` branch in your repository if it verified.
 
 ## 13. Testing
 
@@ -182,7 +197,8 @@ tests, a Docker build, and a security scan. Test counts and coverage are generat
 
 ## 14. Known gaps
 
-Planning is sequential and cannot replan; long-term memory's benefit is unmeasured; the three
+The unattended mode has not been run with a real model, and budgets do not interrupt a model call
+or command that is already running. Planning is sequential and cannot replan; long-term memory's benefit is unmeasured; the three
 optional agent features have no ablation yet; the Rust AST parser is unused; the Go services have
 no client; model routing and delegation have not been audited; most of `cortex/` is not in the
 blocking type check.

@@ -40,6 +40,31 @@ guard. It does not say whether the work is correct: run your tests afterwards.
 cortex -p "list all Python files in the project"
 ```
 
+### Unattended Runs (`cortex run`)
+
+```bash
+cortex run --task "fix the failing test" --verify "python -m pytest -q" --json
+```
+
+Does one task with nobody watching, on its own git branch in a separate worktree, and checks it
+with your command. The branch is kept only if the check passed. Your checkout is never touched.
+The exit code is 0 when the run completed as asked (`passed`, or `unverified` because you said
+`--no-verify`), 1 when it ran and did not succeed, 2 when it could not start. Full description,
+the JSON result and the safety notes: [HEADLESS.md](HEADLESS.md).
+
+| Option | Meaning |
+|--------|---------|
+| `--task TEXT` or `--task-file FILE` | what to do (one is required) |
+| `--verify COMMAND` or `--no-verify` | how the work is checked (one is required) |
+| `--retries N` (1), `--max-steps N` (40), `--max-tokens N` (1000000), `--timeout S` (3600), `--verify-timeout S` (600) | budgets; 0 = no limit |
+| `--project-dir DIR`, `--base REF`, `--branch NAME` | where it runs and what it starts from |
+| `--keep-failed` | keep the branch of a run that did not succeed |
+| `--protect GLOB` | a path the run must not change (repeatable); changing one fails the run |
+| `--require-sandbox` | refuse to run unless `command_sandbox` confines commands |
+| `--model`, `--provider`, `--config` | as for `cortex` |
+| `--price-in`, `--price-out` | dollars per million tokens, to report a cost |
+| `--json`, `--output FILE`, `--quiet` | the result as JSON on stdout; also to a file; hide the agent's commentary |
+
 ---
 
 ## Command-Line Options

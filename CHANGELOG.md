@@ -46,6 +46,16 @@ each claim was either made true, with a test, or removed. Nothing here has a ver
 - Turn results (`ok`, `error`, `max_iterations`, `loop_guard`, `blocked`, `interrupted`): one-shot
   mode (`cortex -p`) exits non-zero unless the turn finished.
 - Providers report token usage in one shape.
+- **`cortex run`: unattended runs.** One task on its own git branch in a separate worktree (your
+  checkout is never touched), checked by a command you give (`--verify`), retried with the failure
+  shown, bounded by budgets on steps, tokens and time, and reported as JSON with an honest status
+  and exit code. A run that verified keeps its branch; one that did not leaves nothing behind.
+  Paths can be protected, the agent gets no tools that publish or switch branches, and the
+  worktree is first on `PYTHONPATH` so tests do not import the checkout the project was installed
+  from (measured: without this a regression passed its tests). Cron and systemd files with a
+  wrapper script are in `examples/scheduled/`. See [docs/HEADLESS.md](docs/HEADLESS.md). Tested
+  with a scripted model and over HTTP against a stand-in OpenAI-style server, not yet with a real
+  model.
 - **OpenAI-compatible provider** (`--provider openai`): OpenAI, or a local vLLM, llama.cpp,
   LM Studio or SGLang server through `OPENAI_BASE_URL` (no key needed locally). The server's
   context window is set with `openai.context_window` or `CORTEX_OPENAI_CONTEXT_WINDOW` so the
@@ -76,6 +86,8 @@ each claim was either made true, with a test, or removed. Nothing here has a ver
 - Documentation rewritten so every claim is true or labelled; Python 3.9 or newer (older docs said 3.8).
 
 ### Fixed
+- A `--config` file that does not exist was silently replaced by the defaults, so a typo meant
+  running without the settings you chose (the command sandbox, for one). It is now an error.
 - `tools.disabled` and `tools.plugins` in the configuration did nothing: they were read and then
   never applied, so a "disabled" tool was still offered to the model and still ran, and a
   configured plugin was never loaded. A disabled tool is now hidden from the model (and no longer

@@ -101,18 +101,35 @@ Features that are off unless you ask for them:
 
 ## Run it unattended
 
+Two ways, depending on whether you want an answer or a result.
+
+**One prompt, then exit** (`cortex -p`): the agent works in your checkout and the exit code says
+only whether it finished its turn, not whether the work is right.
+
 ```bash
-cortex -p "fix the failing test in tests/test_parser.py"      # one prompt, then exit
+cortex -p "fix the failing test in tests/test_parser.py"
 ```
 
 In one-shot mode the exit code is 0 only if the model finished its turn; it is 1 if the turn
 failed, hit the iteration limit, or was stopped by the loop guard. It does **not** say whether the
 work is correct: run your tests afterwards.
 
-Before running unattended, read the "Recommendations" in [SECURITY.md](SECURITY.md). In short:
-work in a git repository so `/undo` is available, turn on `command_sandbox` (and set
-`network: false` if the task allows it), and prefer a container or disposable VM for anything you
-do not trust.
+**A task on its own branch, checked by a command** (`cortex run`): the right tool for a scheduler.
+It works in a separate git worktree on a new branch, runs your verify command, feeds failures back
+for another attempt, keeps the branch only if the check passed, and reports what happened as JSON
+and an exit code.
+
+```bash
+cortex run --task "fix the failing test" --verify "python -m pytest -q" --json
+```
+
+How it works, the result format, budgets, what it does and does not protect, and ready-made cron
+and systemd files: [HEADLESS.md](HEADLESS.md).
+
+Before running either unattended, read the "Recommendations" in [SECURITY.md](SECURITY.md). In
+short: work in a git repository so `/undo` is available (`cortex run` has its own branch), turn on
+`command_sandbox` (and set `network: false` if the task allows it), and prefer a container or
+disposable VM for anything you do not trust.
 
 ## Run in a container
 

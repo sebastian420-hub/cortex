@@ -42,7 +42,8 @@ Other providers: `--provider anthropic` (`ANTHROPIC_API_KEY`), `--provider deeps
 (`OPENAI_BASE_URL`; see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)). One prompt and exit:
 `cortex -p "fix the failing test"`.
 
-More options, containers and unattended use: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+More options and containers: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). To run a task with nobody
+watching, for example from a nightly schedule: `cortex run`, below.
 
 ### Optional features (all off until you ask)
 
@@ -74,6 +75,11 @@ More options, containers and unattended use: [docs/DEPLOYMENT.md](docs/DEPLOYMEN
 *   **Memory you can see and control.** The model can `remember` a convention; `/memory list`,
     `add`, `edit` and `delete` manage what is stored. Only decisions, conventions, facts and
     summaries of solved problems are kept, not your requests or error messages.
+*   **Unattended runs.** `cortex run --task "..." --verify "pytest -q" --json` does one task on its
+    own git branch, checks it with your command, retries with the failure shown, and leaves you a
+    branch only if the check passed. Your checkout is never touched, a run that fails leaves nothing
+    behind, and budgets bound it. See [docs/HEADLESS.md](docs/HEADLESS.md) and the cron and systemd
+    examples in [`examples/scheduled/`](examples/scheduled). Not yet run with a real model.
 *   **A benchmark.** `python -m bench` runs 20 verifiable tasks (bug fixes and refactors) and
     records pass/fail from the tasks' own tests, plus steps, tokens and cost. See
     [docs/BENCHMARK.md](docs/BENCHMARK.md).

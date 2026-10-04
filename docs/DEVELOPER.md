@@ -24,10 +24,12 @@ cortex/
 │   ├── prompts/              # PromptBuilder
 │   ├── providers/            # OpenRouter, Anthropic, DeepSeek, Ollama, OpenAI-compatible; token usage
 │   └── gym/                  # practice sessions
+├── headless/                 # cortex run: worktree per task, verify gate, budgets, JSON result
 ├── tools/                    # the tools the model can call
 ├── utils/message_validation.py   # keeps tool-call messages valid for chat APIs
 ├── native/, cache/           # optional Rust bindings and file cache
 bench/                        # the benchmark (python -m bench)
+examples/scheduled/           # cron and systemd files for unattended runs
 tests/                        # the offline test suite; tests/e2e drives the real loop
 ```
 

@@ -26,9 +26,8 @@ Ranked by value for effort; rough sizes are in working days.
 |------|-------------------|------|
 | Verify after every edit | After each change the agent runs your project's tests, lint or type check and reads the result, and stops only when they pass, configured by a file in the repo | 3 to 4 |
 | Trace and replay | Every model call and tool result written to a file that can be replayed against the fake provider, so any bug report becomes a reproducible test | 2 to 3 |
-| Task branches and `/diff` | Each task on its own git branch, with every change shown before you accept it | 2 |
+| Task branches and `/diff` for interactive sessions | Each task on its own git branch, with every change shown before you accept it. Unattended runs (`cortex run`) already work this way | 2 |
 | Cost meter | Tokens, cache hits and dollars per turn (token usage is already reported by providers) | 1 to 2 |
-| Headless mode with a structured result | `cortex run --task ... --json` with budgets and a diff or pull request as output, so CI can use it | 4 to 5 |
 | Repo map | A token-limited outline of the project's files and symbols, so the agent finds code in a large repository without reading files | 5 to 7 |
 | Offline bundle | One command that downloads the tokenizer and embedding model so air-gapped use works from the first run | 1 to 2 |
 | Secrets redaction and an audit log | Mask keys in tool output, ask before reading `.env` files, keep an append-only log of every action | 2 to 3 |
