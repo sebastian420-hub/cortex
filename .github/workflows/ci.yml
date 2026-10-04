@@ -34,9 +34,25 @@ jobs:
           pip install -e .
           pip install -r requirements-test.txt
 
+      # The coverage floor lives in .coveragerc (fail_under). Nothing is omitted from it to make it
+      # reachable: memory, planning, permissions, the agent and the CLI all count.
       - name: Run tests with coverage
         run: |
-          pytest tests/ -v --cov=cortex --cov-report=xml --cov-report=term-missing --cov-fail-under=80
+          pytest tests/ -q --junitxml=junit.xml --cov=cortex --cov-report=xml --cov-report=term-missing
+
+      # Test counts and coverage are generated here, never typed into the README.
+      - name: Summarise results
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        run: |
+          python scripts/test_summary.py junit.xml coverage.xml --out summary > summary.txt || true
+          cat summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test summary
+        if: always() && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary
+          path: summary/
 
       - name: Upload coverage artifact
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
@@ -150,18 +166,102 @@ jobs:
       - name: Install linting dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install black flake8 mypy
+          pip install black==26.5.1 flake8 mypy types-PyYAML
           pip install -e .
 
       - name: Check formatting with black
-        run: black --check cortex tests
+        run: black --check cortex tests bench
 
+      # Undefined names (F821) and unused variables (F841) are errors. The remaining ignores are
+      # known debt, not policy: F401 (unused imports, many are re-exports), E402, E712, and the
+      # two rules black disagrees with (E203, W503) plus line length (black owns that).
       - name: Lint with flake8
-        run: flake8 cortex tests --max-line-length=120 --extend-ignore=E203,W503,E501,F401,E402,F841,E302,E305,E261,W391,E712,F811,F541,E301,E303,F824,E127,F821
+        run: flake8 cortex tests bench --max-line-length=120 --extend-ignore=E203,W503,E501,F401,E402,E712
 
-      - name: Type check with mypy
+      # The files listed under [tool.mypy] files in pyproject.toml are type-clean and must stay so.
+      - name: Type check (blocking set)
+        run: mypy
+
+      - name: Type check (the rest of cortex, advisory)
         run: mypy cortex --ignore-missing-imports --no-error-summary
-        continue-on-error: true  # Non-blocking until strict mode enabled
+        continue-on-error: true  # existing debt: shrink it, then move files into the blocking set
+
+  # ============================================
+  # Benchmark tasks - each must fail as shipped and pass when solved (no model involved)
+  # ============================================
+  bench:
+    name: Benchmark tasks are sound
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . pytest
+
+      - name: Verify the tasks
+        run: python -m bench verify
+
+  # ============================================
+  # Docker image - builds, starts, runs as a non-root user
+  # ============================================
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: docker build -t cortex:ci .
+
+      - name: Starts and reports its version
+        run: docker run --rm cortex:ci --version
+
+      - name: The python -m entry point works
+        run: docker run --rm --entrypoint python cortex:ci -m cortex --version
+
+      - name: Does not run as root
+        run: test "$(docker run --rm --entrypoint id cortex:ci -u)" != "0"
+
+      - name: git and ripgrep are present
+        run: docker run --rm --entrypoint sh cortex:ci -c 'git --version && rg --version'
+
+      - name: Optional memory extra is not pulled in
+        run: docker run --rm --entrypoint python cortex:ci -c "import sys, cortex; assert 'chromadb' not in sys.modules"
+
+  # ============================================
+  # Badges - test count and coverage, generated from this run (main only)
+  # ============================================
+  publish-badges:
+    name: Publish badges
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the test summary
+        uses: actions/download-artifact@v4
+        with:
+          name: test-summary
+          path: summary
+
+      - name: Publish to the badges branch
+        run: |
+          git init badges-repo
+          cd badges-repo
+          git checkout -b badges
+          cp ../summary/badges/*.json .
+          git add .
+          git -c user.name="github-actions" -c user.email="actions@github.com" \
+            commit -m "Badges for ${GITHUB_SHA}"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" badges
 
   # ============================================
   # Security job - vulnerability scanning (BLOCKING)

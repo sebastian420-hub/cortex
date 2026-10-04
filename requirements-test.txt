@@ -27,7 +27,7 @@ bandit>=1.7.0
 safety>=2.0.0
 
 # Code quality (already in requirements-dev.txt)
-black>=23.0.0
+black==26.5.1
 flake8>=6.0.0
 mypy>=1.0.0
 

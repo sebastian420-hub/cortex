@@ -6,7 +6,7 @@ pytest-cov>=4.0
 
 # Code quality
 mypy>=1.0
-black>=23.0
+black==26.5.1  # pinned: CI checks formatting with exactly this version
 flake8>=6.0
 pre-commit>=3.0
 

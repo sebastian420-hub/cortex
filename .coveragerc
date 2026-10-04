@@ -1,107 +1,38 @@
+# What counts toward coverage.
+#
+# Everything under cortex/ counts except three optional components that cannot run in a normal
+# test environment: the compiled Rust bindings, the Go service client, and the Redis backend
+# (which needs a Redis server). Nothing else is omitted: memory, planning, permissions, the agent
+# loop, providers, tools and the CLI are all measured, so the number below is the real one.
 [run]
 source = cortex
 omit =
     */tests/*
     */__pycache__/*
-    */migrations/*
     setup.py
-    */routing/*
-    */recovery/*
-    */code_ast/*
-    */ast/*
-    */git_tools.py
-    */grep_tool.py
-    */web_tools.py
-    */mcp/*
-    */services/*
     */native/*
+    */services/*
     */redis_backend.py
-    */cli_commands/*
-    */planning_tools.py
-    */skill_tools.py
-    */test_tools.py
-    */todo_tool.py
-    */ask_user_tool.py
-    */edit_tool.py
-    */glob_tool.py
-    */result_truncation.py
-    */output_processing.py
-    */progress.py
-    */repl.py
-    */plan_progress.py
-    */display.py
-    */cli.py
-    */config.py
-    */conversation.py
-    */orchestration.py
-    */memory_layers/*
-    */memory_chunked/*
-    */hooks/*
-    */prompts/*
-    */loop_guards.py
-    */providers/*
-    */registry.py
-    */agent.py
-    */consolidated_display.py
-    */sessions.py
-    */cleanup.py
 
 [report]
 omit =
     */tests/*
     */__pycache__/*
-    */migrations/*
     setup.py
-    */routing/*
-    */recovery/*
-    */code_ast/*
-    */ast/*
-    */git_tools.py
-    */grep_tool.py
-    */web_tools.py
-    */mcp/*
-    */services/*
     */native/*
+    */services/*
     */redis_backend.py
-    */cli_commands/*
-    */planning_tools.py
-    */skill_tools.py
-    */test_tools.py
-    */todo_tool.py
-    */ask_user_tool.py
-    */edit_tool.py
-    */glob_tool.py
-    */result_truncation.py
-    */output_processing.py
-    */progress.py
-    */repl.py
-    */plan_progress.py
-    */display.py
-    */cli.py
-    */config.py
-    */conversation.py
-    */orchestration.py
-    */memory_layers/*
-    */memory_chunked/*
-    */hooks/*
-    */prompts/*
-    */loop_guards.py
-    */providers/*
-    */registry.py
-    */agent.py
-    */consolidated_display.py
-    */sessions.py
-    */cleanup.py
 exclude_lines =
     pragma: no cover
     def __repr__
     if self.debug:
-    if settings.DEBUG
     raise AssertionError
     raise NotImplementedError
     if 0:
     if __name__ == .__main__.:
-    class .*Mock.:
     @abc.abstractmethod
 
-fail_under = 80
+# Set a few points below the figure measured when the omissions were removed, so a regression
+# fails CI. Raise it as coverage grows; never lower it by omitting code. (CI prints the current
+# figure on every run; it is not repeated here so it cannot go stale.)
+fail_under = 64

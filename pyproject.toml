@@ -90,6 +90,35 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+follow_imports = "silent"
+# The modules that are held to a clean type check (`mypy` with no arguments checks exactly these;
+# CI fails if they regress). It is a list of what is clean today, not of what matters: grow it.
+files = [
+    "cortex/core/turn.py",
+    "cortex/core/tool_policy.py",
+    "cortex/core/checkpoints.py",
+    "cortex/core/command_sandbox.py",
+    "cortex/core/transaction.py",
+    "cortex/core/planning.py",
+    "cortex/core/loop_guards.py",
+    "cortex/core/agent_permissions.py",
+    "cortex/core/security.py",
+    "cortex/core/context.py",
+    "cortex/core/conversation.py",
+    "cortex/core/memory/contract.py",
+    "cortex/core/memory/core_memory.py",
+    "cortex/core/memory_layers/session.py",
+    "cortex/core/memory_layers/state.py",
+    "cortex/core/providers/usage.py",
+    "cortex/core/gym/manager.py",
+    "cortex/utils/message_validation.py",
+    "cortex/tools/memory_tools.py",
+    "cortex/tools/skill_tools.py",
+    "cortex/cli_commands/commands/transaction.py",
+    "cortex/cli_commands/commands/gym.py",
+    "cortex/cli_commands/commands/memory.py",
+    "bench",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
