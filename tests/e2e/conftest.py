@@ -17,8 +17,6 @@ from .scripted import ScriptedProvider
 # "unexpectedly passed" and forces the entry to be deleted. The list below is the open-bug list.
 KNOWN_BUGS = {
     "test_edit_can_be_rolled_back_with_the_rollback_command": "P3-1: transactions not wired in",
-    "test_plan_mode_does_not_run_project_code": "P3-3: run_tests runs in PLAN mode",
-    "test_every_registered_tool_has_a_policy_class": "P3-3: no tool classification exists",
     "test_ast_rename_refuses_when_other_files_use_the_symbol": "P3-5: rename is single-file",
 }
 
