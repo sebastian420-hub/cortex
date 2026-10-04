@@ -95,6 +95,7 @@ follow_imports = "silent"
 # CI fails if they regress). It is a list of what is clean today, not of what matters: grow it.
 files = [
     "cortex/core/turn.py",
+    "cortex/headless",
     "cortex/core/tool_policy.py",
     "cortex/core/checkpoints.py",
     "cortex/core/command_sandbox.py",

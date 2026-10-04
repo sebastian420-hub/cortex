@@ -15,6 +15,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional
 
+from cortex.headless.meter import UsageMeter
+
 from .suite import select
 from .task import Task, apply_solution, materialize, verify
 
@@ -71,46 +73,8 @@ class TaskResult:
 
 
 # ---------------------------------------------------------------------------------------
-# Counting tokens
+# Counting tokens (the meter is shared with unattended runs: cortex/headless/meter.py)
 # ---------------------------------------------------------------------------------------
-
-
-class UsageMeter:
-    """Wraps a provider and adds up the tokens its calls used.
-
-    Uses the usage the provider reports. If a call reports none, its tokens are estimated from
-    the text and the totals are flagged as estimates.
-    """
-
-    def __init__(self, inner: Any):
-        self._inner = inner
-        self.calls = 0
-        self.input_tokens = 0
-        self.output_tokens = 0
-        self.estimated = False
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._inner, name)
-
-    def chat(self, model, messages, tools=None):
-        from cortex.core.context import estimate_tokens
-        from cortex.core.providers.usage import usage_of_response
-
-        response = self._inner.chat(model, messages, tools)
-        self.calls += 1
-        usage = usage_of_response(response)
-        if usage:
-            self.input_tokens += usage["input_tokens"]
-            self.output_tokens += usage["output_tokens"]
-        else:
-            self.estimated = True
-            self.input_tokens += sum(estimate_tokens(str(m.get("content", ""))) for m in messages)
-            reply = response.get("message", {}) if isinstance(response, dict) else {}
-            self.output_tokens += estimate_tokens(str(reply.get("content", "")))
-        return response
-
-    def supports_streaming(self) -> bool:  # the benchmark never streams: every call is metered
-        return False
 
 
 def cost(
