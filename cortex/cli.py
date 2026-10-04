@@ -528,9 +528,11 @@ def main():
 
         # Run in async mode if requested
         if args.use_async:
-            asyncio.run(agent._process_message_async(args.prompt, use_streaming=args.streaming))
+            turn = asyncio.run(
+                agent._process_message_async(args.prompt, use_streaming=args.streaming)
+            )
         else:
-            agent._process_message(args.prompt, use_streaming=args.streaming)
+            turn = agent._process_message(args.prompt, use_streaming=args.streaming)
 
         # Save session if requested
         if args.save_session:
@@ -541,6 +543,11 @@ def main():
                 agent.model,
                 agent.permission_mode,
             )
+
+        # Scripts and CI need to know whether the task actually completed.
+        if turn is not None and not turn.ok:
+            console.print(f"[red]Task did not complete ({turn.status}):[/red] {turn.error or ''}")
+            sys.exit(1)
     else:
         # Interactive mode
         run_interactive(

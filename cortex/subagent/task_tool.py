@@ -277,7 +277,10 @@ class TaskTool(Tool):
 
         # Process the task
         # Note: We're calling _process_message directly which populates conversation
-        subagent._process_message(context.task_description)
+        turn = subagent._process_message(context.task_description)
+        if not getattr(turn, "ok", True):
+            # A turn that errored used to look like a finished task with an empty answer.
+            raise RuntimeError(f"Subagent did not finish ({turn.status}): {turn.error}")
 
         # Collect results
         context.conversation_history = subagent.get_conversation_history()

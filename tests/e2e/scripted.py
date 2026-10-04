@@ -63,6 +63,22 @@ def tool_call(name: str, arguments: Dict[str, Any], call_id: str = "call_1") -> 
     }
 
 
+def tool_calls(*calls) -> Dict[str, Any]:
+    """An assistant message that requests several tool calls at once: (name, args, id)."""
+    return {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+            {
+                "id": call_id,
+                "type": "function",
+                "function": {"name": name, "arguments": json.dumps(arguments)},
+            }
+            for name, arguments, call_id in calls
+        ],
+    }
+
+
 def final(text: str) -> Dict[str, Any]:
     """An assistant message with a final text answer and no tool calls."""
     return {"role": "assistant", "content": text}

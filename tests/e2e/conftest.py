@@ -17,8 +17,6 @@ from .scripted import ScriptedProvider
 # "unexpectedly passed" and forces the entry to be deleted. The list below is the open-bug list.
 KNOWN_BUGS = {
     "test_mood_counts_consecutive_failures_not_total": "P2-5: mood counts total failures",
-    "test_turn_returns_a_structured_result": "P2-8: turns return None, not a result",
-    "test_turn_that_raises_reports_error_status": "P2-8: turn errors are swallowed",
     "test_edit_can_be_rolled_back_with_the_rollback_command": "P3-1: transactions not wired in",
     "test_plan_mode_does_not_run_project_code": "P3-3: run_tests runs in PLAN mode",
     "test_every_registered_tool_has_a_policy_class": "P3-3: no tool classification exists",

@@ -16,7 +16,7 @@ import pytest
 
 from cortex.models import PermissionMode
 
-from .scripted import final, tool_call, tool_order_violations
+from .scripted import final, tool_call, tool_calls, tool_order_violations
 
 
 def _text(result) -> str:
@@ -135,6 +135,59 @@ def test_turn_that_raises_reports_error_status(make_agent):
     assert result is not None
     assert result.status == "error"
     assert "provider exploded" in (result.error or "")
+
+
+# ---- the loop guard: stops a turn that keeps failing the same way ----------------------
+
+
+def test_repeating_the_same_error_stops_the_turn(make_agent):
+    script = [tool_call("read_file", {"path": "missing.py"}, f"c{i}") for i in range(6)]
+    agent = make_agent(script)
+
+    result = agent._process_message("keep trying")
+
+    assert result.status == "loop_guard"
+    assert "read_file" in result.error
+    assert len(agent.provider.seen) == 3  # stopped on the third identical failure
+
+
+def test_different_errors_do_not_trip_the_loop_guard(make_agent):
+    script = [tool_call("read_file", {"path": f"missing{i}.py"}, f"c{i}") for i in range(4)]
+    script.append(final("gave up politely"))
+    agent = make_agent(script)
+
+    result = agent._process_message("try several files")
+
+    assert result.status == "ok"
+
+
+def test_loop_guard_history_resets_between_turns(make_agent):
+    def failing_turn(prefix):
+        return [
+            tool_call("read_file", {"path": "missing.py"}, f"{prefix}{i}") for i in range(2)
+        ] + [final("done")]
+
+    agent = make_agent(failing_turn("a") + failing_turn("b"))
+
+    first = agent._process_message("first request")
+    second = agent._process_message("second request")
+
+    assert first.status == "ok"
+    assert second.status == "ok"  # would be loop_guard if turn one's errors still counted
+
+
+def test_guard_guidance_never_lands_inside_a_batch_of_tool_results(make_agent):
+    batch = tool_calls(
+        ("read_file", {"path": "missing.py"}, "x1"), ("read_file", {"path": "missing.py"}, "x2")
+    )
+    agent = make_agent(
+        [batch, batch, batch, final("done")], error_recovery={"enable_smart_recovery": True}
+    )
+
+    agent._process_message("two failing reads at a time")
+
+    # Strict mode raises if any call sent a broken tool order; also check what was sent.
+    assert all(tool_order_violations(sent) == [] for sent in agent.provider.seen)
 
 
 # --------------------------------------------------------------------------------------

@@ -25,6 +25,15 @@ from .core.prompts.builder import PromptBuilder
 from .core.providers import ProviderError, ProviderFactory
 from .core.security import SecurityError
 from .core.streaming import display_streaming_response, stream_model_response
+from .core.turn import (
+    STATUS_BLOCKED,
+    STATUS_ERROR,
+    STATUS_INTERRUPTED,
+    STATUS_LOOP_GUARD,
+    STATUS_MAX_ITERATIONS,
+    STATUS_OK,
+    TurnResult,
+)
 from .hooks import (
     HookAction,
     HookManager,
@@ -537,17 +546,17 @@ class Cortex:
                 session_results = self.memory_bank.retrieve_semantic_context(
                     last_user_msg, top_k=2, global_search=False
                 )
-                
+
                 # Get one highly relevant item from past sessions
                 global_results = self.memory_bank.retrieve_semantic_context(
                     last_user_msg, top_k=1, global_search=True
                 )
-                
+
                 context_items = []
                 if session_results:
                     context_items.append("From current session:")
                     context_items.extend([f"- {r['document']}" for r in session_results])
-                
+
                 if global_results:
                     # Filter out if it's the same as a session result
                     session_docs = [r["document"] for r in session_results]
@@ -555,7 +564,7 @@ class Cortex:
                         if r["document"] not in session_docs:
                             context_items.append("From past sessions:")
                             context_items.append(f"- {r['document']}")
-                
+
                 if context_items:
                     semantic_context = "\n".join(context_items)
 
@@ -568,7 +577,7 @@ class Cortex:
                 "create_and_execute_plan",
                 "metacognitive_reflect",
             ]
-        
+
         tool_schemas = get_registry().get_all_schemas(exclude_names=exclude)
 
         # Build using PromptBuilder
@@ -824,7 +833,7 @@ class Cortex:
             # --- Metacognitive Appraisal ---
             if hasattr(self, "state_manager"):
                 self.state_manager.update_metacognition(tool_name, result)
-            
+
             # Bio-inspired belief reinforcement
             if self.enable_layered_memory and hasattr(self.memory_bank, "verify_memory"):
                 # Use a heuristic: if we were looking for a file and found it, verify that memory
@@ -927,11 +936,11 @@ class Cortex:
         except Exception as e:
             logger.warning(f"Error during cleanup: {e}", exc_info=True)
 
-    def _process_message(self, user_message: str, use_streaming: bool = False):
-        """Unified message processing loop supporting planning and memory."""
+    def _process_message(self, user_message: str, use_streaming: bool = False) -> TurnResult:
+        """Run one user message to completion and report how it ended."""
 
         if self._shutdown_requested:
-            return
+            return TurnResult(STATUS_INTERRUPTED)
 
         # Dispatch UserPromptSubmit hook
         prompt_event = UserPromptSubmitEvent(
@@ -940,8 +949,9 @@ class Cortex:
         prompt_result = self.hook_manager.dispatch(prompt_event)
 
         if prompt_result.action == HookAction.ABORT:
-            self._output_error(prompt_result.message or "Blocked by hook", "prompt_blocked")
-            return
+            blocked_message = prompt_result.message or "Blocked by hook"
+            self._output_error(blocked_message, "prompt_blocked")
+            return TurnResult(STATUS_BLOCKED, error=blocked_message)
         elif prompt_result.action == HookAction.MODIFY and prompt_result.modified_data:
             user_message = prompt_result.modified_data.get("prompt", user_message)
 
@@ -972,9 +982,13 @@ class Cortex:
 
         self._is_processing = True
 
+        # Errors from an earlier request must not count against this one
+        self.loop_guard.reset()
+
         # Agent loop
         max_iterations = self.config.max_iterations
         iteration = 0
+        tool_count = 0
 
         try:
             while True:
@@ -984,7 +998,9 @@ class Cortex:
                 if self._shutdown_requested:
                     self._output_warning("Shutdown requested. Cleaning up...")
                     self._cleanup()
-                    return
+                    return TurnResult(
+                        STATUS_INTERRUPTED, iterations=iteration - 1, tool_calls=tool_count
+                    )
 
                 if iteration > max_iterations:
                     if self._on_max_iterations_reached:
@@ -993,7 +1009,12 @@ class Cortex:
                             max_iterations += additional
                             continue
                     self._output_warning("Reached maximum iterations")
-                    return
+                    return TurnResult(
+                        STATUS_MAX_ITERATIONS,
+                        error="Reached maximum iterations",
+                        iterations=iteration - 1,
+                        tool_calls=tool_count,
+                    )
 
                 self.loop_guard.increment_iteration()
                 console.print(f"[dim]{'-' * 60}[/dim]")
@@ -1077,11 +1098,19 @@ class Cortex:
                             tool_calls_to_run, agent_description
                         ):
                             batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
+                        tool_count += len(tool_calls_to_run)
 
-                        # Process results
+                        # Process results. Nothing but tool results may be added to the
+                        # conversation until every call in this batch is answered (chat APIs
+                        # require the results to directly follow the request), so recovery
+                        # guidance is held back and added after the loop.
+                        recovery_prompts: List[str] = []
+                        guard_error: Optional[str] = None
                         for tool_result in batch_result.results:
                             if self._shutdown_requested:
-                                return
+                                return TurnResult(
+                                    STATUS_INTERRUPTED, iterations=iteration, tool_calls=tool_count
+                                )
 
                             tool_name = tool_result.name
                             result = tool_result.result
@@ -1111,6 +1140,7 @@ class Cortex:
                                     continue
 
                             # Truncate and add to conversation
+                            raw_result = result
                             result = truncate_tool_result(
                                 tool_name,
                                 result,
@@ -1118,20 +1148,39 @@ class Cortex:
                             )
                             self.conversation.add_tool_result(tool_result.id, result)
 
-                            # Loop guard checks
-                            if not self._is_tool_result_success(result):
-                                if self.loop_guard.check_repeated_error(result):
+                            # Loop guard: it only works if it is fed every call and every error
+                            # (it used to be checked but never recorded into, so it never fired).
+                            self.loop_guard.record_tool_call(tool_name, arguments)
+                            if self._is_tool_result_success(raw_result):
+                                self.loop_guard.record_operation(tool_name, arguments)
+                            else:
+                                self.loop_guard.record_error(raw_result)
+                                if self.loop_guard.check_repeated_error(raw_result):
                                     recovery_action = self.loop_guard.get_recovery_action(
-                                        result, tool_name, arguments
+                                        raw_result, tool_name, arguments
                                     )
                                     if recovery_action and recovery_action.strategy != "ESCALATE":
                                         if recovery_action.suggested_prompt:
-                                            self.conversation.add_user_message(
+                                            recovery_prompts.append(
                                                 f"[Recovery Guidance] "
                                                 f"{recovery_action.suggested_prompt}"
                                             )
                                         continue
-                                    return
+                                    guard_error = (
+                                        f"Stopped after repeated errors from {tool_name}: "
+                                        f"{result.get('error', 'unknown error')}"
+                                    )
+
+                        # Every call in the batch is answered now: guidance may follow.
+                        for prompt in recovery_prompts:
+                            self.conversation.add_user_message(prompt)
+                        if guard_error:
+                            return TurnResult(
+                                STATUS_LOOP_GUARD,
+                                error=guard_error,
+                                iterations=iteration,
+                                tool_calls=tool_count,
+                            )
 
                     else:
                         # Final response
@@ -1140,22 +1189,30 @@ class Cortex:
                             self._output_response({"content": final_text}, is_final=True)
                             if self.enable_layered_memory:
                                 self._extract_insights_from_response(final_text)
-                            return
-                        return
+                        return TurnResult(
+                            STATUS_OK,
+                            final_text=final_text or "",
+                            iterations=iteration,
+                            tool_calls=tool_count,
+                        )
 
                 except Exception as e:
                     import traceback
 
                     self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
-                    return
+                    return TurnResult(
+                        STATUS_ERROR, error=str(e), iterations=iteration, tool_calls=tool_count
+                    )
         finally:
             self._is_processing = False
             self.state_manager.set_focus(AgentFocus.EXPLORING)
 
     # Async version of the loop
-    async def _process_message_async(self, user_message: str, use_streaming: bool = False) -> None:
+    async def _process_message_async(
+        self, user_message: str, use_streaming: bool = False
+    ) -> TurnResult:
         """Async version of message processing."""
-        await asyncio.to_thread(self._process_message, user_message, use_streaming)
+        return await asyncio.to_thread(self._process_message, user_message, use_streaming)
 
     def _extract_insights_from_response(self, response: str) -> None:
         """Extract insights from final response text for layered memory."""
