@@ -1,6 +1,32 @@
 """Cortex - A unified agent for coding, cybersecurity, and personal assistance"""
 
-__version__ = "1.2.0"
+
+
+def _resolve_version() -> str:
+    """The version lives in pyproject.toml only; read it from installed metadata."""
+    try:
+        from importlib.metadata import version
+
+        return version("cortex")
+    except Exception:
+        pass
+    # Source checkout that is not installed: read pyproject.toml next to the package.
+    try:
+        import re
+        from pathlib import Path
+
+        text = (Path(__file__).resolve().parent.parent / "pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+        match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return "0.0.0+unknown"
+
+
+__version__ = _resolve_version()
 
 # Load environment variables from .env file if present
 try:

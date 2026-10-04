@@ -7,11 +7,12 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from rich.panel import Panel
 from rich.table import Table
 
+from . import __version__
 from .agent import Cortex
 from .cli_commands.commands import CommandContext, CommandRegistry
 from .config import AgentConfig
@@ -35,8 +36,6 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("cortex.tools.registry").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-
-__version__ = "1.0.0"
 
 
 def check_ollama() -> bool:
@@ -155,8 +154,8 @@ def validate_provider_setup(model: str, provider_override: Optional[str] = None)
         return False
 
 
-def main():
-    """Main CLI entry point"""
+def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
         description="Cortex - A unified agent for coding, cybersecurity, and personal assistance",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -205,9 +204,27 @@ Examples:
     parser.add_argument("--plan-mode", action="store_true", help="Start in plan mode (read-only)")
 
     parser.add_argument(
+        "--planning",
+        action="store_true",
+        help="Enable the planning tools (create_and_execute_plan, monitor_plan, update_plan)",
+    )
+
+    parser.add_argument(
+        "--memory",
+        action="store_true",
+        help="Enable layered memory (failed approaches, patterns, insights)",
+    )
+
+    parser.add_argument(
+        "--metacognition",
+        action="store_true",
+        help="Experimental: inject confidence/urgency/tone state into the system prompt",
+    )
+
+    parser.add_argument(
         "--enhanced",
         action="store_true",
-        help="Use enhanced agent with planning and layered memory",
+        help="Deprecated alias for --planning --memory",
     )
 
     parser.add_argument(
@@ -268,7 +285,39 @@ Examples:
         ),
     )
 
-    args = parser.parse_args()
+    return parser
+
+
+def resolve_agent_features(
+    args: argparse.Namespace, config: AgentConfig
+) -> Tuple[bool, bool, bool]:
+    """Decide which optional agent features are on.
+
+    A command-line flag or a config-file setting turns each one on. ``--enhanced`` is the old
+    name for ``--planning --memory`` and is kept as a deprecated alias.
+
+    Returns:
+        (planning, layered_memory, metacognition)
+    """
+    enhanced = bool(getattr(args, "enhanced", False))
+    planning = bool(args.planning or enhanced or config.enable_planning)
+    memory = bool(args.memory or enhanced or config.enable_layered_memory)
+    metacognition = bool(args.metacognition or config.enable_metacognition)
+    return planning, memory, metacognition
+
+
+def resolve_permission_mode(args: argparse.Namespace, config: AgentConfig) -> str:
+    """Pick the permission mode: a flag wins, otherwise the loaded config decides."""
+    if args.auto_approve:
+        return PermissionMode.AUTO_APPROVE
+    if args.plan_mode:
+        return PermissionMode.PLAN
+    return config.permission_mode or PermissionMode.NORMAL
+
+
+def main():
+    """Main CLI entry point"""
+    args = build_parser().parse_args()
 
     # Handle list-providers command
     if args.list_providers:
@@ -329,12 +378,7 @@ Examples:
         sys.exit(1)
 
     # Determine permission mode
-    if args.auto_approve:
-        permission_mode = PermissionMode.AUTO_APPROVE
-    elif args.plan_mode:
-        permission_mode = PermissionMode.PLAN
-    else:
-        permission_mode = args.config and config.permission_mode or PermissionMode.NORMAL
+    permission_mode = resolve_permission_mode(args, config)
 
     # Project directory
     project_dir = args.project_dir or os.getcwd()
@@ -403,10 +447,24 @@ Examples:
         hook_manager.disable()
 
     # Create unified agent
-    is_enhanced = args.enhanced or (args.config and config.enable_planning)
+    if args.enhanced:
+        console.print(
+            "[yellow]--enhanced is deprecated; use --planning and/or --memory instead.[/yellow]"
+        )
+    enable_planning, enable_memory, enable_metacognition = resolve_agent_features(args, config)
+    config.enable_metacognition = enable_metacognition
 
-    if is_enhanced:
-        console.print("[cyan]Using enhanced features: planning and layered memory[/cyan]")
+    enabled = [
+        name
+        for name, on in (
+            ("planning", enable_planning),
+            ("layered memory", enable_memory),
+            ("metacognition", enable_metacognition),
+        )
+        if on
+    ]
+    if enabled:
+        console.print(f"[cyan]Enabled: {', '.join(enabled)}[/cyan]")
 
     agent = Cortex(
         model=config.model,
@@ -415,8 +473,8 @@ Examples:
         config=config,
         hook_manager=hook_manager,
         output_format=output_format,
-        enable_planning=is_enhanced,
-        enable_layered_memory=is_enhanced,
+        enable_planning=enable_planning,
+        enable_layered_memory=enable_memory,
     )
 
     # Load session if requested

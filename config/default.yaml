@@ -1,7 +1,11 @@
-# Default configuration for Cortex
+# Default configuration for Cortex.
+#
+# Every key below is a real setting. Unknown keys are reported at startup instead of being
+# silently ignored. Environment variables (CORTEX_MODEL, CORTEX_MODE, ...) override this file,
+# and command-line flags override both.
 
 model: moonshotai/kimi-k2.5
-permission_mode: normal
+permission_mode: normal   # normal (ask before changes) | auto_approve | plan (read-only)
 max_iterations: 15
 
 # Context window size (in tokens)
@@ -14,12 +18,24 @@ keep_recent_messages: 20
 auto_save: false
 
 # Provider settings (auto-detected from model name if not specified)
-# provider: null  # "ollama" | "deepseek" | "anthropic" | null (auto-detect)
+# provider: null  # "ollama" | "deepseek" | "anthropic" | "openrouter" | null (auto-detect)
 
 # API keys are read from environment variables:
-# - DEEPSEEK_API_KEY (for DeepSeek models)
-# - ANTHROPIC_API_KEY (for Anthropic/Claude models)
+# - OPENROUTER_API_KEY (OpenRouter models, including the default)
+# - DEEPSEEK_API_KEY (DeepSeek models)
+# - ANTHROPIC_API_KEY (Claude models)
 # Ollama doesn't require API keys
+
+# Optional agent features. All are off by default; each also has a command-line flag.
+enable_planning: false         # --planning: create_and_execute_plan / monitor_plan / update_plan
+enable_layered_memory: false   # --memory: failed approaches, successful patterns, insights
+enable_metacognition: false    # --metacognition (experimental): confidence/urgency/tone in prompt
+
+# Semantic (vector) memory across sessions. Requires: pip install 'cortex[memory]'
+# It only has an effect together with enable_layered_memory.
+semantic_memory:
+  enabled: false
+  # persist_directory: .cortex/semantic_db   # relative to the working directory
 
 # Parallel execution settings
 parallel_execution:
@@ -32,22 +48,20 @@ parallel_execution:
   batch_size: 10
 
 # Tool configuration
-tools:
-  # List of plugin modules to load
-  # plugins:
-  #   - "my_plugins.custom_tools"
-  #   - "examples.plugins.simple_tool"
+# tools_plugins: List of plugin modules to load
+# tools_plugins:
+#   - "my_plugins.custom_tools"
+#   - "examples.plugins.simple_tool"
+tools_plugins: []
 
-  # Tools to disable
-  # disabled:
-  #   - "web_search"
-  #   - "web_fetch"
+# Tools to disable
+# tools_disabled:
+#   - "web_search"
+#   - "web_fetch"
+tools_disabled: []
 
-  # Tools to explicitly enable (re-enable defaults)
-  # enabled: []
-
-# Feature flags for hybrid (Rust/Go) components
-features:
+# Feature flags for the optional native (Rust/Go) components. All off by default.
+feature_flags:
   rust_search: false
   rust_ast: false
   rust_tokenizer: false
