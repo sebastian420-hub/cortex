@@ -46,6 +46,59 @@ jobs:
           path: coverage.xml
 
   # ============================================
+  # Native components - Rust extension and Go services
+  # ============================================
+  rust:
+    name: Rust tests (cortex-native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python (PyO3 links against it)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/cortex-native/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('rust/cortex-native/Cargo.lock') }}
+
+      - name: Run Rust tests
+        working-directory: rust/cortex-native
+        run: cargo test
+
+      - name: Build the Python wheel
+        run: |
+          pip install maturin
+          cd rust/cortex-native && maturin build
+
+  go:
+    name: Go tests (cortex-services)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+
+      - name: Vet and test
+        working-directory: go
+        run: |
+          go vet ./...
+          go test ./... -count=1
+
+  # ============================================
   # Lint job - code quality checks
   # ============================================
   lint:
