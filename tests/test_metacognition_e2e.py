@@ -247,8 +247,13 @@ class TestMetacognitionE2E(unittest.TestCase):
         
         # Run practice session
         result = gym.run_practice_session("Refactoring", "Practice refactoring code safely.")
-        
-        self.assertTrue(result["success"])
+
+        # No verifier was given, so nothing checked the work: the session finished and the model
+        # reflected, but the outcome is neither a success nor a failure.
+        self.assertTrue(result["turn_ok"])
+        self.assertTrue(result["reflected"])
+        self.assertFalse(result["verified"])
+        self.assertIsNone(result["success"])
         
         # Verify focus was set to TRAINING during execution (GymManager restores it to EXPLORING after)
         # We can't easily check it during execution without more mocking, but we can check if 

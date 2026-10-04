@@ -37,13 +37,13 @@ class TestGymLogic(unittest.TestCase):
         args, _ = self.agent._process_message.call_args
         self.assertIn("PRACTICE SESSION: test_task", args[0])
 
-    def _run(self, **agent_attrs):
+    def _run(self, verifier=None, **agent_attrs):
         for name, value in agent_attrs.items():
             setattr(self.agent, name, value)
         with patch("cortex.core.gym.manager.SandboxProvider") as provider_class:
             provider_class.return_value.create_sandbox.return_value = Path("/tmp/sandbox")
             manager = GymManager(self.agent)
-            return manager.run_practice_session("task", "goal")
+            return manager.run_practice_session("task", "goal", verifier=verifier)
 
     def test_prompt_does_not_call_a_project_copy_safe(self):
         self._run()
@@ -73,12 +73,51 @@ class TestGymLogic(unittest.TestCase):
         self.assertFalse(outcome["success"])
         self.assertIn("model crashed", outcome["error"])
 
-    def test_a_finished_turn_is_reported_as_success(self):
+    def test_a_finished_turn_without_a_verifier_is_not_called_a_success(self):
         from cortex.core.turn import STATUS_OK, TurnResult
 
-        self.agent._process_message.return_value = TurnResult(STATUS_OK, final_text="done")
+        self.agent._process_message.return_value = TurnResult(STATUS_OK, final_text="I fixed it!")
 
-        self.assertTrue(self._run()["success"])
+        outcome = self._run()
+
+        # nothing checked the work: the model saying it is done is not a result
+        self.assertIsNone(outcome["success"])
+        self.assertFalse(outcome["verified"])
+        self.assertTrue(outcome["turn_ok"])
+
+    def test_the_verifier_decides_not_the_model(self):
+        from types import SimpleNamespace
+
+        from cortex.core.turn import STATUS_OK, TurnResult
+
+        self.agent._process_message.return_value = TurnResult(STATUS_OK, final_text="All fixed!")
+        failing = lambda path: SimpleNamespace(passed=False, output="1 failed: test_sum")  # noqa: E731
+        passing = lambda path: SimpleNamespace(passed=True, output="1 passed")  # noqa: E731
+
+        bad = self._run(verifier=failing)
+        good = self._run(verifier=passing)
+
+        self.assertFalse(bad["success"])
+        self.assertTrue(bad["verified"])
+        self.assertIn("test_sum", bad["error"])
+        self.assertTrue(good["success"])
+
+    def test_the_verifier_is_given_the_sessions_directory(self):
+        from types import SimpleNamespace
+
+        seen = []
+        self._run(verifier=lambda path: seen.append(path) or SimpleNamespace(passed=True, output=""))
+
+        self.assertEqual(seen, [Path("/tmp/sandbox")])
+
+    def test_a_broken_verifier_is_a_failure_not_a_success(self):
+        def broken(path):
+            raise RuntimeError("could not run the tests")
+
+        outcome = self._run(verifier=broken)
+
+        self.assertFalse(outcome["success"])
+        self.assertIn("could not run the tests", outcome["error"])
 
     def test_the_real_projects_checkpoints_are_off_during_a_session_and_back_after(self):
         real_store = object()
@@ -131,12 +170,34 @@ class TestGymCommandMessages(unittest.TestCase):
         return " ".join(printed)
 
     def test_it_only_claims_learnings_were_saved_when_they_were(self):
-        saved = self._run_command({"success": True, "reflected": True})
-        not_saved = self._run_command({"success": True, "reflected": False})
+        saved = self._run_command({"success": True, "verified": True, "reflected": True})
+        not_saved = self._run_command({"success": True, "verified": True, "reflected": False})
 
         self.assertIn("recorded", saved)
         self.assertNotIn("have been recorded", not_saved)
         self.assertIn("metacognitive_reflect", not_saved)
+
+    def test_a_verified_pass_and_a_verified_failure_are_reported_as_such(self):
+        passed = self._run_command({"success": True, "verified": True, "reflected": False})
+        failed = self._run_command(
+            {"success": False, "verified": True, "error": "1 failed: test_sum", "reflected": True}
+        )
+
+        self.assertIn("passed", passed.lower())
+        self.assertNotIn("completed successfully", failed)
+        self.assertIn("failed", failed.lower())
+        self.assertIn("test_sum", failed)
+
+    def test_an_unchecked_session_is_neither_success_nor_failure(self):
+        unchecked = self._run_command(
+            {"success": None, "verified": False, "turn_ok": True, "reflected": True}
+        )
+
+        text = unchecked.lower()
+        self.assertNotIn("completed successfully", text)
+        self.assertNotIn("passed its verifier", text)
+        self.assertNotIn("failed its verifier", text)
+        self.assertIn("nothing checked", text)
 
 
 if __name__ == "__main__":
