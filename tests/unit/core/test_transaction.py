@@ -509,7 +509,7 @@ class TestTransactionManager:
 
             # Create more transactions than max_backups
             for i in range(transaction_manager.max_backups + 5):
-                tx = transaction_manager.begin()
+                transaction_manager.begin()
                 transaction_manager.commit()
 
             history = transaction_manager.get_transaction_history()

@@ -1,5 +1,6 @@
 """Configuration management for Cortex"""
 
+import logging
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
@@ -16,6 +17,8 @@ except ImportError:
     PYDANTIC_AVAILABLE = False
     BaseModel = object
 
+
+logger = logging.getLogger(__name__)
 
 # Default timeout values (in seconds)
 DEFAULT_TIMEOUTS = {
@@ -57,6 +60,32 @@ DEFAULT_TRANSACTIONS = {
     "enabled": True,
     "max_backups": 10,
     "backup_dir": None,  # Uses .cortex/backups by default
+}
+
+# Default git checkpoint settings (/undo)
+DEFAULT_CHECKPOINTS = {
+    "enabled": True,
+    "keep": 20,  # snapshots kept per stack
+    "timeout": 60.0,  # seconds git may spend on one snapshot before it is skipped
+    "stale_days": 7,  # snapshots left behind by sessions that never exited cleanly
+}
+
+# Default Ollama settings. num_ctx is the context window requested from the server; None means
+# the provider default (see core/providers/ollama.py). CORTEX_OLLAMA_NUM_CTX overrides it.
+DEFAULT_OLLAMA = {"num_ctx": None}
+
+# Default settings for OpenAI-compatible servers (vLLM, llama.cpp, LM Studio; see
+# core/providers/openai_compatible.py). base_url and context_window are None until set; the
+# OPENAI_BASE_URL and CORTEX_OPENAI_CONTEXT_WINDOW environment variables override them.
+DEFAULT_OPENAI = {"base_url": None, "context_window": None}
+
+# Default command sandbox settings (see core/command_sandbox.py). "none" means commands run with
+# the user's own permissions.
+DEFAULT_COMMAND_SANDBOX = {
+    "mode": "none",  # or "bubblewrap" (Linux)
+    "network": True,  # False cuts commands off from the network (bubblewrap only)
+    "private_home": False,  # True hides the home directory from commands (bubblewrap only)
+    "writable": [],  # extra directories commands may write to (bubblewrap only)
 }
 
 # Default parallel execution settings
@@ -163,6 +192,10 @@ DEFAULT_SEMANTIC_MEMORY = {
     "collection_name": "cortex_semantic_memory",
     "clear_on_init": False,
     "persist_directory": ".cortex/semantic_db",  # Relative to project root
+    # Retrieved memories less similar to the request than this are not put in the prompt: a
+    # memory about something else costs tokens and misleads. This is a starting value, not a
+    # tuned one; the benchmark ablation is where it should be set.
+    "min_similarity": 0.3,
 }
 
 
@@ -215,6 +248,14 @@ class AgentConfig:
         redis_cache: Optional[Dict[str, Any]] = None,
         # Transaction settings (new)
         transactions: Optional[Dict[str, Any]] = None,
+        # Git checkpoint settings (/undo)
+        checkpoints: Optional[Dict[str, Any]] = None,
+        # Confinement for shell commands
+        command_sandbox: Optional[Dict[str, Any]] = None,
+        # Settings for local models served by Ollama
+        ollama: Optional[Dict[str, Any]] = None,
+        # Settings for OpenAI-compatible servers
+        openai: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
         # Rate limiting settings (new)
@@ -229,6 +270,10 @@ class AgentConfig:
         profiling: Optional[Dict[str, Any]] = None,
         feature_flags: Optional[Dict[str, Any]] = None,
         services: Optional[Dict[str, Any]] = None,
+        # Agent feature switches (all off by default; see docs/STATUS.md)
+        enable_planning: bool = False,
+        enable_layered_memory: bool = False,
+        enable_metacognition: bool = False,
         **kwargs,
     ):
         # Core settings
@@ -288,6 +333,10 @@ class AgentConfig:
 
         # Transaction settings (merge with defaults)
         self.transactions = {**DEFAULT_TRANSACTIONS, **(transactions or {})}
+        self.checkpoints = {**DEFAULT_CHECKPOINTS, **(checkpoints or {})}
+        self.command_sandbox = {**DEFAULT_COMMAND_SANDBOX, **(command_sandbox or {})}
+        self.ollama = {**DEFAULT_OLLAMA, **(ollama or {})}
+        self.openai = {**DEFAULT_OPENAI, **(openai or {})}
 
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
@@ -300,7 +349,7 @@ class AgentConfig:
 
         # Semantic memory settings (merge with defaults)
         self.semantic_memory = {**DEFAULT_SEMANTIC_MEMORY, **(semantic_memory or {})}
-        
+
         # Summarization settings (merge with defaults)
         self.summarization = {**DEFAULT_CONTEXT_COMPRESSION, **(summarization or {})}
 
@@ -308,6 +357,11 @@ class AgentConfig:
         self.profiling = {**DEFAULT_PROFILING, **(profiling or {})}
         self.feature_flags = {**DEFAULT_FEATURE_FLAGS, **(feature_flags or {})}
         self.services = {**DEFAULT_SERVICES, **(services or {})}
+
+        # Agent feature switches
+        self.enable_planning = bool(enable_planning)
+        self.enable_layered_memory = bool(enable_layered_memory)
+        self.enable_metacognition = bool(enable_metacognition)
 
         # Extra settings for extensibility
         self.extra = kwargs
@@ -345,6 +399,26 @@ class AgentConfig:
     def get_transactions_config(self) -> Dict[str, Any]:
         """Get configuration for TransactionManager."""
         return self.transactions
+
+    def get_ollama_config(self) -> Dict[str, Any]:
+        """Get settings for the Ollama provider."""
+        return self.ollama
+
+    def get_openai_config(self) -> Dict[str, Any]:
+        """Get settings for the OpenAI-compatible provider."""
+        return self.openai
+
+    def get_provider_options(self, section: Optional[str]) -> Dict[str, Any]:
+        """Settings for one provider's config section (``ollama``, ``openai``); none for others."""
+        return {"ollama": self.ollama, "openai": self.openai}.get(section or "", {})
+
+    def get_command_sandbox_config(self) -> Dict[str, Any]:
+        """Get configuration for command confinement."""
+        return self.command_sandbox
+
+    def get_checkpoints_config(self) -> Dict[str, Any]:
+        """Get configuration for the git checkpoint store (/undo)."""
+        return self.checkpoints
 
     def get_parallel_execution_config(self) -> Dict[str, Any]:
         """Get configuration for ParallelToolExecutor."""
@@ -404,6 +478,32 @@ class AgentConfig:
 
         return None
 
+    @staticmethod
+    def _normalize_file_keys(data: Dict[str, Any]) -> Dict[str, Any]:
+        """Map the friendlier section names used in config/default.yaml onto real settings.
+
+        - ``features:``  -> ``feature_flags``
+        - ``tools:``     -> ``tools_plugins`` (from ``plugins``) and ``tools_disabled`` (from
+          ``disabled``)
+        An empty section (for example one containing only comments) is ignored.
+        """
+        data = dict(data)
+
+        features = data.pop("features", None)
+        if isinstance(features, dict):
+            merged = dict(data.get("feature_flags") or {})
+            merged.update(features)
+            data["feature_flags"] = merged
+
+        tools = data.pop("tools", None)
+        if isinstance(tools, dict):
+            if tools.get("plugins") and "tools_plugins" not in data:
+                data["tools_plugins"] = tools["plugins"]
+            if tools.get("disabled") and "tools_disabled" not in data:
+                data["tools_disabled"] = tools["disabled"]
+
+        return data
+
     @classmethod
     def from_file(cls, config_path: Path) -> "AgentConfig":
         """Load configuration from YAML file"""
@@ -414,11 +514,22 @@ class AgentConfig:
             with open(config_path, "r") as f:
                 config_data = yaml.safe_load(f) or {}
 
+            if not isinstance(config_data, dict):
+                raise ValueError("top level of the config file must be a mapping")
+
             # Parse max_tokens if present (handle 'auto' string)
             if "max_tokens" in config_data:
                 config_data["max_tokens"] = cls._parse_max_tokens(config_data["max_tokens"])
 
-            return cls(**config_data)
+            config_data = cls._normalize_file_keys(config_data)
+            config = cls(**config_data)
+            if config.extra:
+                logger.warning(
+                    "Ignoring unknown setting(s) in %s: %s",
+                    config_path,
+                    ", ".join(sorted(config.extra)),
+                )
+            return config
         except Exception as e:
             print(f"Warning: Error loading config file: {e}")
             return cls()
@@ -491,33 +602,12 @@ class AgentConfig:
         # Start with defaults
         config = cls()
 
-        # Load from file if provided
+        # Load from file if provided. Take *every* setting the file produced: a fixed list of
+        # keys here used to drop semantic_memory, feature_flags, parallel_execution, routing and
+        # more without any warning.
         if config_path and config_path.exists():
             file_config = cls.from_file(config_path)
-            # Merge file config - core settings
-            config.model = file_config.model
-            config.permission_mode = file_config.permission_mode
-            config.max_iterations = file_config.max_iterations
-            config.max_iterations_continue_default = file_config.max_iterations_continue_default
-            config.max_iterations_continue_amount = file_config.max_iterations_continue_amount
-            config.max_tokens = file_config.max_tokens
-            config.keep_recent_messages = file_config.keep_recent_messages
-            config.auto_save = file_config.auto_save
-            # New settings
-            config.output_format = file_config.output_format
-            config.hooks = file_config.hooks
-            config.hooks_enabled = file_config.hooks_enabled
-            config.tools_disabled = file_config.tools_disabled
-            config.tools_plugins = file_config.tools_plugins
-            config.subagent_max_iterations = file_config.subagent_max_iterations
-            config.subagent_allowed_tools = file_config.subagent_allowed_tools
-            config.provider = file_config.provider
-            # Robustness settings
-            config.timeouts = file_config.timeouts
-            config.tool_timeouts = file_config.tool_timeouts
-            config.session_retention = file_config.session_retention
-            config.error_recovery = file_config.error_recovery
-            config.summarization = file_config.summarization
+            config.__dict__.update(vars(file_config))
 
         # Override with environment variables
         env_config = cls.from_env()
@@ -564,10 +654,18 @@ class AgentConfig:
             "error_recovery": self.error_recovery,
             "file_cache": self.file_cache,
             "transactions": self.transactions,
+            "checkpoints": self.checkpoints,
+            "command_sandbox": self.command_sandbox,
+            "ollama": self.ollama,
+            "openai": self.openai,
             "routing": self.routing,
             # Hybrid architecture
-            "semantic_memory": self.semantic_memory, # New
+            "semantic_memory": self.semantic_memory,  # New
             "profiling": self.profiling,
             "feature_flags": self.feature_flags,
             "services": self.services,
+            # Agent feature switches
+            "enable_planning": self.enable_planning,
+            "enable_layered_memory": self.enable_layered_memory,
+            "enable_metacognition": self.enable_metacognition,
         }

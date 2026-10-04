@@ -174,7 +174,7 @@ def test_all_tools_use_standardized_errors(tmp_path):
             assert success["success"] is True
             assert success["content"] == "test"
 
-        except Exception as e:
+        except Exception:
             # Some tools might not be available or have specific requirements
             # This is expected for certain tools
             pass

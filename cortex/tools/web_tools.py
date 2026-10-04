@@ -392,9 +392,9 @@ class WebSearchTool(Tool):
         """
         if not HAS_DUCKDUCKGO_SEARCH:
             return create_error_response(
-                "duckduckgo-search library not installed. Run: pip install duckduckgo-search",
+                "ddgs library not installed. Run: pip install ddgs",
                 ErrorType.EXECUTION,
-                {"missing_dependency": "duckduckgo-search"},
+                {"missing_dependency": "ddgs"},
             )
 
         if not query or len(query.strip()) < 2:

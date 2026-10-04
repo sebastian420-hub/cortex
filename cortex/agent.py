@@ -3,11 +3,13 @@
 import asyncio
 import json
 import logging
+import os
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from rich.markdown import Markdown
 
@@ -24,6 +26,21 @@ from .core.prompts.builder import PromptBuilder
 from .core.providers import ProviderError, ProviderFactory
 from .core.security import SecurityError
 from .core.streaming import display_streaming_response, stream_model_response
+from .core.checkpoints import GitCheckpointStore
+from .core.command_sandbox import SandboxConfig
+from .core.context import estimate_tokens
+from .core.conversation import RESPONSE_RESERVE_TOKENS
+from .core.tool_policy import PLAN_MODE_CLASSES, classify_tool
+from .core.transaction import TransactionManager
+from .core.turn import (
+    STATUS_BLOCKED,
+    STATUS_ERROR,
+    STATUS_INTERRUPTED,
+    STATUS_LOOP_GUARD,
+    STATUS_MAX_ITERATIONS,
+    STATUS_OK,
+    TurnResult,
+)
 from .hooks import (
     HookAction,
     HookManager,
@@ -45,6 +62,7 @@ from .utils.errors import (
     create_permission_denial,
     create_success_response,
 )
+from .utils.message_validation import normalize_tool_messages, tool_order_violations, trim_history
 from .utils.output_processing import process_model_output
 from .utils.result_truncation import truncate_tool_result
 
@@ -69,6 +87,9 @@ logger = logging.getLogger(__name__)
 
 # Platform-specific spinner (Windows cp1252 can't handle Unicode Braille)
 SPINNER_TYPE = "line" if sys.platform == "win32" else "dots"
+
+# Below this much room for the conversation (after tools and the reply reserve) Cortex warns
+MIN_USEFUL_HISTORY_TOKENS = 4000
 
 
 class Cortex:
@@ -112,9 +133,15 @@ class Cortex:
         self.hook_manager = hook_manager or HookManager()
         self.output_format = output_format
 
-        # Enhanced features configuration
+        # Optional features configuration
         self.enable_planning = enable_planning
         self.enable_layered_memory = enable_layered_memory
+        # Experimental: put confidence/urgency/tone into the system prompt (off by default; the
+        # state is still tracked either way)
+        self.enable_metacognition = bool(getattr(self.config, "enable_metacognition", False))
+        # Retrieved context for the current user message: (query, text). Looked up once per
+        # message, not once per loop iteration.
+        self._semantic_context_cache: Optional[tuple] = None
 
         # Use AgentInitializer to handle complex initialization
         initializer = AgentInitializer(
@@ -180,8 +207,35 @@ class Cortex:
         self.prompt_generator = PromptGenerator(self)
         self.prompt_builder = PromptBuilder(self.model, project_dir=self.project_dir)
         self.permission_manager = PermissionManager(self)
+        # One transaction manager per session: every file-changing tool backs up through it, and
+        # /rollback restores the files the latest user message changed.
+        transactions_config = self.config.get_transactions_config()
+        backup_dir = transactions_config.get("backup_dir")
+        self.transaction_manager = TransactionManager(
+            backup_dir=Path(backup_dir).expanduser() if backup_dir else None,
+            max_backups=transactions_config.get("max_backups", 10),
+            enabled=transactions_config.get("enabled", True),
+        )
+        # How shell commands are confined (a bad mode raises here, at startup, not mid-session)
+        self.command_sandbox = SandboxConfig.from_dict(self.config.get_command_sandbox_config())
+        # Git checkpoints: a snapshot of the whole project before a request's first change, which
+        # /undo restores (this is what covers shell commands; transactions only see file tools)
+        checkpoints_config = self.config.get_checkpoints_config()
+        self.checkpoints: Optional[GitCheckpointStore] = None
+        if checkpoints_config.get("enabled", True):
+            self.checkpoints = GitCheckpointStore(
+                self.project_dir,
+                session_id=uuid.uuid4().hex[:8],
+                keep=checkpoints_config.get("keep", 20),
+                timeout=checkpoints_config.get("timeout", 60.0),
+                stale_days=checkpoints_config.get("stale_days", 7),
+            )
+        self._checkpoint_pending = False
+        self._turn_label = ""
+        self._turn_checkpoint = None
         self.tool_executor = ToolExecutor(self)
         self.message_processor = MessageProcessor(self)
+        self._apply_provider_limits()
 
         # Enhanced metrics
         self.plans_generated = 0
@@ -383,16 +437,19 @@ class Cortex:
             return
 
         old_model = self.model
-        old_provider_name = ProviderFactory.get_provider_name(self.model)
+        old_provider_name = ProviderFactory.get_provider_name(
+            self.model, getattr(self.config, "provider", None)
+        )
 
         try:
             # Reinitialize provider for new model
             provider_override = provider_override or getattr(self.config, "provider", None)
             new_provider = ProviderFactory.get_provider(new_model, provider_override)
+            new_provider.configure(self.config.get_provider_options(new_provider.config_section))
 
             # Validate API key for cloud providers
             if not new_provider.validate_api_key():
-                provider_name = ProviderFactory.get_provider_name(new_model)
+                provider_name = ProviderFactory.get_provider_name(new_model, provider_override)
                 raise ProviderError(
                     f"API key not set for {provider_name} provider. "
                     f"Please set the required environment variable."
@@ -407,10 +464,11 @@ class Cortex:
 
             # Update conversation manager's model reference for token counting
             self.conversation.update_model(new_model)
+            self._apply_provider_limits()
 
             # Notify user of model switch (unless silent mode)
             if not silent:
-                new_provider_name = ProviderFactory.get_provider_name(new_model)
+                new_provider_name = ProviderFactory.get_provider_name(new_model, provider_override)
                 reason_str = f" [dim]({reason})[/dim]" if reason else ""
                 if old_provider_name != new_provider_name:
                     console.print(
@@ -510,6 +568,111 @@ class Cortex:
         """Public method to load project context for backward compatibility."""
         return self._load_project_context()
 
+    def _disabled_tool_names(self) -> Set[str]:
+        """Tools switched off in this agent's configuration (``tools.disabled``).
+
+        Kept per agent: the tool registry is shared by the whole process, and one agent's
+        settings must not change what another is offered.
+        """
+        configured = getattr(self.config, "tools_disabled", None)
+        if not isinstance(configured, (list, tuple, set)):
+            return set()
+        return {name for name in configured if isinstance(name, str)}
+
+    def _enabled_tool_schemas(self) -> List[Dict[str, Any]]:
+        """The tool definitions offered to the model (planning tools only with --planning, and
+        never the ones the configuration disables)."""
+        exclude: List[str] = []
+        if not self.enable_planning:
+            exclude = [
+                "monitor_plan",
+                "update_plan",
+                "create_and_execute_plan",
+                "metacognitive_reflect",
+            ]
+        exclude += sorted(self._disabled_tool_names())
+        return get_registry().get_all_schemas(exclude_names=exclude)
+
+    def _apply_provider_limits(self) -> None:
+        """Fit the history to the context window the provider really gives the model.
+
+        The tool definitions are sent next to the history, not in it, and can be a large part of a
+        small window (about 6,000 tokens for the full tool set). A window that is smaller than the
+        model table assumes would otherwise be overflowed silently by the server.
+        """
+        window = getattr(self.provider, "context_window", None)
+        if not isinstance(window, int) or isinstance(window, bool):
+            return
+        tool_tokens = estimate_tokens(json.dumps(self._enabled_tool_schemas()), self.model)
+        self.conversation.limit_context(window - tool_tokens)
+
+        if window - tool_tokens - RESPONSE_RESERVE_TOKENS < MIN_USEFUL_HISTORY_TOKENS:
+            suggested = -(-(tool_tokens + 16000) // 1024) * 1024  # round up to a multiple of 1024
+            advise = getattr(self.provider, "window_advice", None)
+            advice = (
+                advise(suggested)
+                if callable(advise)
+                else f"Give the model a context window of at least {suggested} tokens"
+            )
+            message = (
+                f"The model's context window is {window} tokens, but Cortex's tool definitions "
+                f"alone take about {tool_tokens}, leaving too little room for the conversation. "
+                f"{advice}, or turn tools off with tools.disabled."
+            )
+            logger.warning(message)
+            if self._is_text_output():
+                console.print(f"[yellow]{message}[/yellow]")
+
+    def _get_semantic_context(self) -> Optional[str]:
+        """Memory relevant to the latest user message, looked up once per message.
+
+        The system prompt is rebuilt on every loop iteration; the lookup is cached by query so
+        a ten-step turn runs it once instead of ten times.
+        """
+        if not (
+            self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context")
+        ):
+            return None
+
+        query = self.conversation.get_last_user_message()
+        if not query:
+            return None
+
+        cached = self._semantic_context_cache
+        if cached is not None and cached[0] == query:
+            return cached[1]
+
+        # Relevant items from the current session
+        floor = float(self.config.semantic_memory.get("min_similarity", 0.3))
+
+        def relevant(results):
+            return [r for r in results if r.get("similarity", 1.0) >= floor]
+
+        session_results = relevant(
+            self.memory_bank.retrieve_semantic_context(query, top_k=2, global_search=False)
+        )
+        # One highly relevant item from past sessions
+        global_results = relevant(
+            self.memory_bank.retrieve_semantic_context(query, top_k=1, global_search=True)
+        )
+
+        context_items = []
+        if session_results:
+            context_items.append("From current session:")
+            context_items.extend([f"- {r['document']}" for r in session_results])
+
+        if global_results:
+            # Filter out if it's the same as a session result
+            session_docs = [r["document"] for r in session_results]
+            for r in global_results:
+                if r["document"] not in session_docs:
+                    context_items.append("From past sessions:")
+                    context_items.append(f"- {r['document']}")
+
+        semantic_context = "\n".join(context_items) if context_items else None
+        self._semantic_context_cache = (query, semantic_context)
+        return semantic_context
+
     def _get_system_prompt(self) -> str:
         """Generate comprehensive system prompt using PromptBuilder"""
         # Get dynamic context
@@ -521,53 +684,14 @@ class Cortex:
         )
         metacognitive_context = (
             self.state_manager.get_metacognitive_context()
-            if hasattr(self, "state_manager")
+            if hasattr(self, "state_manager") and self.enable_metacognition
             else None
         )
 
-        # Get semantic context if enabled
-        semantic_context = None
-        if self.enable_layered_memory and hasattr(self.memory_bank, "retrieve_semantic_context"):
-            # Use last user message as query for semantic retrieval
-            last_user_msg = self.conversation.get_last_user_message()
-            if last_user_msg:
-                # Get relevant items from current session
-                session_results = self.memory_bank.retrieve_semantic_context(
-                    last_user_msg, top_k=2, global_search=False
-                )
-                
-                # Get one highly relevant item from past sessions
-                global_results = self.memory_bank.retrieve_semantic_context(
-                    last_user_msg, top_k=1, global_search=True
-                )
-                
-                context_items = []
-                if session_results:
-                    context_items.append("From current session:")
-                    context_items.extend([f"- {r['document']}" for r in session_results])
-                
-                if global_results:
-                    # Filter out if it's the same as a session result
-                    session_docs = [r["document"] for r in session_results]
-                    for r in global_results:
-                        if r["document"] not in session_docs:
-                            context_items.append("From past sessions:")
-                            context_items.append(f"- {r['document']}")
-                
-                if context_items:
-                    semantic_context = "\n".join(context_items)
+        semantic_context = self._get_semantic_context()
 
         # Get all tool schemas (includes base + orchestration tools)
-        exclude = []
-        if not self.enable_planning:
-            exclude = [
-                "monitor_plan",
-                "update_plan",
-                "create_and_execute_plan",
-                "metacognitive_reflect",
-            ]
-        
-        tool_schemas = get_registry().get_all_schemas(exclude_names=exclude)
+        tool_schemas = self._enabled_tool_schemas()
 
         # Build using PromptBuilder
         return self.prompt_builder.build_system_prompt(
@@ -690,17 +814,8 @@ class Cortex:
 
         for attempt in range(max_retries):
             try:
-                # Pre-flight validation
-                validation = self._validate_messages_for_api(messages)
-                if not validation["valid"]:
-                    critical_issues = [
-                        i for i in validation["issues"] if i["severity"] == "critical"
-                    ]
-                    if critical_issues:
-                        messages = self._repair_messages_for_api(messages, critical_issues)
-                        logger.warning(
-                            f"Repaired {len(critical_issues)} critical issues before API call"
-                        )
+                # Pre-flight validation (and repair) of what is about to be sent
+                messages = self._prepare_messages_for_api(messages)
 
                 # Apply rate limiting
                 if self.rate_limiter:
@@ -724,10 +839,9 @@ class Cortex:
 
                     if attempt < max_retries - 1:
                         # Aggressive truncation
-                        self.conversation.history = [
-                            self.conversation.history[0],  # System prompt
-                            *self.conversation.history[-5:],  # Last 5 messages
-                        ]
+                        # System prompt + the last few messages, without splitting a tool
+                        # call from its result
+                        self.conversation.history = trim_history(self.conversation.history, 5)
 
                         # Truncate remaining tool results
                         max_tool_content_length = self.conversation._get_max_tool_result_length()
@@ -798,6 +912,14 @@ class Cortex:
             tool_name = pre_result.modified_data.get("tool_name", tool_name)
             arguments = pre_result.modified_data.get("arguments", arguments)
 
+        # A tool the configuration disables is refused even if the model asks for it anyway
+        if tool_name in self._disabled_tool_names():
+            return create_error_response(
+                f"The tool '{tool_name}' is disabled in this configuration (tools.disabled).",
+                ErrorType.PERMISSION,
+                {"tool_name": tool_name, "blocked_by": "config"},
+            )
+
         # Permission check
         if not self.permission_manager.check(tool_name, arguments):
             return create_permission_denial(
@@ -805,6 +927,16 @@ class Cortex:
                 action=tool_name,
                 context={"tool_name": tool_name, "permission_mode": self.permission_mode},
             )
+
+        # A tool that runs outside a user turn (a slash command, a direct call) still needs an open
+        # transaction, or its file changes would silently have no backup
+        if (
+            self.transaction_manager.enabled
+            and not self.transaction_manager.has_active_transaction()
+        ):
+            self._begin_turn_transaction(f"direct call: {tool_name}")
+
+        self._checkpoint_before_first_change(tool_name, arguments)
 
         # Track tool usage
         self._tools_used.append(tool_name)
@@ -823,6 +955,8 @@ class Cortex:
                 console,
                 parent_agent=self,
                 timeout_config=self._timeout_config,
+                transaction_manager=self.transaction_manager,
+                command_sandbox=self.command_sandbox,
             )
 
             # Execute tool
@@ -832,7 +966,7 @@ class Cortex:
             # --- Metacognitive Appraisal ---
             if hasattr(self, "state_manager"):
                 self.state_manager.update_metacognition(tool_name, result)
-            
+
             # Bio-inspired belief reinforcement
             if self.enable_layered_memory and hasattr(self.memory_bank, "verify_memory"):
                 # Use a heuristic: if we were looking for a file and found it, verify that memory
@@ -929,17 +1063,77 @@ class Cortex:
     def _cleanup(self) -> None:
         """Cleanup resources on shutdown."""
         try:
+            self._finish_turn_transaction()
+            if self.checkpoints is not None:
+                self.checkpoints.clear()
             self._dispatch_session_end()
             if self.parallel_executor:
                 self.parallel_executor.shutdown()
         except Exception as e:
             logger.warning(f"Error during cleanup: {e}", exc_info=True)
 
-    def _process_message(self, user_message: str, use_streaming: bool = False):
-        """Unified message processing loop supporting planning and memory."""
+    def _finish_turn_transaction(self) -> None:
+        """Make the previous turn's changes permanent (drops its undo information)."""
+        try:
+            if self.transaction_manager.has_active_transaction():
+                self.transaction_manager.commit()
+        except Exception as e:
+            logger.warning(f"Could not finish the previous transaction: {e}")
+
+    def _begin_turn_transaction(self, user_message: str) -> None:
+        """Open the transaction that records this turn's file changes.
+
+        The previous turn is committed first, so /rollback always means "undo my last request".
+        """
+        self._finish_turn_transaction()
+        self._checkpoint_pending = True
+        self._turn_label = user_message
+        self._turn_checkpoint = None
+        try:
+            self.transaction_manager.begin(metadata={"request": user_message[:200]})
+        except Exception as e:
+            logger.warning(f"Could not start a transaction; changes will not be undoable: {e}")
+
+    def _checkpoint_before_first_change(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Snapshot the project before the first tool of this request that could change it."""
+        if not self._checkpoint_pending or self.checkpoints is None:
+            return
+        # Only tools known to be harmless skip it: an unclassified tool is treated as a change
+        if classify_tool(tool_name, arguments) in PLAN_MODE_CLASSES:
+            return
+        self._checkpoint_pending = False
+        self._turn_checkpoint = self.checkpoints.snapshot(self._turn_label)
+
+    def _announce_undo(self) -> None:
+        """Tell the user, once a turn ends, that its file changes can be undone."""
+        if not self._is_text_output():
+            return
+        if self._turn_checkpoint is not None:
+            console.print(
+                "[dim]Checkpoint saved: /undo restores the project to before this request.[/dim]"
+            )
+        else:
+            transaction = self.transaction_manager.get_current_transaction()
+            count = len({str(f) for f in transaction.get_files_modified()}) if transaction else 0
+            if count:
+                plural = "s" if count != 1 else ""
+                console.print(
+                    f"[dim]{count} file{plural} changed. /rollback undoes this request.[/dim]"
+                )
+
+    def _process_message(self, user_message: str, use_streaming: bool = False) -> TurnResult:
+        """Run one user message to completion and report how it ended."""
+        self._begin_turn_transaction(user_message)
+        result = self._run_turn(user_message, use_streaming)
+        # The transaction stays open on purpose: it is what /rollback restores
+        self._announce_undo()
+        return result
+
+    def _run_turn(self, user_message: str, use_streaming: bool = False) -> TurnResult:
+        """The agent loop for one user message."""
 
         if self._shutdown_requested:
-            return
+            return TurnResult(STATUS_INTERRUPTED)
 
         # Dispatch UserPromptSubmit hook
         prompt_event = UserPromptSubmitEvent(
@@ -948,8 +1142,9 @@ class Cortex:
         prompt_result = self.hook_manager.dispatch(prompt_event)
 
         if prompt_result.action == HookAction.ABORT:
-            self._output_error(prompt_result.message or "Blocked by hook", "prompt_blocked")
-            return
+            blocked_message = prompt_result.message or "Blocked by hook"
+            self._output_error(blocked_message, "prompt_blocked")
+            return TurnResult(STATUS_BLOCKED, error=blocked_message)
         elif prompt_result.action == HookAction.MODIFY and prompt_result.modified_data:
             user_message = prompt_result.modified_data.get("prompt", user_message)
 
@@ -980,9 +1175,15 @@ class Cortex:
 
         self._is_processing = True
 
+        # Errors from an earlier request must not count against this one
+        self.loop_guard.reset()
+        # A new user message gets a fresh memory lookup
+        self._semantic_context_cache = None
+
         # Agent loop
         max_iterations = self.config.max_iterations
         iteration = 0
+        tool_count = 0
 
         try:
             while True:
@@ -992,7 +1193,9 @@ class Cortex:
                 if self._shutdown_requested:
                     self._output_warning("Shutdown requested. Cleaning up...")
                     self._cleanup()
-                    return
+                    return TurnResult(
+                        STATUS_INTERRUPTED, iterations=iteration - 1, tool_calls=tool_count
+                    )
 
                 if iteration > max_iterations:
                     if self._on_max_iterations_reached:
@@ -1001,7 +1204,12 @@ class Cortex:
                             max_iterations += additional
                             continue
                     self._output_warning("Reached maximum iterations")
-                    return
+                    return TurnResult(
+                        STATUS_MAX_ITERATIONS,
+                        error="Reached maximum iterations",
+                        iterations=iteration - 1,
+                        tool_calls=tool_count,
+                    )
 
                 self.loop_guard.increment_iteration()
                 console.print(f"[dim]{'-' * 60}[/dim]")
@@ -1012,15 +1220,7 @@ class Cortex:
                     self.conversation.update_system_prompt(new_system_prompt)
                     messages = self.conversation.get_history()
 
-                    exclude = []
-                    if not self.enable_planning:
-                        exclude = [
-                            "monitor_plan",
-                            "update_plan",
-                            "create_and_execute_plan",
-                            "metacognitive_reflect",
-                        ]
-                    tools = get_registry().get_all_schemas(exclude_names=exclude)
+                    tools = self._enabled_tool_schemas()
 
                     with console.status("[cyan]Thinking...[/cyan]", spinner=SPINNER_TYPE):
                         if (
@@ -1029,6 +1229,7 @@ class Cortex:
                             and self.provider.supports_streaming()
                         ):
                             normalized_model = self.provider.normalize_model_name(self.model)
+                            messages = self._prepare_messages_for_api(messages)
                             stream = stream_model_response(
                                 self.provider, normalized_model, messages, tools
                             )
@@ -1084,11 +1285,19 @@ class Cortex:
                             tool_calls_to_run, agent_description
                         ):
                             batch_result = self.parallel_executor.execute_batch(tool_calls_to_run)
+                        tool_count += len(tool_calls_to_run)
 
-                        # Process results
+                        # Process results. Nothing but tool results may be added to the
+                        # conversation until every call in this batch is answered (chat APIs
+                        # require the results to directly follow the request), so recovery
+                        # guidance is held back and added after the loop.
+                        recovery_prompts: List[str] = []
+                        guard_error: Optional[str] = None
                         for tool_result in batch_result.results:
                             if self._shutdown_requested:
-                                return
+                                return TurnResult(
+                                    STATUS_INTERRUPTED, iterations=iteration, tool_calls=tool_count
+                                )
 
                             tool_name = tool_result.name
                             result = tool_result.result
@@ -1103,12 +1312,8 @@ class Cortex:
 
                             self._output_tool_result(tool_name, result)
 
-                            # Update state and memory
+                            # Update state and memory (this also records learnings, once)
                             self.state_manager.record_tool_execution(tool_name, arguments, result)
-                            if self.enable_layered_memory and isinstance(
-                                self.memory_bank, EnhancedMemoryBank
-                            ):
-                                self.memory_bank.extract_learnings_from_tool_results([result])
 
                             # Delegation
                             if tool_name in ("delegate_to_model", "return_to_coordinator"):
@@ -1122,6 +1327,7 @@ class Cortex:
                                     continue
 
                             # Truncate and add to conversation
+                            raw_result = result
                             result = truncate_tool_result(
                                 tool_name,
                                 result,
@@ -1129,20 +1335,39 @@ class Cortex:
                             )
                             self.conversation.add_tool_result(tool_result.id, result)
 
-                            # Loop guard checks
-                            if not self._is_tool_result_success(result):
-                                if self.loop_guard.check_repeated_error(result):
+                            # Loop guard: it only works if it is fed every call and every error
+                            # (it used to be checked but never recorded into, so it never fired).
+                            self.loop_guard.record_tool_call(tool_name, arguments)
+                            if self._is_tool_result_success(raw_result):
+                                self.loop_guard.record_operation(tool_name, arguments)
+                            else:
+                                self.loop_guard.record_error(raw_result)
+                                if self.loop_guard.check_repeated_error(raw_result):
                                     recovery_action = self.loop_guard.get_recovery_action(
-                                        result, tool_name, arguments
+                                        raw_result, tool_name, arguments
                                     )
                                     if recovery_action and recovery_action.strategy != "ESCALATE":
                                         if recovery_action.suggested_prompt:
-                                            self.conversation.add_user_message(
+                                            recovery_prompts.append(
                                                 f"[Recovery Guidance] "
                                                 f"{recovery_action.suggested_prompt}"
                                             )
                                         continue
-                                    return
+                                    guard_error = (
+                                        f"Stopped after repeated errors from {tool_name}: "
+                                        f"{result.get('error', 'unknown error')}"
+                                    )
+
+                        # Every call in the batch is answered now: guidance may follow.
+                        for prompt in recovery_prompts:
+                            self.conversation.add_user_message(prompt)
+                        if guard_error:
+                            return TurnResult(
+                                STATUS_LOOP_GUARD,
+                                error=guard_error,
+                                iterations=iteration,
+                                tool_calls=tool_count,
+                            )
 
                     else:
                         # Final response
@@ -1151,22 +1376,30 @@ class Cortex:
                             self._output_response({"content": final_text}, is_final=True)
                             if self.enable_layered_memory:
                                 self._extract_insights_from_response(final_text)
-                            return
-                        return
+                        return TurnResult(
+                            STATUS_OK,
+                            final_text=final_text or "",
+                            iterations=iteration,
+                            tool_calls=tool_count,
+                        )
 
                 except Exception as e:
                     import traceback
 
                     self._output_error(str(e), "error", {"traceback": traceback.format_exc()})
-                    return
+                    return TurnResult(
+                        STATUS_ERROR, error=str(e), iterations=iteration, tool_calls=tool_count
+                    )
         finally:
             self._is_processing = False
             self.state_manager.set_focus(AgentFocus.EXPLORING)
 
     # Async version of the loop
-    async def _process_message_async(self, user_message: str, use_streaming: bool = False) -> None:
+    async def _process_message_async(
+        self, user_message: str, use_streaming: bool = False
+    ) -> TurnResult:
         """Async version of message processing."""
-        await asyncio.to_thread(self._process_message, user_message, use_streaming)
+        return await asyncio.to_thread(self._process_message, user_message, use_streaming)
 
     def _extract_insights_from_response(self, response: str) -> None:
         """Extract insights from final response text for layered memory."""
@@ -1201,7 +1434,19 @@ class Cortex:
             return {"success": False, "error": str(e)}
 
     def _load_skill(self, skill_name: str) -> Dict[str, Any]:
-        return {}
+        """Load a skill playbook for a plan step. Returns {} when there is no such skill."""
+        from .tools.skill_tools import SkillLoaderTool
+
+        loader = SkillLoaderTool(self.project_dir, self.permission_mode, None)
+        skill = loader.find_skill(skill_name)
+        if skill is None:
+            return {}
+        return {
+            "name": skill.name,
+            "description": skill.description,
+            "content": skill.content,
+            "workflow_steps": skill.get_workflow_steps(),
+        }
 
     def _execute_tool_for_planning(
         self, tool_name: str, arguments: Dict[str, Any]
@@ -1216,39 +1461,16 @@ class Cortex:
         """
         Callback triggered when a plan step completes.
 
-        This records the step execution in history and memory so the agent
-        stays informed of what happened during planning execution.
+        Records the step in agent state and memory. It must NOT add messages to the
+        conversation: the plan was requested by a pending tool call, and chat APIs require that
+        call's result to come immediately after it. The outcome of every step reaches the model
+        inside the plan tool's own result instead (see PlanningEngine.summarize_steps).
         """
-        if self.enable_layered_memory and isinstance(self.memory_bank, EnhancedMemoryBank):
-            self.memory_bank.extract_learnings_from_tool_results([result])
-
-        # Record the tool execution in conversation history if it was a tool call
         if step.step_type == PlanStepType.TOOL_CALL and step.tool_name:
-            # We don't have the original tool_call_id from the model here,
-            # so we use the step ID as a reference.
-            tool_call_id = f"plan_{step.id}"
-
-            # Add a synthetic assistant message showing the tool call that was executed
-            # This helps the model maintain context of the conversation flow
-            self.conversation.add_assistant_message(
-                content=f"Executing plan step: {step.description}",
-                tool_calls=[
-                    {
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {
-                            "name": step.tool_name,
-                            "arguments": json.dumps(step.tool_arguments or {}),
-                        },
-                    }
-                ],
+            # One record per step, with the tool name, so learnings are attributed correctly.
+            self.state_manager.record_tool_execution(
+                step.tool_name, step.tool_arguments or {}, result
             )
-
-            # Add the result
-            truncated_result = truncate_tool_result(
-                step.tool_name, result, max_length=self.conversation._get_max_tool_result_length()
-            )
-            self.conversation.add_tool_result(tool_call_id, truncated_result)
 
             if self._is_text_output():
                 status = "success" if result.get("success", False) else "failed"
@@ -1259,7 +1481,31 @@ class Cortex:
 
     def clear_conversation(self) -> None:
         self.conversation.clear(keep_system=True)
+        self._semantic_context_cache = None
         self.conversation.history[0]["content"] = self._get_system_prompt()
+
+    def _prepare_messages_for_api(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Validate the messages about to be sent, and repair what strict providers would reject.
+
+        With CORTEX_STRICT_MESSAGES=1 (set in the end-to-end tests) a broken tool-call order
+        raises instead of being repaired, so a regression cannot hide behind the repair.
+        """
+        validation = self._validate_messages_for_api(messages)
+        if validation["valid"]:
+            return messages
+
+        critical_issues = [i for i in validation["issues"] if i["severity"] == "critical"]
+        if not critical_issues:
+            return messages
+
+        if os.environ.get("CORTEX_STRICT_MESSAGES") == "1":
+            order = [i for i in critical_issues if i["type"] == "tool_order"]
+            if order:
+                raise ModelError(f"Invalid tool-call message order: {order[0]['violations']}")
+
+        repaired = self._repair_messages_for_api(messages, critical_issues)
+        logger.warning(f"Repaired {len(critical_issues)} critical issues before API call")
+        return repaired
 
     def _validate_messages_for_api(self, messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Validate messages for API compliance, checking for missing content keys."""
@@ -1276,6 +1522,18 @@ class Cortex:
                     issues.append(
                         {"index": i, "type": "invalid_assistant_message", "severity": "critical"}
                     )
+
+        # Tool calls must be answered immediately, in order (see utils/message_validation.py)
+        violations = tool_order_violations(messages)
+        if violations:
+            issues.append(
+                {
+                    "index": violations[0]["index"],
+                    "type": "tool_order",
+                    "severity": "critical",
+                    "violations": violations,
+                }
+            )
         return {"valid": len(issues) == 0, "issues": issues}
 
     def _repair_messages_for_api(
@@ -1294,4 +1552,8 @@ class Cortex:
                     ] = f"[Reasoning: {repaired[idx]['reasoning_content'][:200]}]"
                 else:
                     repaired[idx]["content"] = "[Repaired empty response]"
+        if any(issue["type"] == "tool_order" for issue in issues):
+            repaired, notes = normalize_tool_messages(repaired)
+            for note in notes:
+                logger.warning(f"Tool message repair: {note}")
         return repaired

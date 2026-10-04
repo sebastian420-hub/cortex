@@ -31,9 +31,12 @@ class FileBackup:
     original_path: Path
     backup_path: Optional[Path]
     operation: str  # 'write', 'edit', 'delete'
-    content: Optional[str]  # In-memory backup for small files
+    content: Optional[str]  # In-memory backup for small files (decoded text, for display)
     existed: bool  # Whether file existed before operation
     timestamp: datetime = field(default_factory=datetime.now)
+    # The exact bytes of a small file. Restoring from these gives back the original file even
+    # when it has CRLF line endings or is not valid UTF-8, which a text round trip would change.
+    raw: Optional[bytes] = None
 
     def restore(self) -> bool:
         """Restore the file to its original state."""
@@ -46,8 +49,13 @@ class FileBackup:
                 return True
 
             # File existed, restore content
-            if self.content is not None:
-                # Restore from in-memory backup
+            if self.raw is not None:
+                # Restore the exact bytes from the in-memory backup
+                self.original_path.parent.mkdir(parents=True, exist_ok=True)
+                self.original_path.write_bytes(self.raw)
+                logger.debug(f"Restored from memory: {self.original_path}")
+            elif self.content is not None:
+                # Text-only backup (created without raw bytes)
                 self.original_path.write_text(self.content, encoding="utf-8")
                 logger.debug(f"Restored from memory: {self.original_path}")
             elif self.backup_path and self.backup_path.exists():
@@ -199,6 +207,7 @@ class TransactionManager:
 
             existed = path.exists()
             content = None
+            raw = None
             backup_path = None
 
             if existed:
@@ -206,8 +215,12 @@ class TransactionManager:
                     file_size = path.stat().st_size
 
                     if file_size <= MEMORY_BACKUP_THRESHOLD:
-                        # Small file - backup in memory
-                        content = path.read_text(encoding="utf-8")
+                        # Small file - backup in memory, as the exact bytes
+                        raw = path.read_bytes()
+                        try:
+                            content = raw.decode("utf-8")
+                        except UnicodeDecodeError:
+                            content = None  # binary or another encoding: bytes only
                         logger.debug(f"In-memory backup: {path} ({file_size} bytes)")
                     else:
                         # Large file - backup to disk
@@ -230,6 +243,7 @@ class TransactionManager:
                 operation=operation,
                 content=content,
                 existed=existed,
+                raw=raw,
             )
 
             self._current_transaction.add_backup(backup)

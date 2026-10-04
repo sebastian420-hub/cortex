@@ -5,20 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cortex"
 version = "1.2.0"
-description = "A unified agent for coding, cybersecurity, and personal assistance"
+description = "A terminal coding agent with undoable changes, honest results and an optional command sandbox"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "MIT"
 authors = [
     {name = "Cortex Contributors", email = "contributors@cortex.ai"}
 ]
-keywords = ["ai", "coding-assistant", "cybersecurity", "llm", "ollama", "terminal", "mcp"]
+keywords = ["ai", "coding-assistant", "agent", "llm", "ollama", "terminal"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -43,11 +41,14 @@ dependencies = [
     "tree-sitter-typescript>=0.21.0",
     "tree-sitter-java>=0.21.0",
     "tree-sitter-go>=0.21.0",
-    "chromadb>=0.5.0",
-    "sentence-transformers>=3.0.0",
 ]
 
 [project.optional-dependencies]
+# Semantic (vector) memory. Heavy: sentence-transformers pulls in PyTorch. Off by default.
+memory = [
+    "chromadb>=0.5.0",
+    "sentence-transformers>=3.0.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
@@ -75,9 +76,13 @@ Repository = "https://github.com/sebastian420-hub/cortex"
 where = ["."]
 include = ["cortex*"]
 
+# Non-Python files that must ship inside the wheel (the skills are loaded at runtime).
+[tool.setuptools.package-data]
+cortex = ["py.typed", "*.pyi", "skills/*.md"]
+
 [tool.black]
 line-length = 100
-target-version = ['py38', 'py39', 'py310', 'py311']
+target-version = ['py39', 'py310', 'py311']
 
 [tool.mypy]
 python_version = "3.10"
@@ -85,6 +90,36 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+follow_imports = "silent"
+# The modules that are held to a clean type check (`mypy` with no arguments checks exactly these;
+# CI fails if they regress). It is a list of what is clean today, not of what matters: grow it.
+files = [
+    "cortex/core/turn.py",
+    "cortex/headless",
+    "cortex/core/tool_policy.py",
+    "cortex/core/checkpoints.py",
+    "cortex/core/command_sandbox.py",
+    "cortex/core/transaction.py",
+    "cortex/core/planning.py",
+    "cortex/core/loop_guards.py",
+    "cortex/core/agent_permissions.py",
+    "cortex/core/security.py",
+    "cortex/core/context.py",
+    "cortex/core/conversation.py",
+    "cortex/core/memory/contract.py",
+    "cortex/core/memory/core_memory.py",
+    "cortex/core/memory_layers/session.py",
+    "cortex/core/memory_layers/state.py",
+    "cortex/core/providers/usage.py",
+    "cortex/core/gym/manager.py",
+    "cortex/utils/message_validation.py",
+    "cortex/tools/memory_tools.py",
+    "cortex/tools/skill_tools.py",
+    "cortex/cli_commands/commands/transaction.py",
+    "cortex/cli_commands/commands/gym.py",
+    "cortex/cli_commands/commands/memory.py",
+    "bench",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

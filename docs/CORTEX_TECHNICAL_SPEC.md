@@ -1,146 +1,204 @@
 # Cortex: Technical Specification
 
-## Version 1.2.0 (Bio-inspired Metacognition)
+This describes how Cortex works today. Where a feature is optional, experimental or limited, it
+says so; [STATUS.md](STATUS.md) has the one-page summary and [SECURITY.md](SECURITY.md) has the
+safety model in full.
 
-## Table of Contents
-
-1. [System Architecture](#1-system-architecture)
-2. [Core Components](#2-core-components)
-3. [Data Models](#3-data-models)
-4. [Metacognitive Core (Limbic System)](#4-metacognitive-core-limbic-system)
-5. [Tool System](#5-tool-system)
-6. [Provider Interface](#6-provider-interface)
-7. [Memory Architecture](#7-memory-architecture)
-8. [Planning System](#8-planning-system)
-9. [Research Framework](#9-research-framework)
-10. [Security Model](#10-security-model)
-11. [Configuration System](#11-configuration-system)
-12. [Storage Layer](#12-storage-layer)
-13. [UI/UX Specifications](#13-uiux-specifications)
-14. [Testing Strategy](#14-testing-strategy)
-
----
-
-## 1. System Architecture
-
-### 1.1 High-Level Architecture
+## 1. Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    User Interface Layer                      │
-├─────────────────────────────────────────────────────────────┤
-│  CLI │ REPL │ API Gateway │ Web UI (Future) │ MCP Server    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    Agent Orchestration Layer                 │
-├─────────────────────────────────────────────────────────────┤
-│  Base Cortex Agent │ Enhanced Cortex Agent │ Subagents      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    Cognitive Core Layer                      │
-├─────────────────────────────────────────────────────────────┤
-│  Metacognition (Limbic) │ Planning │ Memory │ Security      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    Integration Layer                         │
-├─────────────────────────────────────────────────────────────┤
-│  Tool Registry │ Provider Factory │ Hook System │ AST       │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    External Systems Layer                    │
-├─────────────────────────────────────────────────────────────┤
-│  Ollama │ DeepSeek │ Anthropic │ Git │ File System │ MCP    │
-└─────────────────────────────────────────────────────────────┘
+  CLI / REPL  (cortex/cli.py, cortex/cli_commands/, cortex/ui/)
+        │
+  Agent loop  (cortex/agent.py): one user request = one turn
+        │
+  ┌─────┴───────────────────────────────────────────────────────────────┐
+  │ Permissions   core/agent_permissions.py, tool_policy.py, security.py │
+  │ Undo          core/transaction.py (files), core/checkpoints.py (git)  │
+  │ Memory        core/memory/, core/memory_layers/                       │
+  │ Planning      core/planning.py        Prompts   core/prompts/         │
+  │ Providers     core/providers/         Hooks     hooks/                │
+  │ Unattended    headless/ (cortex run): worktree, verify gate, budgets  │
+  └─────┬───────────────────────────────────────────────────────────────┘
+        │
+  Tools  (cortex/tools/): files, edit, git, search, AST, web, commands, tests, plan, memory
+        │
+  Your project, your git repository, and the model provider
 ```
 
-## 2. Core Components
+There is no server, API gateway or MCP endpoint: Cortex is a client that runs in your terminal.
 
-### 2.1 Agent System
+## 2. The agent loop
 
-#### Enhanced Cortex Agent (`cortex/agent.py`)
-In v1.2.0, the "Enhanced" and "Base" agents have been unified. The agent now supports:
-- **Limbic Feedback**: Adjusts strategy based on Confidence and Urgency.
-- **Atomic Planning**: 1-step creation and execution of task DAGs.
-- **Layered Memory**: Multi-tier persistence from Working to Semantic memory.
+`Cortex._process_message(text)` runs one **turn**:
 
-## 3. Data Models
+1. Open a transaction and mark a git checkpoint as due (see §6).
+2. Add the user message; refresh the system prompt; ask the model.
+3. If the model asked for tools, run them (in parallel when they are independent), append each
+   result directly after the request that produced it, and loop.
+4. Stop when the model answers without tool calls, the iteration limit is reached, the loop guard
+   fires, a hook blocks the prompt, or shutdown is requested.
 
-### 3.1 Metacognitive State (`cortex/core/memory_layers/state.py`)
-```python
-@dataclass
-class MetacognitiveState:
-    confidence_score: float = 0.8  # 0.0 - 1.0
-    urgency_score: float = 0.1     # 0.0 - 1.0
-    emotional_tone: str = "analytical" # analytical, confident, cautious, frustrated
-    internal_monologue: str = ""   # Persistent self-reflection
-```
+The turn returns a `TurnResult` (`cortex/core/turn.py`) with a `status` of `ok`, `error`,
+`max_iterations`, `loop_guard`, `blocked` or `interrupted`, plus the iteration and tool-call
+counts and any error. One-shot mode (`cortex -p`) exits 0 only for `ok`; the gym, subagents and
+the benchmark read the same result instead of guessing from printed output.
 
-## 4. Metacognitive Core (Limbic System)
+**Loop guard** (`core/loop_guards.py`): fed with every tool call and every error; stops a turn
+when the same call or error repeats, and is reset at the start of each turn.
 
-The Limbic System acts as the agent's "Gut Feeling" and emotional regulator.
+## 3. Messages and providers
 
-### 4.1 Appraisal Loop
-1. **Action**: Agent executes a tool.
-2. **Appraisal**: `StateManager` evaluates the result.
-3. **Shift**: 
-    - **Success** -> Confidence Spike (+0.1), Tone becomes "Confident".
-    - **Failure** -> Confidence Drop (-0.15), Tone becomes "Cautious" or "Frustrated" (if failures >= 2).
-4. **Injection**: The `Internal Monologue` is injected into the next prompt, forcing the LLM to reflect on the failure before acting again.
+Chat APIs require that an assistant message with tool calls is *immediately* followed by one
+`tool` message per call. Anything that edits history can break that, so
+`cortex/utils/message_validation.py` detects violations, repairs them (moves results back, adds a
+placeholder for a missing one, drops orphans) and trims or summarises history without splitting a
+tool exchange (`tail_start`). Before each model call the agent validates the messages; with
+`CORTEX_STRICT_MESSAGES=1` (used by the tests) a violation raises instead of being repaired.
 
-## 5. Tool System
+Providers (`core/providers/`): OpenRouter (default), Anthropic, DeepSeek, Ollama, and an
+OpenAI-compatible provider for OpenAI and local servers (vLLM, llama.cpp, LM Studio), chosen only
+with `--provider openai` because a model name cannot tell such a server from OpenRouter. Each
+returns `{"message": ..., "usage": {"input_tokens", "output_tokens"}}`; `usage` is omitted when the
+API reported none (`providers/usage.py`). A provider that fixes the model's context window
+exposes it as `context_window`, which the agent uses to size the history; the OpenAI-compatible
+provider knows it only when configured.
 
-### 5.1 Simplified Planning Tools
-- `create_and_execute_plan`: The primary interface for complex tasks (4+ steps).
-- `monitor_plan`: Tracks progress and completion percentage.
-- `update_plan`: Dynamically modifies a running plan.
+Ollama is always sent an explicit context window (`options.num_ctx`: 32,768 by default,
+`ollama.num_ctx` or `CORTEX_OLLAMA_NUM_CTX` to change it), because its own default is smaller
+than Cortex's tool definitions and system prompt and would silently truncate them. A provider
+that fixes a window reports it as `context_window`, and the agent limits its history budget to
+that window minus the tool definitions (`ConversationManager.limit_context`), warning when too
+little is left.
 
-### 5.2 Surgical Tools (v1.2.0 Fixed)
-- `search_files(query, path, file_pattern)`: Now features robust path resolution for all OS environments.
+### The system prompt
 
-## 7. Memory Architecture
+Built by `PromptBuilder` in two parts so provider prompt caches (which match on the start of the
+prompt) stay valid: first everything fixed for the session (identity, tool documentation,
+planning and memory guidance, project context, custom instructions), then what changes
+(retrieved memory for the current request, session memory, current state, and the experimental
+metacognition note), slowest-changing first. Long-term memory is looked up once per user message,
+not once per loop iteration.
 
-### 7.1 The Multi-Layered Memory Stack
-1. **Working Memory**: Short-term context (max 20 items).
-2. **Session Memory**: Tracks **Failed Approaches** and **Successful Patterns**.
-3. **Semantic Memory**: Persistent vector storage (ChromaDB) with:
-    - **Belief Verification**: Confidence reinforcement upon tool confirmation.
-    - **Memory Decay**: Natural confidence reduction for unverified facts over time.
+## 4. Tools and the tool policy
 
-## 8. Planning System
+Every registered tool has a class in `core/tool_policy.py`: `read_only`, `agent_state` (the
+agent's own bookkeeping: todos, plans, memory), `mutating` or `runs_code`. A test fails if a
+registered tool has none. File tools check that paths stay inside the project directory.
 
-### 8.1 Atomic Execution
-Cortex v1.2.0 moves away from the "Plan then Execute" split. The `create_and_execute_plan` tool is an atomic operation that hands a validated DAG to the engine, reducing "context drift" where the agent forgets its plan during long runs.
+`remember`, `create_and_execute_plan` and friends are tools like any other; the planning tools
+are only offered with `--planning`.
 
-## 9. Research Framework
+## 5. Permissions
 
-The Research Framework (`research/`) is Cortex's "Laboratory" for systematic intelligence benchmarking.
+- **NORMAL**: each tool that writes, edits, runs a command or changes git asks first.
+- **PLAN**: `allowed_in_plan_mode` lets only `read_only` and `agent_state` tools through; an
+  unclassified tool is refused, so a new tool is blocked until someone classifies it.
+- **AUTO_APPROVE**: no prompts.
+- **Command blocklist** (`core/security.py:is_dangerous_command`), applied in every mode: splits a
+  command line into the commands that will run (`;`, `&&`, `||`, `|`, newlines), unwraps `sudo`,
+  `env`, `xargs` and `sh -c '...'`, and refuses the well-known destructive forms. It is a filter,
+  not a boundary.
+- **Command sandbox** (`core/command_sandbox.py`): optional bubblewrap confinement of
+  `execute_command` and `run_tests`; refused, never skipped, if requested and unavailable.
 
-### 9.1 Evaluation Tiers
-- **Control**: Baseline without metacognition.
-- **Architectural**: Enables the Limbic and Layered Memory systems.
-- **Stress**: Injected environment failures (corrupted configs, tool instability).
+## 6. Undo
 
-### 9.2 Key KPIs
-- **Correction Latency**: Steps taken to identify and fix an error.
-- **Success Rate**: % of challenges passed in the sandbox.
+Two layers, because they see different things:
 
-## 14. Testing Strategy
+- **Transactions** (`core/transaction.py`): one `TransactionManager` per session, passed to every
+  tool. Each user request opens a transaction; every file a tool creates or changes is backed up
+  first as exact bytes; the transaction stays open after the turn so `/rollback` can restore it,
+  and is committed when the next request starts or the session ends.
+- **Git checkpoints** (`core/checkpoints.py`): before the first tool of a request that could
+  change anything (including shell commands), a snapshot of the whole working tree is committed
+  to a private ref `refs/cortex/<session>/<n>`, built with a temporary index so HEAD, branches,
+  the real index and stashes are untouched. `/undo` restores the files that differ and removes
+  files created since; `/redo` reverses an undo. Git-ignored files and branch moves are not
+  covered. Checkpoints are removed when the session ends; stale ones are swept after 7 days.
 
-### 14.1 Full-Stack Verification
-The project maintains a **100% success rate** across 950+ tests.
-- **Python**: Unit and Integration tests for agent logic.
-- **Rust/Go**: Performance verification for native bindings and caching.
+## 7. Memory
 
----
+- **Session memory** (`--memory`): working memory (current task, files, tools), failed approaches
+  (the same failure is counted, not listed again) and successful patterns, kept for the session.
+- **Long-term memory** (`[memory]` extra, `semantic_memory.enabled: true`): a ChromaDB vector
+  store under `.cortex/semantic_db`.
+  - **Contract** (`core/memory/contract.py`): stores decisions, conventions/preferences, explicit
+    facts, summaries of solved problems and anything explicitly remembered. It does not store the
+    user's requests, raw errors, file references or progress notes.
+  - **De-duplication**: an entry's id is a hash of its normalised text, so writing a fact twice
+    leaves one record that keeps its creation time, counts the sighting and keeps the higher
+    confidence.
+  - **Ranking** (`core/memory/semantic.py`): score = 0.6 x similarity + 0.2 x confidence +
+    0.2 x recency, where recency halves every 30 days since the entry was last confirmed
+    (explicit user instructions do not fade). Computed when reading; nothing is written back.
+    Confirming an entry (`verify`) raises its confidence and restarts its age; a contradiction
+    lowers it.
+  - **Retrieval**: memories less similar to the request than `semantic_memory.min_similarity`
+    (default 0.3, a starting value) are not put in the prompt.
+  - **Control**: the `remember` tool; `/memory list`, `add`, `edit`, `delete`, `search`, `clear`.
 
-## Appendix C: Revision History
+## 8. Planning (`--planning`)
 
-| Version | Date | Changes | Author |
-|---------|------|---------|--------|
-| 1.2.0 | 2026-02-25 | Metacognitive Core, Atomic Planning, Research Framework | Cortex Team |
-| 1.1.0 | 2026-02-24 | Added AST-driven surgical refactoring and semantic memory | Cortex Team |
-| 1.0.0 | 2024-01-15 | Initial technical specification | Cortex Team |
+The model supplies the steps (`create_and_execute_plan` requires them) and `core/planning.py`
+runs them one at a time. A step that fails or is blocked fails the plan, and the result carries
+per-step summaries. `SUBTASK`, `DECISION` and `CHECKPOINT` steps are not implemented and are
+reported as not implemented. There is no replanning.
+
+## 9. Metacognition (`--metacognition`, experimental)
+
+`MetacognitiveState` holds confidence, urgency and an emotional tone updated by fixed rules after
+each tool result (mood follows *consecutive* failures: one is "cautious", two in a row are
+"frustrated", a success resets the streak). When the flag is on, a short note is added to the
+prompt. Off by default; nothing measures whether it helps.
+
+## 10. Practice and measurement
+
+- **Benchmark** (`bench/`, [BENCHMARK.md](BENCHMARK.md)): 20 tasks judged by their own tests.
+- **Unattended runs** (`headless/`, [HEADLESS.md](HEADLESS.md)): `cortex run` does one task on
+  its own git worktree and branch, with a shell command as the verdict. `workspace.py` makes and
+  removes the worktree and commits what the agent left; `verify.py` runs the command (through the
+  command sandbox when one is configured, and not at all if it was asked for and is unavailable);
+  `meter.py` wraps the provider to count tokens and stop the run when a budget is used up, by
+  requesting the agent's shutdown rather than raising; `runner.py` ties them together and decides
+  the status; `cli.py` is the command line. A run keeps its branch only if it verified. The agent
+  runs with `ask_user_question` and the git tools that reach outside the worktree removed, and with
+  the worktree first on `PYTHONPATH`, so tests do not import the checkout the project was installed
+  from.
+- **Cognitive Gym** (`core/gym/`): the agent works in a scratch copy of a project. With a
+  verifier (`/gym --bench <task>`) the result is the verifier's verdict; without one the outcome
+  is reported as unchecked.
+
+## 11. Configuration
+
+Priority, lowest to highest: built-in defaults, a YAML file (`--config`), `CORTEX_*` environment
+variables, command-line flags. Every key in the YAML file is applied (a test fails when a setting
+is added without one proving it takes effect). Main sections: `model`, `provider`,
+`permission_mode`, `max_iterations`, `transactions`, `checkpoints`, `command_sandbox`,
+`semantic_memory`, `session_retention`, `timeouts`, `hooks`, `routing`, `parallel_execution`,
+`ollama`, `openai`, and `tools` (`disabled` hides tools from the model and refuses them, per agent;
+`plugins` loads tool modules). A `--config` file that does not exist is an error.
+
+## 12. Storage
+
+`~/.cortex/sessions/` (saved conversations), `~/.cortex/backups/` (file backups while a request
+is open), `.cortex/semantic_db/` (long-term memory, if enabled), `refs/cortex/*` in your git
+repository (checkpoints, while the session runs). Session files are written atomically. An
+unattended run (`cortex run`) uses a temporary `cortex-run-*` directory for its worktree, removed
+when the run ends, and a `cortex/<task>-<id>` branch in your repository if it verified.
+
+## 13. Testing
+
+The suite is offline and hermetic (no network, no model, a throwaway git identity, a stub for the
+embedding model). `tests/e2e/` drives the real agent loop with a scripted fake provider
+(`tests/e2e/scripted.py`); its `KNOWN_BUGS` registry holds open bugs as strict expected failures.
+CI runs the suite on Linux, Windows and macOS with Python 3.9 to 3.12, lint, a blocking type
+check on the modules listed in `pyproject.toml`, the benchmark's self-check, the Rust and Go
+tests, a Docker build, and a security scan. Test counts and coverage are generated by CI.
+
+## 14. Known gaps
+
+The unattended mode has not been run with a real model, and budgets do not interrupt a model call
+or command that is already running. Planning is sequential and cannot replan; long-term memory's benefit is unmeasured; the three
+optional agent features have no ablation yet; the Rust AST parser is unused; the Go services have
+no client; model routing and delegation have not been audited; most of `cortex/` is not in the
+blocking type check.

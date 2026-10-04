@@ -173,7 +173,6 @@ def test_health_monitor_coverage():
 
 def test_ui_coverage():
     """Exercise UI components."""
-    theme = UITheme()
 
     # ConsolidatedDisplay
     console = MagicMock()
@@ -204,7 +203,6 @@ def test_agent_coverage(tmp_path):
 
 def test_cli_coverage(tmp_path):
     """Exercise CLI commands via registry."""
-    console = MagicMock()
     config = AgentConfig(model="test-model")
     with patch("cortex.core.providers.factory.ProviderFactory.get_provider"):
         agent = Cortex(config=config, project_dir=tmp_path)

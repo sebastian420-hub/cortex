@@ -63,8 +63,7 @@ class TestASTParsingBenchmarks:
         if not parser.is_language_supported("javascript"):
             pytest.skip("JavaScript parser not available")
 
-        js_code = (
-            """
+        js_code = """
 function processData(items) {
     const results = [];
     for (const item of items) {
@@ -93,9 +92,7 @@ class DataManager {
 }
 
 export { processData, DataManager };
-"""
-            * 10
-        )
+""" * 10
         benchmark(parser.parse, js_code, "javascript")
 
 

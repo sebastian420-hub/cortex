@@ -70,7 +70,7 @@ class SearchFilesTool(Tool):
         try:
             target_path = Path(path)
             full_path = validate_path(self.project_dir, str(target_path))
-            
+
             # If path is a file, use its parent directory
             if os.path.isfile(full_path):
                 full_path = os.path.dirname(full_path)

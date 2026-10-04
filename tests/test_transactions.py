@@ -212,7 +212,6 @@ class TestTransactionManager:
 
     def test_transaction_context_manager_success(self, tm, temp_file):
         """Test transaction context manager with successful operation."""
-        original_content = temp_file.read_text()
 
         with tm.transaction() as tx:
             tm.backup_file(temp_file, "edit")

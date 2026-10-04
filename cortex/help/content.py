@@ -165,15 +165,24 @@ HELP_ENTRIES: List[HelpEntry] = [
         command="/memory",
         short_desc="Manage semantic memory",
         long_desc="""Manage the semantic memory (Vector Database).
-        
+
 Subcommands:
+- list: Show everything stored for future sessions, with its confidence and when it was last confirmed.
+- add <text>: Remember something as your own instruction (it does not fade over time).
+- edit <id> <text>: Change a stored memory. An id prefix is enough.
+- delete <id>: Forget one memory (also: forget <id>).
 - search <query>: Search for similar memories in the current session.
 - search --global <query>: Search across all past sessions in this project.
 - clear: Permanently delete the entire semantic database for this project.
 
-The memory bank stores facts, decisions, and context learned during interactions.""",  # noqa: E501
+Long-term memory keeps decisions, conventions, facts and summaries of solved problems, not your requests or error messages. The model can store one itself with the remember tool. It needs 'cortex[memory]' installed and semantic_memory.enabled set.""",  # noqa: E501
         category=HelpCategory.CONTEXT,
-        examples=["/memory", "/memory search 'api key'", "/memory search --global 'refactor'", "/memory clear"],
+        examples=[
+            "/memory",
+            "/memory search 'api key'",
+            "/memory search --global 'refactor'",
+            "/memory clear",
+        ],
         related=["/stats", "/summary"],
         keywords=["memory", "facts", "context", "learned", "vector", "db", "search", "clear"],
         beginner_friendly=False,
@@ -228,12 +237,32 @@ The memory bank stores facts, decisions, and context learned during interactions
         beginner_friendly=False,
     ),
     HelpEntry(
+        command="/undo",
+        short_desc="Undo the last request",
+        long_desc="Restore the whole project to how it was before the last request, including changes made by shell commands. Needs a git repository; your branch, index and stash are not touched. Run it again to step back one more request. Files that git ignores (build output, virtual environments) are not restored, and neither is the branch position if a command moved it.",  # noqa: E501
+        category=HelpCategory.ADVANCED,
+        examples=["/undo"],
+        related=["/redo", "/rollback"],
+        keywords=["undo", "restore", "revert", "checkpoint", "git"],
+        beginner_friendly=True,
+    ),
+    HelpEntry(
+        command="/redo",
+        short_desc="Bring back what /undo removed",
+        long_desc="Reapply the changes the last /undo took away. Anything you changed after the undo is saved first, so /undo can bring it back.",  # noqa: E501
+        category=HelpCategory.ADVANCED,
+        examples=["/redo"],
+        related=["/undo"],
+        keywords=["redo", "undo", "restore"],
+        beginner_friendly=False,
+    ),
+    HelpEntry(
         command="/rollback",
-        short_desc="Rollback file changes",
-        long_desc="Rollback the current transaction, restoring all modified files to their original state. Works with active transactions only.",  # noqa: E501
+        short_desc="Roll back the last request's file edits",
+        long_desc="Restore the exact bytes of every file the last request created, edited or overwrote with Cortex's file tools. Works without git, but does not see changes made by shell commands (use /undo for those).",  # noqa: E501
         category=HelpCategory.ADVANCED,
         examples=["/rollback"],
-        related=["/transactions"],
+        related=["/undo", "/transactions"],
         keywords=["rollback", "undo", "restore", "revert"],
         beginner_friendly=False,
     ),
@@ -513,7 +542,9 @@ Use tools efficiently: Start with search (glob/grep) before reading, use edit fo
 - `/cache` - Show or clear file cache
 
 ## Advanced Features
-- `/rollback` - Rollback file changes
+- `/undo` - Restore the project to before the last request (git)
+- `/redo` - Bring back what /undo removed
+- `/rollback` - Undo the last request's file edits (no git needed)
 - `/transactions` - Show transaction info
 - `/model <model_name>` - Switch LLM model
 

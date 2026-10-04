@@ -87,7 +87,7 @@ class REPL:
   /plan              Enter read-only planning mode
   /reset-context     Clear history but keep memory
   /focus <path>      Focus on a directory
-  /memory            Show memory bank contents
+  /memory            Show memory bank contents (list, add, edit, delete, search)
   /stats             Show session statistics
 
 [bold cyan]Display Commands:[/bold cyan]
@@ -95,7 +95,9 @@ class REPL:
   /storage           Show storage statistics
   /cleanup           Run session cleanup
   /cache [clear]     Show cache stats or clear cache
-  /rollback          Rollback active transaction
+  /undo              Restore the project to before the last request (git)
+  /redo              Bring back what /undo removed
+  /rollback          Undo the last request's file edits (no git needed)
   /transactions      Show transaction statistics
 
 [bold cyan]Tips:[/bold cyan]

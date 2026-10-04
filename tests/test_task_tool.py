@@ -198,7 +198,7 @@ class TestTaskToolExecution:
         with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Done"}
 
-            result = tool.execute(
+            tool.execute(
                 description="Complex task",
                 max_iterations=20,
             )
@@ -218,7 +218,7 @@ class TestTaskToolExecution:
         with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.return_value = {"final_response": "Done"}
 
-            result = tool.execute(
+            tool.execute(
                 description="Analyze code",
                 context="Focus on error handling",
             )
@@ -330,7 +330,7 @@ class TestAllowedToolsEnforcement:
         # when allowed_tools is set, a PermissionHook would block disallowed tools
 
         # Create a hook manager like _run_subagent does
-        from cortex.hooks import HookManager, PermissionHook, PreToolUseEvent, HookAction
+        from cortex.hooks import PermissionHook, PreToolUseEvent, HookAction
 
         allowed_tools = ["read_file", "list_files"]
         subagent_hooks = HookManager()
@@ -413,7 +413,7 @@ class TestTaskToolIntegration:
         with patch.object(tool, "_run_subagent") as mock_run:
             mock_run.side_effect = Exception("Failed")
 
-            result = tool.execute(description="Failing task")
+            tool.execute(description="Failing task")
 
             # All tasks should be cleaned up
             assert len(tool.active_tasks) == 0

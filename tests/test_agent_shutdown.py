@@ -47,12 +47,10 @@ def test_shutdown_check_in_loop(tmp_path):
     agent.request_shutdown()
 
     # Process message should return early
-    initial_history_len = len(agent.conversation.get_history())
     agent._process_message("test")
 
     # Verify loop exited early (history shouldn't have changed much)
     # Since shutdown was requested, the message processing should exit quickly
-    final_history_len = len(agent.conversation.get_history())
 
     # The user message might be added, but processing should stop early
     assert agent._shutdown_requested is True

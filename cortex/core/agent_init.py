@@ -120,6 +120,7 @@ class AgentInitializer:
         self.file_cache = self._init_file_cache()
         self.router = self._init_routing()
         self.tool_registry = get_registry()
+        self._load_tool_plugins()
         self.formatter = create_formatter(output_format, console=console)
 
         # Initialize planning engine
@@ -136,24 +137,33 @@ class AgentInitializer:
         # Timeout configuration
         self.timeout_config = self.config.get_timeout_config()
 
+    def _load_tool_plugins(self) -> None:
+        """Load the plugin modules named in ``tools.plugins``. A plugin that cannot be loaded is
+        reported, and does not stop Cortex from starting."""
+        plugins = getattr(self.config, "tools_plugins", None)
+        if not isinstance(plugins, (list, tuple)):
+            return
+        for plugin in plugins:
+            if isinstance(plugin, str) and not self.tool_registry.load_plugin(plugin):
+                logger.warning(f"Could not load the tool plugin '{plugin}' (see the log above)")
+
     def _init_memory_bank(self) -> MemoryBank:
         """Initialize memory bank for tracking decisions and facts"""
         if self.enable_layered_memory:
             # Re-use the session_memory from state_manager for consistency
             memory_bank = self.state_manager.state.session_memory
-            
+
             # Configure semantic memory if enabled in config
-            if self.config.semantic_memory and self.config.semantic_memory.get("enabled"):
-                # We need to manually initialize semantic manager since StateManager 
+            if self.config.semantic_memory and self.config.semantic_memory.get("enabled") is True:
+                # We need to manually initialize semantic manager since StateManager
                 # doesn't know about AgentConfig.
                 try:
-                    from .memory_layers.session import EnhancedMemoryBank
                     if isinstance(memory_bank, EnhancedMemoryBank):
                         # Re-initialize with config to ensure semantic manager is set
                         new_bank = EnhancedMemoryBank(
                             max_items=100,
                             semantic_config=self.config.semantic_memory,
-                            session_id=self.state_manager.state.session_id
+                            session_id=self.state_manager.state.session_id,
                         )
                         # Copy existing items if any
                         new_bank.items = memory_bank.items
@@ -162,9 +172,9 @@ class AgentInitializer:
                         return new_bank
                 except Exception as e:
                     logger.error(f"Failed to configure semantic memory on session bank: {e}")
-            
+
             return memory_bank
-            
+
         return create_memory_bank(max_items=50)
 
     def _init_state_manager(self) -> StateManager:
@@ -319,10 +329,12 @@ class AgentInitializer:
         provider_override = getattr(self.config, "provider", None)
         try:
             provider = ProviderFactory.get_provider(self.model, provider_override)
+            provider.configure(self.config.get_provider_options(provider.config_section))
             # Validate API key for cloud providers
             if not provider.validate_api_key():
                 raise ProviderError(
-                    f"API key not set for {ProviderFactory.get_provider_name(self.model)} "
+                    f"API key not set for "
+                    f"{ProviderFactory.get_provider_name(self.model, provider_override)} "
                     f"provider. Please set the required environment variable."
                 )
             return provider

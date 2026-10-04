@@ -277,7 +277,10 @@ class TaskTool(Tool):
 
         # Process the task
         # Note: We're calling _process_message directly which populates conversation
-        subagent._process_message(context.task_description)
+        turn = subagent._process_message(context.task_description)
+        if not getattr(turn, "ok", True):
+            # A turn that errored used to look like a finished task with an empty answer.
+            raise RuntimeError(f"Subagent did not finish ({turn.status}): {turn.error}")
 
         # Collect results
         context.conversation_history = subagent.get_conversation_history()
@@ -348,9 +351,7 @@ class TaskTool(Tool):
 
         # Agent-type specific instructions
         if agent_type == "explore":
-            return (
-                base
-                + """
+            return base + """
 ## Exploration Strategy
 
 You are exploring a codebase to understand its structure and answer questions.
@@ -382,12 +383,9 @@ Provide a structured summary:
 4. **Findings**: Direct answers to any questions asked
 
 Be thorough but concise. Reference files with `file.py:line` format."""
-            )
 
         elif agent_type == "search":
-            return (
-                base
-                + """
+            return base + """
 ## Search Strategy
 
 You are searching for specific code patterns or definitions.
@@ -413,12 +411,9 @@ Report findings as:
 - **Found in**: file.py:42
 - **Context**: Brief description of what's there
 - List all relevant matches"""
-            )
 
         elif agent_type == "analyze":
-            return (
-                base
-                + """
+            return base + """
 ## Analysis Strategy
 
 You are analyzing code structure, relationships, and patterns.
@@ -445,12 +440,9 @@ Provide:
 2. **Dependencies**: Key imports and relationships
 3. **Patterns**: Design patterns used
 4. **Observations**: Notable findings or concerns"""
-            )
 
         else:  # general
-            return (
-                base
-                + """
+            return base + """
 ## Guidelines
 
 1. **Focus**: Work ONLY on the assigned task
@@ -463,7 +455,6 @@ Provide:
 1. Brief summary of what you found/accomplished
 2. Key findings or results
 3. Relevant code snippets or file references"""
-            )
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """

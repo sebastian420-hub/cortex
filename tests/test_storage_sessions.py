@@ -275,7 +275,7 @@ def test_session_file_integrity(tmp_path):
         try:
             result = manager.load_session("integrity_test")
             read_results.append(result)
-        except Exception as e:
+        except Exception:
             read_results.append(None)
 
     def write_session(i):

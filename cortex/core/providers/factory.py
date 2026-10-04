@@ -7,6 +7,7 @@ from .ollama import OllamaProvider
 from .deepseek import DeepSeekProvider
 from .anthropic_provider import AnthropicProvider
 from .openrouter import OpenRouterProvider
+from .openai_compatible import OpenAICompatibleProvider
 
 
 class ProviderFactory:
@@ -105,6 +106,10 @@ class ProviderFactory:
             return AnthropicProvider()
         elif provider_lower == "openrouter":
             return OpenRouterProvider()
+        elif provider_lower in ["openai", "openai-compatible"]:
+            # Only ever chosen explicitly: a model name cannot tell a local OpenAI-style server
+            # from OpenRouter (both use names such as "org/model")
+            return OpenAICompatibleProvider()
         else:
             raise ProviderError(f"Unknown provider: {provider_name}")
 
@@ -172,9 +177,16 @@ class ProviderFactory:
         # Default to local (Ollama)
         return False
 
+    # Names that mean the same provider as another
+    _PROVIDER_ALIASES = {"claude": "anthropic", "openai-compatible": "openai"}
+
     @staticmethod
-    def get_provider_name(model_name: str) -> str:
-        """Get provider name for a model"""
+    def get_provider_name(model_name: str, provider_override: Optional[str] = None) -> str:
+        """Get provider name for a model; an explicit override wins over the model name"""
+        if isinstance(provider_override, str) and provider_override:
+            override = provider_override.lower()
+            return ProviderFactory._PROVIDER_ALIASES.get(override, override)
+
         model_lower = model_name.lower()
 
         # Exclude models with ollama/ prefix - these are local

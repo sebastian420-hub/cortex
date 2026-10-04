@@ -104,7 +104,6 @@ class GrepTool(Tool):
         result = None
 
         # Phase 2: Rust native search via feature flag
-        rust_failed = False
         try:
             from ..core.feature_flags import FeatureFlag, FeatureManager
 
@@ -124,7 +123,6 @@ class GrepTool(Tool):
                     offset,
                 )
                 if result and not result.get("success"):
-                    rust_failed = True
                     if self.console:
                         self.console.print("[dim]Rust search failed, falling back...[/dim]")
                     result = None  # Reset result to trigger fallback
@@ -341,7 +339,7 @@ class GrepTool(Tool):
                 ErrorType.TIMEOUT,
                 {"pattern": pattern, "path": str(path)},
             )
-        except Exception as e:
+        except Exception:
             # Fall back to Python on any ripgrep error
             return self._search_with_python(
                 pattern,

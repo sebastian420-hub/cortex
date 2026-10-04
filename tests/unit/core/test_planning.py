@@ -339,9 +339,9 @@ class TestPlanningEngine:
         assert step.tool_name == "read_file"
         assert step.tool_arguments == {"path": "config.yaml"}
 
-        # Verify step is in plan (plan already has 3 auto-skeleton steps from create_plan)
-        assert len(plan) == 4  # 3 skeleton steps + added step
-        assert plan[3].id == step.id  # Added step is at index 3
+        # A new plan is empty (there is no hidden starter plan), so the added step is the only one
+        assert len(plan) == 1
+        assert plan[0].id == step.id
 
     def test_get_plan(self, planning_engine):
         """Test retrieving a plan by ID."""
@@ -452,12 +452,12 @@ class TestPlanningEngine:
         # Execute plan
         results = planning_engine.execute_plan(plan)
 
-        # Verify steps were executed (3 skeleton steps [2 tool calls] + 2 tool steps)
-        assert mock_tool_executor.call_count == 4  # 2 from skeleton + 2 added
+        # Verify exactly the two added steps were executed
+        assert mock_tool_executor.call_count == 2
         assert step1.status == PlanStepStatus.COMPLETED
         assert step2.status == PlanStepStatus.COMPLETED
         assert plan.status == "completed"
-        assert len(results["data"]["step_results"]) == 5  # 3 skeleton steps + 2 added tool steps
+        assert len(results["data"]["step_results"]) == 2
         assert all(r["success"] for r in results["data"]["step_results"])
 
     def test_execute_plan_with_step_callback(self, mock_tool_executor):
@@ -499,8 +499,8 @@ class TestPlanningEngine:
         assert loaded_plan is not None
         assert loaded_plan.id == plan.id
         assert loaded_plan.goal == plan.goal
-        assert len(loaded_plan) == 4  # 3 skeleton steps + added step
-        assert loaded_plan[3].description == "Step 1"  # Added step is at index 3
+        assert len(loaded_plan) == 1
+        assert loaded_plan[0].description == "Step 1"
 
     @pytest.mark.skip("Test is disabled")
     def test_DISABLED_generate_plan_from_goal(self, planning_engine):

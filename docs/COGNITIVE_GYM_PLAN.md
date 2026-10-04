@@ -1,3 +1,12 @@
+> **Status.** This is the original design. What exists: `core/gym/` with a scratch-copy
+> sandbox, `AgentFocus.TRAINING`, the `metacognitive_reflect` tool, and `/gym`. A practice session
+> now reports success only if a **verifier** passes: `/gym --bench <task_id>` uses the benchmark
+> tasks ([BENCHMARK.md](BENCHMARK.md)), and a free-form `/gym --goal` session is reported as
+> unchecked. **Not built:** a challenge injector, "Engineering Kata" generator, bulk training,
+> and replay of stored experiences into real tasks as the design describes. A scratch copy of a
+> project protects the original files only; commands still run on your machine
+> ([SECURITY.md](SECURITY.md)). Whether practising improves the agent is unmeasured.
+
 # Cortex Cognitive Gym: Implementation Plan
 ## Autonomous Learning via Synthetic Experience
 

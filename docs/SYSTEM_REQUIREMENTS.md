@@ -1136,7 +1136,7 @@ max_iterations: 15
 ### Documentation
 - [User Guide](../docs/COMMANDS.md)
 - [API Reference](../docs/api/)
-- [Development Guide](../docs/development.md)
+- [Development Guide](DEVELOPER.md)
 
 ### Community Support
 - GitHub Issues: https://github.com/yourusername/cortex/issues

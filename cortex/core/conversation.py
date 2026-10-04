@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional, Callable, TYPE_CHECKING
 from datetime import datetime
 from .context import truncate_history, get_conversation_tokens
+from ..utils.message_validation import tail_start
 from ..utils.encoding import sanitize_object
 from .model_context_limits import auto_configure_context, get_model_context_info
 
@@ -209,7 +210,8 @@ class ConversationManager:
         """
         for msg in reversed(self.history):
             if msg.get("role") == "user":
-                return msg.get("content")
+                content = msg.get("content")
+                return content if isinstance(content, str) else None
         return None
 
     def clear(self, keep_system: bool = True) -> None:
@@ -263,7 +265,9 @@ class ConversationManager:
             ):
                 # Get messages to summarize (skip system, keep recent)
                 # We need at least 5 messages to make summarization worthwhile
-                messages_to_summarize = self.history[1 : -self.keep_recent]
+                # Split where the recent tail starts, never inside a tool call/result pair
+                split_at = max(1, tail_start(self.history, self.keep_recent))
+                messages_to_summarize = self.history[1:split_at]
 
                 if len(messages_to_summarize) >= 5:
                     try:
@@ -279,7 +283,7 @@ class ConversationManager:
                         self.history = [
                             self.history[0],  # System prompt
                             summary_message,
-                            *self.history[-self.keep_recent :],  # Recent messages
+                            *self.history[split_at:],  # Recent messages
                         ]
 
                         new_count = len(self.history)
@@ -336,6 +340,15 @@ class ConversationManager:
     def get_token_count(self) -> int:
         """Get current token count"""
         return get_conversation_tokens(self.history, self.model)
+
+    def limit_context(self, window_tokens: int) -> None:
+        """Keep the history within a window the server really gives the model.
+
+        ``window_tokens`` is what is left of the server's window after the tool definitions (which
+        are sent separately from the history). Only ever lowers the budget; room is kept for the
+        model's reply.
+        """
+        self.max_tokens = max(2000, min(self.max_tokens, window_tokens - RESPONSE_RESERVE_TOKENS))
 
     def update_model(self, new_model: str) -> None:
         """

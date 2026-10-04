@@ -20,8 +20,7 @@ def temp_project():
     temp_dir = Path(tempfile.mkdtemp())
 
     # Create test files
-    (temp_dir / "main.py").write_text(
-        """
+    (temp_dir / "main.py").write_text("""
 def hello_world():
     print("Hello, World!")
 
@@ -34,11 +33,9 @@ class Calculator:
 
     def subtract(self, x, y):
         return x - y
-"""
-    )
+""")
 
-    (temp_dir / "utils.py").write_text(
-        """
+    (temp_dir / "utils.py").write_text("""
 import os
 import sys
 
@@ -48,14 +45,12 @@ def get_path():
 def helper_function():
     # This is a helper
     pass
-"""
-    )
+""")
 
     # Create subdirectory with files
     src_dir = temp_dir / "src"
     src_dir.mkdir()
-    (src_dir / "app.py").write_text(
-        """
+    (src_dir / "app.py").write_text("""
 from flask import Flask
 
 app = Flask(__name__)
@@ -63,22 +58,18 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     return "Hello"
-"""
-    )
+""")
 
-    (src_dir / "config.py").write_text(
-        """
+    (src_dir / "config.py").write_text("""
 DEBUG = True
 PORT = 8080
 HOST = "localhost"
-"""
-    )
+""")
 
     # Create a test directory
     tests_dir = temp_dir / "tests"
     tests_dir.mkdir()
-    (tests_dir / "test_main.py").write_text(
-        """
+    (tests_dir / "test_main.py").write_text("""
 import pytest
 
 def test_hello():
@@ -86,8 +77,7 @@ def test_hello():
 
 def test_calculator():
     assert 1 + 1 == 2
-"""
-    )
+""")
 
     yield temp_dir
 

@@ -1,0 +1,23 @@
+# A systemd user service that runs one Cortex task. Install:
+#   mkdir -p ~/.config/systemd/user ~/.config/cortex
+#   cp cortex-nightly.service cortex-nightly.timer ~/.config/systemd/user/
+#   cp nightly.env.example ~/.config/cortex/nightly.env     # then edit it
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now cortex-nightly.timer
+# Try it once by hand:  systemctl --user start cortex-nightly.service
+# See what happened:    journalctl --user -u cortex-nightly.service
+# To run while you are logged out:  loginctl enable-linger "$USER"
+
+[Unit]
+Description=Cortex: one unattended task on its own branch
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/cortex/nightly.env
+# Adjust the path to wherever you cloned Cortex, and the arguments to your model and project
+ExecStart=%h/cortex/examples/scheduled/run-task.sh --provider openai --model qwen3-coder --protect 'tests/*'
+# A backstop above the script's own wall-clock limit (CORTEX_WALL_TIMEOUT)
+TimeoutStartSec=2h
+# Be polite to whatever else uses the machine
+Nice=10

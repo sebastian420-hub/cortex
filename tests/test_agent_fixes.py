@@ -299,11 +299,6 @@ def test_multiple_recovery_attempts_ordering(tmp_path):
     history = agent.conversation.get_history()
 
     # Verify pattern: tool_call → tool_result → recovery_guidance (repeated)
-    tool_calls = [
-        i
-        for i, msg in enumerate(history)
-        if msg.get("role") == "assistant" and msg.get("tool_calls")
-    ]
     tool_results = [i for i, msg in enumerate(history) if msg.get("role") == "tool"]
     recoveries = [
         i for i, msg in enumerate(history) if "[Recovery Guidance]" in msg.get("content", "")

@@ -18,7 +18,7 @@ class MemoryCommand(Command):
 
     @property
     def description(self) -> str:
-        return "Manage memory (subcommands: search, clear)"
+        return "Manage memory (subcommands: list, add, edit, delete, search, clear)"
 
     def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
         """Execute the memory command"""
@@ -35,11 +35,28 @@ class MemoryCommand(Command):
                     return
                 else:
                     query = search_args
-                    
+
                 self._handle_search(ctx, query, global_search)
                 return
             elif trimmed_args == "clear":
                 self._handle_clear(ctx)
+                return
+            elif trimmed_args == "list" or trimmed_args.startswith("list "):
+                self._handle_list(ctx)
+                return
+            elif trimmed_args == "add" or trimmed_args.startswith("add "):
+                self._handle_add(ctx, trimmed_args[3:].strip())
+                return
+            elif trimmed_args == "edit" or trimmed_args.startswith("edit "):
+                self._handle_edit(ctx, trimmed_args[4:].strip())
+                return
+            elif trimmed_args.split()[0] in ("delete", "forget"):
+                self._handle_delete(
+                    ctx,
+                    trimmed_args.split(maxsplit=1)[1:]
+                    and trimmed_args.split(maxsplit=1)[1].strip()
+                    or "",
+                )
                 return
 
         # Default display
@@ -53,14 +70,130 @@ class MemoryCommand(Command):
             )
         else:
             console.print("[dim]Memory bank is empty.[/dim]")
-        
+
         # Show semantic memory status if available
-        if hasattr(ctx.agent.memory_bank, "semantic_manager") and ctx.agent.memory_bank.semantic_manager:
+        if (
+            hasattr(ctx.agent.memory_bank, "semantic_manager")
+            and ctx.agent.memory_bank.semantic_manager
+        ):
             sm = ctx.agent.memory_bank.semantic_manager
             count = sm.count()
             session_id = getattr(ctx.agent.memory_bank, "session_id", "none")
-            console.print(f"[dim]Semantic Memory (Vector DB): {count} documents indexed (Session: {session_id})[/dim]")
+            console.print(
+                f"[dim]Semantic Memory (Vector DB): {count} documents indexed (Session: {session_id})[/dim]"
+            )
             console.print("[dim]Use '/memory clear' to wipe the entire vector database.[/dim]")
+
+    # ---- managing long-term entries -----------------------------------------------------
+
+    def _long_term(self, ctx: CommandContext):
+        """The session's memory bank if it has long-term memory, else None (after explaining)."""
+        bank = ctx.agent.memory_bank
+        if getattr(bank, "semantic_manager", None) is None:
+            console.print(
+                "[yellow]Long-term memory is off, so there is nothing stored across sessions.[/yellow] "
+                "[dim]Install 'cortex[memory]' and set semantic_memory.enabled to true.[/dim]"
+            )
+            return None
+        return bank
+
+    def _resolve(self, bank, reference: str) -> Optional[str]:
+        """The full id for an id or unique prefix, or None (after saying why)."""
+        reference = reference.strip()
+        entries = bank.list_memories()
+        matches = [
+            e["id"]
+            for e in entries
+            if e["id"] == reference
+            or e["id"].startswith(reference)
+            or e["id"].startswith(f"mem_{reference}")
+        ]
+        if not reference or not matches:
+            console.print(
+                f"[red]No memory with id '{reference}'.[/red] [dim]/memory list shows ids.[/dim]"
+            )
+            return None
+        if len(matches) > 1:
+            console.print(
+                f"[red]'{reference}' matches {len(matches)} memories;[/red] use more of the id."
+            )
+            return None
+        return str(matches[0])
+
+    def _handle_list(self, ctx: CommandContext) -> None:
+        bank = self._long_term(ctx)
+        if bank is None:
+            return
+        entries = bank.list_memories()
+        if not entries:
+            console.print("[dim]Nothing is stored in long-term memory yet.[/dim]")
+            return
+
+        from datetime import datetime
+        from rich.table import Table
+        from ...core.memory.semantic import age_days
+
+        table = Table(title=f"Long-term memory ({len(entries)})")
+        table.add_column("Id", style="dim")
+        table.add_column("Memory", style="white")
+        table.add_column("Kind", style="cyan")
+        table.add_column("Source", style="dim")
+        table.add_column("Conf.", justify="right")
+        table.add_column("Checked", justify="right", style="dim")
+        for entry in entries:
+            metadata = entry["metadata"]
+            days = age_days(metadata, datetime.now())
+            checked = "today" if days < 1 else f"{int(days)}d ago"
+            text = entry["document"]
+            table.add_row(
+                entry["id"][:14],
+                text if len(text) <= 100 else text[:97] + "...",
+                str(metadata.get("kind") or metadata.get("type", "")),
+                str(metadata.get("source", "")),
+                f"{float(metadata.get('confidence', 0)):.2f}",
+                checked,
+            )
+        console.print(table)
+        console.print(
+            "[dim]/memory edit <id> <text>   /memory delete <id>   /memory add <text>[/dim]"
+        )
+
+    def _handle_add(self, ctx: CommandContext, text: str) -> None:
+        bank = self._long_term(ctx)
+        if bank is None:
+            return
+        if not text:
+            console.print("[red]Usage: /memory add <something to remember>[/red]")
+            return
+        result = bank.remember(text, "convention", user_requested=True)
+        console.print(f"[green]✓[/green] {result['message']}")
+
+    def _handle_edit(self, ctx: CommandContext, rest: str) -> None:
+        bank = self._long_term(ctx)
+        if bank is None:
+            return
+        parts = rest.split(maxsplit=1)
+        if len(parts) < 2:
+            console.print("[red]Usage: /memory edit <id> <new text>[/red]")
+            return
+        memory_id = self._resolve(bank, parts[0])
+        if memory_id is None:
+            return
+        bank.edit_memory(memory_id, parts[1])
+        console.print("[green]✓[/green] Memory updated.")
+
+    def _handle_delete(self, ctx: CommandContext, reference: str) -> None:
+        bank = self._long_term(ctx)
+        if bank is None:
+            return
+        if not reference:
+            console.print("[red]Usage: /memory delete <id>[/red]")
+            return
+        memory_id = self._resolve(bank, reference)
+        if memory_id is None:
+            return
+        bank.forget(memory_id)
+        console.print("[green]✓[/green] Memory deleted.")
 
     def _handle_clear(self, ctx: CommandContext) -> None:
         """Handle clearing the semantic memory database"""
@@ -70,8 +203,10 @@ class MemoryCommand(Command):
 
         # Ask for confirmation (simulated since we are in a non-interactive tool call usually,
         # but the CLI itself is interactive)
-        console.print("[yellow]Warning: This will permanently delete all long-term semantic memories for this project.[/yellow]")
-        
+        console.print(
+            "[yellow]Warning: This will permanently delete all long-term semantic memories for this project.[/yellow]"
+        )
+
         success = ctx.agent.memory_bank.clear_semantic_memory()
         if success:
             console.print("[green]✓[/green] Semantic memory database cleared successfully.")
@@ -90,13 +225,16 @@ class MemoryCommand(Command):
 
         scope = "all sessions" if global_search else "current session"
         console.print(f"[cyan]Searching semantic memory ({scope}) for:[/cyan] '{query}'...")
-        results = ctx.agent.memory_bank.retrieve_semantic_context(query, top_k=5, global_search=global_search)
+        results = ctx.agent.memory_bank.retrieve_semantic_context(
+            query, top_k=5, global_search=global_search
+        )
 
         if not results:
             console.print("[yellow]No semantically similar memories found.[/yellow]")
             return
 
         from rich.table import Table
+
         title_scope = "Global" if global_search else "Session"
         table = Table(title=f"🔍 {title_scope} Semantic Search Results for '{query}'")
         table.add_column("Similarity", justify="right", style="dim")
@@ -111,10 +249,10 @@ class MemoryCommand(Command):
             content = res.get("document", "")
             if len(content) > 150:
                 content = content[:147] + "..."
-            
+
             metadata = res.get("metadata", {})
             m_type = metadata.get("type", "unknown")
-            
+
             if global_search:
                 s_id = metadata.get("session_id", "unknown")
                 table.add_row(score, content, m_type, s_id)
@@ -142,7 +280,9 @@ class FocusCommand(Command):
             if focus_path.exists() and focus_path.is_dir():
                 # Add to memory as a fact
                 ctx.agent.memory_bank.add_fact(
-                    f"User focused on directory: {focus_path}", source=MemorySource.USER
+                    f"User focused on directory: {focus_path}",
+                    source=MemorySource.USER,
+                    metadata={"transient": True},  # this session's focus, not lasting knowledge
                 )
                 console.print(f"[green]✓[/green] Focus set to: {focus_path}")
                 console.print("[dim]Future searches will prioritize this directory[/dim]")

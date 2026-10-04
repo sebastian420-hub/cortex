@@ -3,9 +3,13 @@ Shared pytest fixtures and configuration for Cortex tests.
 """
 
 import asyncio
+import hashlib
 import json
 import os
+import re
+import sys
 import tempfile
+import types
 from pathlib import Path
 from typing import Dict, Any, Optional, Generator
 from unittest.mock import Mock, patch, MagicMock
@@ -269,3 +273,69 @@ def setup_test_env(monkeypatch):
     monkeypatch.setattr(
         "requests.post", Mock(side_effect=RuntimeError("Network calls disabled in tests"))
     )
+
+
+@pytest.fixture(scope="session")
+def _git_config_file(tmp_path_factory) -> Path:
+    """A throwaway global git config so tests never depend on the developer's own."""
+    path = tmp_path_factory.mktemp("gitconfig") / "gitconfig"
+    path.write_text(
+        "[user]\n\tname = Cortex Test\n\temail = test@example.com\n"
+        "[init]\n\tdefaultBranch = main\n"
+        "[commit]\n\tgpgsign = false\n"
+    )
+    return path
+
+
+@pytest.fixture(autouse=True)
+def hermetic_git(monkeypatch, _git_config_file):
+    """Give every test a known git identity and default branch ("main")."""
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(_git_config_file))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+
+@pytest.fixture(autouse=True)
+def hermetic_tokenizer(monkeypatch):
+    """Never let token counting try to download tiktoken vocabularies during tests."""
+    monkeypatch.setattr("cortex.core.context.TIKTOKEN_AVAILABLE", False)
+
+
+class _StubSentenceTransformer:
+    """Deterministic stand-in for sentence-transformers: a hashed bag-of-words embedding.
+
+    Texts that share words get similar vectors, which is all the semantic-memory tests need.
+    Using it keeps those tests offline and fast (no model download, no torch).
+    """
+
+    DIMS = 64
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def get_sentence_embedding_dimension(self) -> int:
+        return self.DIMS
+
+    def _embed(self, text: str):
+        import numpy as np
+
+        vector = np.zeros(self.DIMS)
+        for word in re.findall(r"[a-z0-9]+", text.lower()):
+            vector[int(hashlib.md5(word.encode()).hexdigest(), 16) % self.DIMS] += 1.0
+        norm = np.linalg.norm(vector)
+        return vector / norm if norm else vector
+
+    def encode(self, texts, *args, **kwargs):
+        import numpy as np
+
+        if isinstance(texts, str):
+            return self._embed(texts)
+        return np.array([self._embed(t) for t in texts])
+
+
+@pytest.fixture
+def stub_sentence_transformers(monkeypatch):
+    """Replace the sentence-transformers package with a deterministic offline stub."""
+    module = types.ModuleType("sentence_transformers")
+    module.SentenceTransformer = _StubSentenceTransformer
+    monkeypatch.setitem(sys.modules, "sentence_transformers", module)
+    return module

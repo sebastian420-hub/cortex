@@ -209,7 +209,6 @@ class ASTAnalyzeTool(Tool):
             File analysis results
         """
         results = {}
-        _rel_path = str(file_path.relative_to(self.project_dir))
 
         if include_metrics or analysis_type in ["complexity", "all"]:
             results["metrics"] = self._calculate_file_metrics(file_path, language)

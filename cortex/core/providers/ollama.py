@@ -1,12 +1,21 @@
 """Ollama provider for local models."""
 
+import os
 from typing import Dict, Any, List, Iterator, Optional
 
-from .base import ModelProvider, ProviderError
+from .base import ModelProvider, ProviderError, positive_int
+
+# Cortex sends about 7,000 tokens (tool definitions and system prompt) before the user's first
+# word. When no window is requested Ollama applies its own small default and silently drops the
+# oldest messages, system prompt included, so a window is always requested explicitly.
+DEFAULT_NUM_CTX = 32768
+NUM_CTX_ENV = "CORTEX_OLLAMA_NUM_CTX"
 
 
 class OllamaProvider(ModelProvider):
     """Provider for local Ollama models"""
+
+    config_section = "ollama"
 
     def __init__(self):
         try:
@@ -15,6 +24,24 @@ class OllamaProvider(ModelProvider):
             self.ollama = ollama
         except ImportError:
             raise ProviderError("Ollama package not installed. Install with: pip install ollama")
+        self.num_ctx = self._resolve_num_ctx(None)
+
+    @staticmethod
+    def _resolve_num_ctx(configured: Any) -> int:
+        """Environment variable, then the config value, then the default; unusable values skipped."""
+        return (
+            positive_int(os.environ.get(NUM_CTX_ENV)) or positive_int(configured) or DEFAULT_NUM_CTX
+        )
+
+    def configure(self, options: Optional[Dict[str, Any]] = None) -> None:
+        self.num_ctx = self._resolve_num_ctx((options or {}).get("num_ctx"))
+
+    @property
+    def context_window(self) -> Optional[int]:
+        return self.num_ctx
+
+    def window_advice(self, needed: int) -> str:
+        return f"Set {NUM_CTX_ENV} (or ollama.num_ctx in the config) to at least {needed}"
 
     def chat(
         self,
@@ -26,7 +53,11 @@ class OllamaProvider(ModelProvider):
         try:
             # Sanitize messages and tools to remove invalid UTF-8 characters
             sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
-            kwargs = {"model": model, "messages": sanitized_messages}
+            kwargs = {
+                "model": model,
+                "messages": sanitized_messages,
+                "options": {"num_ctx": self.num_ctx},
+            }
             if sanitized_tools:
                 kwargs["tools"] = sanitized_tools
 
@@ -44,7 +75,12 @@ class OllamaProvider(ModelProvider):
         try:
             # Sanitize messages and tools to remove invalid UTF-8 characters
             sanitized_messages, sanitized_tools = self._sanitize_request(messages, tools)
-            kwargs = {"model": model, "messages": sanitized_messages, "stream": True}
+            kwargs = {
+                "model": model,
+                "messages": sanitized_messages,
+                "stream": True,
+                "options": {"num_ctx": self.num_ctx},
+            }
             if sanitized_tools:
                 kwargs["tools"] = sanitized_tools
 

@@ -289,7 +289,12 @@ class ASTQueries:
             from tree_sitter import Node
 
             def walk(node: Node):
-                if node.type in ["function_definition", "function_declaration", "method_declaration", "method_definition"]:
+                if node.type in [
+                    "function_definition",
+                    "function_declaration",
+                    "method_declaration",
+                    "method_definition",
+                ]:
                     name_node = node.child_by_field_name("name")
                     if name_node:
                         functions.append(
@@ -301,14 +306,14 @@ class ASTQueries:
                                 end_column=node.end_point[1] + 1,
                             )
                         )
-                
+
                 for child in node.children:
                     walk(child)
 
             walk(ast.root_node)
         except Exception as e:
             logger.error(f"Failed to walk AST for functions: {e}")
-        
+
         return functions
 
     def extract_classes(self, ast: Any, language: str) -> List[ClassInfo]:
@@ -332,14 +337,14 @@ class ASTQueries:
                                 end_column=node.end_point[1] + 1,
                             )
                         )
-                
+
                 for child in node.children:
                     walk(child)
 
             walk(ast.root_node)
         except Exception as e:
             logger.error(f"Failed to walk AST for classes: {e}")
-        
+
         return classes
 
     def extract_imports(self, ast: Any, language: str) -> List[ImportInfo]:
@@ -449,7 +454,11 @@ class ASTQueries:
             # Language-specific identifier types
             identifier_types = {
                 "python": ["identifier"],
-                "javascript": ["identifier", "property_identifier", "shorthand_property_identifier"],
+                "javascript": [
+                    "identifier",
+                    "property_identifier",
+                    "shorthand_property_identifier",
+                ],
                 "typescript": ["identifier", "property_identifier", "type_identifier"],
                 "java": ["identifier", "type_identifier"],
                 "go": ["identifier", "field_identifier", "type_identifier"],

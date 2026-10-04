@@ -7,11 +7,12 @@ import os
 import signal
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 from rich.panel import Panel
 from rich.table import Table
 
+from . import __version__
 from .agent import Cortex
 from .cli_commands.commands import CommandContext, CommandRegistry
 from .config import AgentConfig
@@ -35,8 +36,6 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("cortex.tools.registry").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
-
-__version__ = "1.0.0"
 
 
 def check_ollama() -> bool:
@@ -93,9 +92,23 @@ def list_providers():
         openrouter_key,
     )
 
+    # OpenAI-compatible servers: a base URL is enough for a local server, a key for OpenAI itself
+    openai_setup = (
+        "No (local server)"
+        if os.getenv("OPENAI_BASE_URL")
+        else "Yes" if os.getenv("OPENAI_API_KEY") else "[red]OPENAI_BASE_URL or key (not set)[/red]"
+    )
+    table.add_row(
+        "OpenAI-compatible",
+        "any name the server knows (--provider openai)",
+        "OpenAI, or a local vLLM / llama.cpp / LM Studio server via OPENAI_BASE_URL",
+        openai_setup,
+    )
+
     console.print(table)
     console.print(
-        "\n[dim]Note: Provider is auto-detected from model name. Use --provider to override.[/dim]"
+        "\n[dim]Note: Provider is auto-detected from model name. Use --provider to override "
+        "(required for openai).[/dim]"
     )
 
 
@@ -106,7 +119,7 @@ def validate_provider_setup(model: str, provider_override: Optional[str] = None)
 
         # Check API key for cloud providers
         if not provider.validate_api_key():
-            provider_name = ProviderFactory.get_provider_name(model)
+            provider_name = ProviderFactory.get_provider_name(model, provider_override)
             if provider_name == "deepseek":
                 console.print(
                     Panel(
@@ -132,7 +145,7 @@ def validate_provider_setup(model: str, provider_override: Optional[str] = None)
             return False
 
         # Check Ollama connection if using Ollama provider
-        provider_name = ProviderFactory.get_provider_name(model)
+        provider_name = ProviderFactory.get_provider_name(model, provider_override)
         if provider_name == "ollama" and not check_ollama():
             console.print(
                 Panel(
@@ -155,8 +168,8 @@ def validate_provider_setup(model: str, provider_override: Optional[str] = None)
         return False
 
 
-def main():
-    """Main CLI entry point"""
+def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line argument parser."""
     parser = argparse.ArgumentParser(
         description="Cortex - A unified agent for coding, cybersecurity, and personal assistance",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -166,6 +179,7 @@ Examples:
   cortex --model llama3.3:70b         # Use different model
   cortex --auto-approve               # Skip permissions (dangerous!)
   cortex -p "your task"               # One-shot mode
+  cortex run --task "fix the parser" --verify "pytest -q" --json   # Unattended, on its own branch
   cortex --config config.yaml         # Use config file
   cortex --save-session mywork         # Save session
   cortex --load-session mywork        # Load session
@@ -189,7 +203,7 @@ Examples:
 
     parser.add_argument(
         "--provider",
-        choices=["ollama", "deepseek", "anthropic", "openrouter"],
+        choices=["ollama", "deepseek", "anthropic", "openrouter", "openai"],
         default=None,
         help="Override provider auto-detection (normally auto-detected from model name)",
     )
@@ -205,9 +219,27 @@ Examples:
     parser.add_argument("--plan-mode", action="store_true", help="Start in plan mode (read-only)")
 
     parser.add_argument(
+        "--planning",
+        action="store_true",
+        help="Enable the planning tools (create_and_execute_plan, monitor_plan, update_plan)",
+    )
+
+    parser.add_argument(
+        "--memory",
+        action="store_true",
+        help="Enable layered memory (failed approaches, patterns, insights)",
+    )
+
+    parser.add_argument(
+        "--metacognition",
+        action="store_true",
+        help="Experimental: inject confidence/urgency/tone state into the system prompt",
+    )
+
+    parser.add_argument(
         "--enhanced",
         action="store_true",
-        help="Use enhanced agent with planning and layered memory",
+        help="Deprecated alias for --planning --memory",
     )
 
     parser.add_argument(
@@ -268,28 +300,78 @@ Examples:
         ),
     )
 
-    args = parser.parse_args()
+    return parser
+
+
+def resolve_agent_features(
+    args: argparse.Namespace, config: AgentConfig
+) -> Tuple[bool, bool, bool]:
+    """Decide which optional agent features are on.
+
+    A command-line flag or a config-file setting turns each one on. ``--enhanced`` is the old
+    name for ``--planning --memory`` and is kept as a deprecated alias.
+
+    Returns:
+        (planning, layered_memory, metacognition)
+    """
+    enhanced = bool(getattr(args, "enhanced", False))
+    planning = bool(args.planning or enhanced or config.enable_planning)
+    memory = bool(args.memory or enhanced or config.enable_layered_memory)
+    metacognition = bool(args.metacognition or config.enable_metacognition)
+    return planning, memory, metacognition
+
+
+def resolve_permission_mode(args: argparse.Namespace, config: AgentConfig) -> str:
+    """Pick the permission mode: a flag wins, otherwise the loaded config decides."""
+    if args.auto_approve:
+        return PermissionMode.AUTO_APPROVE
+    if args.plan_mode:
+        return PermissionMode.PLAN
+    return config.permission_mode or PermissionMode.NORMAL
+
+
+def load_agent_config(config_arg: Optional[str] = None) -> Tuple[AgentConfig, Optional[Path]]:
+    """The configuration to use: the file given, else config/default.yaml next to the package
+    (in a source checkout), else the built-in defaults. Also returns the file used, if any."""
+    config_path = None
+    if config_arg:
+        config_path = Path(config_arg)
+        if not config_path.is_file():
+            # Quietly using the defaults instead would run with settings you did not choose,
+            # command_sandbox among them
+            raise FileNotFoundError(f"The configuration file '{config_arg}' does not exist.")
+    else:
+        default_config = Path(__file__).parent.parent / "config" / "default.yaml"
+        if default_config.exists():
+            config_path = default_config
+    if config_path:
+        return AgentConfig.load(config_path), config_path
+    return AgentConfig(), None
+
+
+def main():
+    """Main CLI entry point"""
+    # `cortex run ...` is the unattended mode; it has its own arguments
+    if len(sys.argv) > 1 and sys.argv[1] == "run":
+        from .headless.cli import main as run_main
+
+        sys.exit(run_main(sys.argv[2:]))
+
+    args = build_parser().parse_args()
 
     # Handle list-providers command
     if args.list_providers:
         list_providers()
         sys.exit(0)
 
-    # Load configuration - try default config/default.yaml first, then CLI arg
-    config_path = None
-    if args.config:
-        config_path = Path(args.config)
-    else:
-        # Auto-load config/default.yaml if it exists
-        default_config = Path(__file__).parent.parent / "config" / "default.yaml"
-        if default_config.exists():
-            config_path = default_config
-
+    # Load configuration: --config if given, else config/default.yaml if it exists
+    try:
+        config, config_path = load_agent_config(args.config)
+    except FileNotFoundError as e:
+        console.print(Panel(f"[red]Error:[/red] {e}", title="Configuration", border_style="red"))
+        sys.exit(1)
     if config_path:
-        config = AgentConfig.load(config_path)
         console.print(f"[dim]Loaded config from {config_path}[/dim]")
-    else:
-        config = AgentConfig()
 
     # Initialize FeatureManager with loaded config
     FeatureManager.get_instance(config.get_feature_flags_config())
@@ -329,12 +411,7 @@ Examples:
         sys.exit(1)
 
     # Determine permission mode
-    if args.auto_approve:
-        permission_mode = PermissionMode.AUTO_APPROVE
-    elif args.plan_mode:
-        permission_mode = PermissionMode.PLAN
-    else:
-        permission_mode = args.config and config.permission_mode or PermissionMode.NORMAL
+    permission_mode = resolve_permission_mode(args, config)
 
     # Project directory
     project_dir = args.project_dir or os.getcwd()
@@ -403,10 +480,24 @@ Examples:
         hook_manager.disable()
 
     # Create unified agent
-    is_enhanced = args.enhanced or (args.config and config.enable_planning)
+    if args.enhanced:
+        console.print(
+            "[yellow]--enhanced is deprecated; use --planning and/or --memory instead.[/yellow]"
+        )
+    enable_planning, enable_memory, enable_metacognition = resolve_agent_features(args, config)
+    config.enable_metacognition = enable_metacognition
 
-    if is_enhanced:
-        console.print("[cyan]Using enhanced features: planning and layered memory[/cyan]")
+    enabled = [
+        name
+        for name, on in (
+            ("planning", enable_planning),
+            ("layered memory", enable_memory),
+            ("metacognition", enable_metacognition),
+        )
+        if on
+    ]
+    if enabled:
+        console.print(f"[cyan]Enabled: {', '.join(enabled)}[/cyan]")
 
     agent = Cortex(
         model=config.model,
@@ -415,8 +506,8 @@ Examples:
         config=config,
         hook_manager=hook_manager,
         output_format=output_format,
-        enable_planning=is_enhanced,
-        enable_layered_memory=is_enhanced,
+        enable_planning=enable_planning,
+        enable_layered_memory=enable_memory,
     )
 
     # Load session if requested
@@ -470,9 +561,11 @@ Examples:
 
         # Run in async mode if requested
         if args.use_async:
-            asyncio.run(agent._process_message_async(args.prompt, use_streaming=args.streaming))
+            turn = asyncio.run(
+                agent._process_message_async(args.prompt, use_streaming=args.streaming)
+            )
         else:
-            agent._process_message(args.prompt, use_streaming=args.streaming)
+            turn = agent._process_message(args.prompt, use_streaming=args.streaming)
 
         # Save session if requested
         if args.save_session:
@@ -483,6 +576,11 @@ Examples:
                 agent.model,
                 agent.permission_mode,
             )
+
+        # Scripts and CI need to know whether the task actually completed.
+        if turn is not None and not turn.ok:
+            console.print(f"[red]Task did not complete ({turn.status}):[/red] {turn.error or ''}")
+            sys.exit(1)
     else:
         # Interactive mode
         run_interactive(
@@ -670,6 +768,8 @@ def init_command_registry(session_manager: SessionManager) -> "CommandRegistry":
         CacheCommand,
         RollbackCommand,
         TransactionsCommand,
+        UndoCommand,
+        RedoCommand,
         # Gym command
         GymCommand,
     )
@@ -713,6 +813,8 @@ def init_command_registry(session_manager: SessionManager) -> "CommandRegistry":
     # Register transaction/cache commands
     registry.register(CacheCommand())
     registry.register(RollbackCommand())
+    registry.register(UndoCommand())
+    registry.register(RedoCommand())
     registry.register(TransactionsCommand())
 
     # Register gym command

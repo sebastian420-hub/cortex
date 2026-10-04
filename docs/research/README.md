@@ -1,3 +1,6 @@
+> **Status.** These are notes from an earlier analysis of the codebase, written when the project
+> was called LocalAgent. They are not current; see [STATUS.md](../STATUS.md).
+
 # LocalAgent Codebase Research Documentation
 
 This directory contains comprehensive research documentation analyzing the LocalAgent codebase, identifying issues, and providing recommendations for improvement.

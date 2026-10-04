@@ -31,7 +31,7 @@ class TestHelpContent:
     def test_all_entries_have_required_fields(self):
         """Test that all entries have required fields."""
         for entry in HELP_ENTRIES:
-            assert entry.command, f"Entry missing command"
+            assert entry.command, "Entry missing command"
             assert entry.short_desc, f"Entry {entry.command} missing short_desc"
             assert entry.long_desc, f"Entry {entry.command} missing long_desc"
             assert entry.category is not None, f"Entry {entry.command} missing category"

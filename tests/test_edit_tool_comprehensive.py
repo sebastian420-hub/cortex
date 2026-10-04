@@ -560,8 +560,8 @@ class TestEditToolUI:
         # Should print success message
         mock_console.print.assert_called()
         # Check if any call contains "Edited" or success-related text
-        calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any("Edited" in str(call) or "green" in str(call) for call in calls)
+        calls = [str(c) for c in mock_console.print.call_args_list]
+        assert any("Edited" in c or "green" in c for c in calls)
 
 
 # ============================================================================

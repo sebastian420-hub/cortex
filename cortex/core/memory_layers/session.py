@@ -17,8 +17,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Set, Tuple
 import uuid
 
+from ..memory.contract import should_index
 from ..memory.core_memory import MemoryBank, MemoryItem, MemoryType, MemorySource
-from ..memory.semantic import ChromaMemoryManager
+from ..memory.semantic import ChromaMemoryManager, content_id
 from ..memory.embeddings import LocalEmbeddingModel
 
 
@@ -42,6 +43,7 @@ class FailedApproach:
     alternative_suggested: Optional[str] = None  # What to try instead
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
+    occurrences: int = 1  # how many times this same failure happened
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -52,6 +54,7 @@ class FailedApproach:
             "alternative_suggested": self.alternative_suggested,
             "timestamp": self.timestamp,
             "metadata": self.metadata,
+            "occurrences": self.occurrences,
         }
 
     @classmethod
@@ -64,6 +67,7 @@ class FailedApproach:
             alternative_suggested=data.get("alternative_suggested"),
             timestamp=data.get("timestamp", datetime.now().isoformat()),
             metadata=data.get("metadata", {}),
+            occurrences=data.get("occurrences", 1),
         )
 
 
@@ -135,41 +139,54 @@ class EnhancedMemoryBank(MemoryBank):
         self.session_insights: List[MemoryItem] = []
         self.progress_markers: Dict[str, str] = {}  # task_id -> progress_description
         self.context_summaries: Dict[str, str] = {}  # context_key -> summary
-        
+
         # Initialize semantic memory manager if enabled
         self.semantic_manager: Optional[ChromaMemoryManager] = None
-        if semantic_config and semantic_config.get("enabled", False):
+        # The flag must be a real boolean and the directory a real path: a truthy placeholder
+        # (such as a Mock) must never switch the vector database on or choose where it lives.
+        if semantic_config and semantic_config.get("enabled", False) is True:
             try:
                 persist_dir = semantic_config.get("persist_directory", ".cortex/semantic_db")
+                if not isinstance(persist_dir, (str, Path)):
+                    raise TypeError(
+                        f"semantic_memory.persist_directory must be a path, got {type(persist_dir)}"
+                    )
                 # Ensure persist_dir is a Path object
                 persist_path = Path(persist_dir)
                 if not persist_path.is_absolute():
                     # If relative, make it relative to the current working directory
                     # or a known project root if available.
                     persist_path = Path.cwd() / persist_path
-                
+
                 self.semantic_manager = ChromaMemoryManager(
                     persist_directory=persist_path,
-                    collection_name=semantic_config.get("collection_name", "cortex_semantic_memory"),
-                    clear_on_init=semantic_config.get("clear_on_init", False)
+                    collection_name=semantic_config.get(
+                        "collection_name", "cortex_semantic_memory"
+                    ),
+                    clear_on_init=semantic_config.get("clear_on_init", False),
                 )
             except Exception as e:
                 import logging
+
                 logging.getLogger(__name__).error(f"Failed to initialize semantic memory: {e}")
 
     def add(self, item: MemoryItem) -> None:
         """Add a memory item and index it semantically if enabled."""
         super().add(item)
-        
-        # Automatically index in semantic memory if available
-        if self.semantic_manager:
+
+        # Long-term memory only takes what the contract allows (core/memory/contract.py): not the
+        # user's raw requests, raw errors, file references or the session's own bookkeeping.
+        if self.semantic_manager and should_index(item):
             try:
                 # Create a serializable version of metadata
                 metadata = {
                     "type": item.type.value if hasattr(item.type, "value") else str(item.type),
-                    "source": item.source.value if hasattr(item.source, "value") else str(item.source),
+                    "source": (
+                        item.source.value if hasattr(item.source, "value") else str(item.source)
+                    ),
                     "confidence": float(item.confidence),
                     "timestamp": item.timestamp,
+                    "last_verified": item.last_verified,
                     "session_id": self.session_id or "unknown",
                 }
                 # Add any extra metadata
@@ -185,19 +202,44 @@ class EnhancedMemoryBank(MemoryBank):
                 # Use chunking for large documents (e.g. tool results)
                 if len(item.content) > 1500:
                     self.semantic_manager.add_large_document(
-                        text=item.content,
-                        metadata=metadata,
-                        chunk_size=1000,
-                        overlap=200
+                        text=item.content, metadata=metadata, chunk_size=1000, overlap=200
                     )
                 else:
-                    self.semantic_manager.add_document(
-                        text=item.content,
-                        metadata=metadata
-                    )
+                    self.semantic_manager.add_document(text=item.content, metadata=metadata)
             except Exception as e:
                 import logging
-                logging.getLogger(__name__).warning(f"Failed to index memory item semantically: {e}")
+
+                logging.getLogger(__name__).warning(
+                    f"Failed to index memory item semantically: {e}"
+                )
+
+    def _persisted_id(self, text: str) -> Optional[str]:
+        if not self.semantic_manager:
+            return None
+        try:
+            doc_id = content_id(text)
+            return doc_id if self.semantic_manager.get_document(doc_id) else None
+        except Exception:
+            return None
+
+    def list_memories(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Everything in long-term memory, most recently confirmed first."""
+        if not self.semantic_manager:
+            return []
+        return self.semantic_manager.list_documents(limit)
+
+    def edit_memory(self, memory_id: str, new_text: str) -> str:
+        """Replace an entry's text (keeping its history); returns its new id."""
+        if not self.semantic_manager:
+            raise KeyError(f"No memory with id {memory_id}")
+        return self.semantic_manager.update_document(memory_id, new_text.strip())
+
+    def forget(self, memory_id: str) -> bool:
+        """Delete an entry from long-term memory. False if there is no such entry."""
+        if not self.semantic_manager or not self.semantic_manager.get_document(memory_id):
+            return False
+        self.semantic_manager.delete_document(memory_id)
+        return True
 
     def add_decision(
         self, decision: str, source: MemorySource = MemorySource.INFERRED, confidence: float = 0.8
@@ -210,11 +252,21 @@ class EnhancedMemoryBank(MemoryBank):
         )
 
     def add_fact(
-        self, fact: str, source: MemorySource = MemorySource.TOOL_RESULT, confidence: float = 1.0
+        self,
+        fact: str,
+        source: MemorySource = MemorySource.TOOL_RESULT,
+        confidence: float = 1.0,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Add a fact memory and index semantically."""
+        """Add a fact memory; it is indexed semantically unless the contract says otherwise."""
         self.add(
-            MemoryItem(type=MemoryType.FACT, content=fact, source=source, confidence=confidence)
+            MemoryItem(
+                type=MemoryType.FACT,
+                content=fact,
+                source=source,
+                confidence=confidence,
+                metadata=metadata or {},
+            )
         )
 
     def add_preference(
@@ -245,6 +297,13 @@ class EnhancedMemoryBank(MemoryBank):
             alternative_suggested: What to try instead
             metadata: Additional metadata
         """
+        # The same failure again is counted, not listed again
+        for existing in self.failed_approaches:
+            if existing.approach == approach and existing.error == error:
+                existing.occurrences += 1
+                existing.timestamp = datetime.now().isoformat()
+                return
+
         failed_approach = FailedApproach(
             approach=approach,
             error=error,
@@ -398,9 +457,18 @@ class EnhancedMemoryBank(MemoryBank):
                     item.confidence = min(1.0, item.confidence + 0.1)
                 else:
                     item.confidence = max(0.1, item.confidence - 0.3)
-                
+
                 # If confidence is very low, it will be pruned during the next _prune call
                 break
+
+        # Long-term memory too: confirm or contradict the stored entries that mention this
+        if self.semantic_manager:
+            try:
+                self.semantic_manager.verify_matching(content_substring, success)
+            except Exception as e:
+                import logging
+
+                logging.getLogger(__name__).debug(f"Could not verify semantic memory: {e}")
 
     def decay_memories(self, decay_factor: float = 0.05) -> None:
         """
@@ -427,16 +495,17 @@ class EnhancedMemoryBank(MemoryBank):
         """
         if not self.semantic_manager:
             return []
-        
+
         try:
             # Use session filtering if not a global search
             filter_session_id = None if global_search else self.session_id
-            
+
             return self.semantic_manager.search_documents(
                 query, top_k=top_k, session_id=filter_session_id
             )
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).warning(f"Failed to retrieve semantic context: {e}")
             return []
 
@@ -469,24 +538,13 @@ class EnhancedMemoryBank(MemoryBank):
                     },
                 )
             else:
-                # Check for patterns in successful execution
+                # Successful reads, writes and searches are not worth remembering: "File operation
+                # read_file on a.py" tells a later session nothing. Only a reflection on finished
+                # work is kept.
                 result_data = result.get("data", {})
 
-                # Look for file operations
-                if "path" in result_data and tool_name in ["read_file", "write_file", "edit"]:
-                    pattern = f"File operation {tool_name} on {result_data.get('path')}"
-                    context = f"Successfully used {tool_name} tool"
-                    self.record_successful_pattern(pattern, context)
-
-                # Look for search operations
-                elif "matches" in result_data and tool_name in ["grep", "search_files"]:
-                    pattern_count = result_data.get("match_count", 0)
-                    pattern = f"Search with {tool_name} found {pattern_count} matches"
-                    context = f"Successfully used {tool_name} for discovery"
-                    self.record_successful_pattern(pattern, context)
-                
                 # Special handling for metacognitive reflection
-                elif tool_name == "metacognitive_reflect":
+                if tool_name == "metacognitive_reflect":
                     exp = result_data.get("synthetic_experience", {})
                     if exp:
                         # Index as a high-confidence synthetic experience
@@ -499,18 +557,20 @@ class EnhancedMemoryBank(MemoryBank):
                                 metadata={
                                     "synthetic": True,
                                     "task": exp.get("task"),
-                                    "success": exp.get("success")
-                                }
+                                    "success": exp.get("success"),
+                                },
                             )
                         )
                         # Also record patterns and failures explicitly
                         for p in exp.get("patterns", []):
-                            self.record_successful_pattern(p, f"From synthetic experience: {exp.get('task')}")
+                            self.record_successful_pattern(
+                                p, f"From synthetic experience: {exp.get('task')}"
+                            )
                         for f in exp.get("failures", []):
                             self.record_failed_approach(
                                 approach=f.get("approach", "unknown"),
                                 error=f.get("error", "unknown"),
-                                root_cause=f.get("root_cause")
+                                root_cause=f.get("root_cause"),
                             )
 
     def get_session_summary(self) -> str:
@@ -535,7 +595,7 @@ class EnhancedMemoryBank(MemoryBank):
                 if fa.alternative_suggested:
                     failed_list.append(f"   → Try: {fa.alternative_suggested}")
 
-            sections.append("Recent Failed Approaches:\\n" + "\\n".join(failed_list))
+            sections.append("Recent Failed Approaches:\n" + "\n".join(failed_list))
 
         # Successful patterns
         if self.successful_patterns:
@@ -543,7 +603,7 @@ class EnhancedMemoryBank(MemoryBank):
             for i, sp in enumerate(self.successful_patterns[:3], 1):
                 pattern_list.append(f"{i}. {sp.pattern} (used {sp.applications} times)")
 
-            sections.append("Successful Patterns:\\n" + "\\n".join(pattern_list))
+            sections.append("Successful Patterns:\n" + "\n".join(pattern_list))
 
         # Session insights
         if self.session_insights:
@@ -551,7 +611,7 @@ class EnhancedMemoryBank(MemoryBank):
             for i, insight in enumerate(self.session_insights[-3:], 1):
                 insight_list.append(f"{i}. {insight.content}")
 
-            sections.append("Session Insights:\\n" + "\\n".join(insight_list))
+            sections.append("Session Insights:\n" + "\n".join(insight_list))
 
         # Progress markers
         if self.progress_markers:
@@ -559,9 +619,9 @@ class EnhancedMemoryBank(MemoryBank):
             for task_id, progress in list(self.progress_markers.items())[-3:]:
                 progress_list.append(f"- {task_id}: {progress}")
 
-            sections.append("Recent Progress:\\n" + "\\n".join(progress_list))
+            sections.append("Recent Progress:\n" + "\n".join(progress_list))
 
-        return "\\n\\n".join(sections)
+        return "\n\n".join(sections)
 
     def get_failed_approaches_for_context(self, context: str) -> List[FailedApproach]:
         """
@@ -622,12 +682,13 @@ class EnhancedMemoryBank(MemoryBank):
         """
         if not self.semantic_manager:
             return False
-        
+
         try:
             self.semantic_manager.clear_collection()
             return True
         except Exception as e:
             import logging
+
             logging.getLogger(__name__).error(f"Failed to clear semantic memory: {e}")
             return False
 
@@ -644,7 +705,7 @@ class EnhancedMemoryBank(MemoryBank):
             "context_summaries": self.context_summaries,
             "semantic_enabled": self.semantic_manager is not None,
         }
-        
+
         if self.semantic_manager:
             enhanced_dict["semantic_config"] = {
                 "persist_directory": str(self.semantic_manager.persist_directory),
@@ -662,7 +723,7 @@ class EnhancedMemoryBank(MemoryBank):
         session_insights_data = data.pop("session_insights", [])
         progress_markers = data.pop("progress_markers", {})
         context_summaries = data.pop("context_summaries", {})
-        
+
         semantic_config = data.pop("semantic_config", {})
         semantic_enabled = data.pop("semantic_enabled", False)
         if semantic_enabled and not semantic_config.get("enabled"):
@@ -671,7 +732,7 @@ class EnhancedMemoryBank(MemoryBank):
         # Create base memory bank
         emb = cls(
             max_items=data.get("max_items", 100),
-            semantic_config=semantic_config if semantic_enabled else None
+            semantic_config=semantic_config if semantic_enabled else None,
         )
 
         # Restore base items

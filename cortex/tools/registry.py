@@ -82,6 +82,15 @@ class ToolRegistry:
         logger.debug(f"Unregistered tool: {name}")
         return True
 
+    def _lookup(self, name: str) -> Optional[Dict[str, Any]]:
+        """A tool's entry by its full name (``plugin:echo``), or by the short name the model is
+        shown (``echo``) when exactly one registered tool has that short name."""
+        tool_info = self._tools.get(name)
+        if tool_info is not None:
+            return tool_info
+        matches = [info for info in self._tools.values() if info["short_name"] == name]
+        return matches[0] if len(matches) == 1 else None
+
     def get_tool_class(self, name: str) -> Optional[Type[Tool]]:
         """
         Get tool class by name.
@@ -92,7 +101,7 @@ class ToolRegistry:
         Returns:
             Tool class if found and enabled, None otherwise
         """
-        tool_info = self._tools.get(name)
+        tool_info = self._lookup(name)
         if tool_info and tool_info["enabled"]:
             return tool_info["class"]
         return None
@@ -107,7 +116,7 @@ class ToolRegistry:
         Returns:
             Tool schema if found and enabled, None otherwise
         """
-        tool_info = self._tools.get(name)
+        tool_info = self._lookup(name)
         if tool_info and tool_info["enabled"]:
             return tool_info["schema"]
         return None
@@ -167,7 +176,7 @@ class ToolRegistry:
 
     def is_enabled(self, name: str) -> bool:
         """Check if a tool is enabled."""
-        tool_info = self._tools.get(name)
+        tool_info = self._lookup(name)
         return tool_info["enabled"] if tool_info else False
 
     def list_tools(
@@ -255,6 +264,7 @@ class ToolRegistry:
 
         # Metacognition tools
         from .metacognition import MetacognitiveReflectorTool, REFLECT_SCHEMA
+        from .memory_tools import RememberTool, REMEMBER_SCHEMA
 
         # Phase 3 web tools
         from .web_tools import WebFetchTool, WebSearchTool
@@ -318,6 +328,7 @@ class ToolRegistry:
             "glob": GlobTool,
             "edit": EditTool,
             "metacognitive_reflect": MetacognitiveReflectorTool,
+            "remember": RememberTool,
             # Phase 3 web tools
             "web_fetch": WebFetchTool,
             "web_search": WebSearchTool,
@@ -385,7 +396,7 @@ class ToolRegistry:
                 "type": "function",
                 "function": {
                     "name": "execute_command",
-                    "description": "Execute a shell command. Use for git, npm, pip, pytest, etc. Be cautious with destructive commands.",  # noqa: E501
+                    "description": "Execute a shell command. Use for git, npm, pip, pytest, etc. Be cautious with destructive commands. Commands run with the user's own permissions and are not isolated; a blocklist refuses some destructive commands but cannot catch everything, so do not run anything you would not run by hand.",  # noqa: E501
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -805,6 +816,7 @@ class ToolRegistry:
                 },
             },
             "metacognitive_reflect": REFLECT_SCHEMA,
+            "remember": REMEMBER_SCHEMA,
             # Phase 3 web tools
             "web_fetch": {
                 "type": "function",

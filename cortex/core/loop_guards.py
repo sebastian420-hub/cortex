@@ -286,7 +286,9 @@ class LoopGuard:
         if not self.recovery_manager:
             return None
 
-        from .recovery_strategies import RecoveryContext
+        # Imported here on purpose: the module-level import is for type checkers only
+        # (it sits under TYPE_CHECKING), so the name does not exist at run time.
+        from .recovery_strategies import RecoveryContext  # noqa: F811
 
         context = RecoveryContext(
             error_type=error.get("error_type", "unknown"),
@@ -318,7 +320,7 @@ class LoopGuard:
 
     def get_stats(self) -> Dict[str, Any]:
         """Get loop guard statistics."""
-        stats = {
+        stats: Dict[str, Any] = {
             "iteration_count": self.iteration_count,
             "unique_operations": len(self.unique_operations),
             "files_read": len(self.files_read),

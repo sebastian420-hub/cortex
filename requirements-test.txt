@@ -4,6 +4,9 @@
 # Base requirements
 -r requirements.txt
 
+# Vector store used by the semantic-memory tests (embeddings are stubbed; no torch needed)
+chromadb>=0.5.0
+
 # Testing framework
 pytest>=7.0.0
 pytest-cov>=4.0.0
@@ -24,7 +27,7 @@ bandit>=1.7.0
 safety>=2.0.0
 
 # Code quality (already in requirements-dev.txt)
-black>=23.0.0
+black==26.5.1
 flake8>=6.0.0
 mypy>=1.0.0
 

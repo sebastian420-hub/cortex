@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from .base import Tool
+from ..core.command_sandbox import SandboxUnavailable, confine
 from ..utils.errors import create_error_response, create_success_response, ErrorType
 
 
@@ -95,8 +96,16 @@ class RunTestsTool(Tool):
                     cmd.append("-v")
 
             timeout = self.get_timeout()
+            try:
+                confined = confine(cmd, self.project_dir, self._command_sandbox)
+            except SandboxUnavailable as e:
+                return create_error_response(
+                    str(e),
+                    ErrorType.SECURITY,
+                    {"pattern": pattern, "framework": framework, "reason": "sandbox_unavailable"},
+                )
             result = subprocess.run(
-                cmd,
+                confined or cmd,
                 capture_output=True,
                 text=True,
                 cwd=self.project_dir,

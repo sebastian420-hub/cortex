@@ -9,6 +9,8 @@ import hashlib
 
 from ..models import PermissionMode
 from ..ui.console import console
+from .security import is_dangerous_command
+from .tool_policy import allowed_in_plan_mode, classify_tool
 
 if TYPE_CHECKING:
     from ..agent import Cortex
@@ -23,7 +25,7 @@ class PermissionManager:
     Responsibilities:
     - Check if operations are permitted based on permission mode
     - Handle user approval dialogs for dangerous operations
-    - Detect and block destructive operations in PLAN mode
+    - Block everything but read-only tools in PLAN mode (allowlist)
     - Cache user approvals to avoid repeated prompts
     """
 
@@ -39,15 +41,6 @@ class PermissionManager:
         "git push --force",
         "npm publish",
     ]
-
-    # Destructive tools blocked in PLAN mode
-    DESTRUCTIVE_TOOLS = {
-        "write_file",
-        "edit_file",
-        "execute_command",
-        "git_commit",
-        "git_push",
-    }
 
     def __init__(self, agent: "Cortex"):
         """
@@ -74,20 +67,23 @@ class PermissionManager:
         if self.agent.permission_mode == PermissionMode.AUTO_APPROVE:
             return True
 
-        # PLAN mode - block destructive operations
+        # PLAN mode - read-only allowlist (see core/tool_policy.py)
         if self.agent.permission_mode == PermissionMode.PLAN:
-            if tool_name in self.DESTRUCTIVE_TOOLS:
-                console.print(
-                    Panel(
-                        f"[yellow]⚠️  Operation blocked in PLAN mode[/yellow]\n\n"
-                        f"Tool: [cyan]{tool_name}[/cyan]\n"
-                        f"PLAN mode is read-only. Use /mode normal to execute changes.",
-                        title="Permission Denied",
-                        border_style="yellow",
-                    )
+            if allowed_in_plan_mode(tool_name, args):
+                return True
+            tool_class = classify_tool(tool_name, args)
+            what = tool_class.value.replace("_", " ") if tool_class else "unclassified"
+            console.print(
+                Panel(
+                    f"[yellow]⚠️  Operation blocked in PLAN mode[/yellow]\n\n"
+                    f"Tool: [cyan]{tool_name}[/cyan] ({what})\n"
+                    f"PLAN mode changes nothing and runs no code. "
+                    f"Use /mode normal to execute changes.",
+                    title="Permission Denied",
+                    border_style="yellow",
                 )
-                return False
-            return True
+            )
+            return False
 
         # NORMAL mode - ask user for dangerous operations
         if self._is_dangerous(tool_name, args):
@@ -119,7 +115,9 @@ class PermissionManager:
     def _is_dangerous_command(self, args: Dict[str, Any]) -> bool:
         """Check if command is dangerous"""
         command = args.get("command", "")
-        return any(pattern in command for pattern in self.DANGEROUS_COMMANDS)
+        return is_dangerous_command(command) or any(
+            pattern in command for pattern in self.DANGEROUS_COMMANDS
+        )
 
     def _is_dangerous_write(self, args: Dict[str, Any]) -> bool:
         """Check if file write is dangerous"""

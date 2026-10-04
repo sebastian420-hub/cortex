@@ -160,6 +160,7 @@ class ChunkedEditTool(Tool):
             new_content = content.replace(old_string, new_string, 1)
 
             # Write back to file
+            self.backup_file(full_path, "edit")
             full_path.write_text(new_content, encoding="utf-8")
 
             # Invalidate cache
@@ -237,6 +238,7 @@ class ChunkedEditTool(Tool):
             reassembled = "\n".join([c.content for c in chunks])
 
             # Write back to file
+            self.backup_file(full_path, "edit")
             full_path.write_text(reassembled, encoding="utf-8")
 
             # Invalidate cache
@@ -351,6 +353,7 @@ class ChunkedEditTool(Tool):
             new_content = content.replace(old_chunk_content, new_chunk_content, 1)
 
             # Write back to file
+            self.backup_file(full_path, "edit")
             full_path.write_text(new_content, encoding="utf-8")
 
             # Invalidate cache

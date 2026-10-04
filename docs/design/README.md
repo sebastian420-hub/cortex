@@ -1,3 +1,7 @@
+> **Status.** The documents in this folder are design proposals. Nothing here describes
+> implemented behaviour unless [STATUS.md](../STATUS.md) says so; several of them (an API
+> gateway, MCP integration, webhooks, a security agent) were never built.
+
 # Cortex v2.0 Design Specifications
 
 ## Overview
