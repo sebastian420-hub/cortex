@@ -122,3 +122,15 @@ lerna-debug.log*
 
 # Created by tests that pass a placeholder object as a path
 MagicMock/
+
+# Local Claude Code settings (per-developer permissions)
+.claude/settings.local.json
+
+# Cortex runtime state and benchmark scratch output
+.cortex/
+bench/reports/*.tmp
+
+# Test artefacts
+junit.xml
+test-summary.json
+coverage.xml

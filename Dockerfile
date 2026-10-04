@@ -1,69 +1,37 @@
-# Cortex Terminal Agent Dockerfile
-# Multi-stage build for optimal size
+# Cortex in a container: the project you mount at /work is the only thing the agent can reach
+# on disk by default (see docs/SECURITY.md for what a container does and does not isolate).
+#
+#   docker build -t cortex .
+#   docker run --rm -it -v "$PWD":/work -e OPENROUTER_API_KEY cortex
 
-# Build stage
-FROM python:3.11-slim as builder
+# Pinned by digest so a rebuild gets the same base. To update: pull the tag, copy its digest.
+FROM python:3.11-slim-bookworm@sha256:2333bd330d12de02514770b3585cad313644316047cdee24a7acfdece6de6efb
 
-WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
+# git and ripgrep are used by the agent's tools
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ripgrep \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt requirements-test.txt ./
-COPY pyproject.toml setup.py ./
+# Install the package from source (the base install, no optional extras)
+WORKDIR /opt/cortex
+COPY pyproject.toml setup.py README.md LICENSE ./
+COPY cortex ./cortex
+RUN pip install .
 
-# Install dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e . && \
-    pip wheel --no-cache-dir --wheel-dir=/wheels -e .
-
-# Production stage
-FROM python:3.11-slim
-
-WORKDIR /app
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    ripgrep \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy wheels from builder
-COPY --from=builder /wheels /wheels
-COPY --from=builder /app /app
-
-# Install the package
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir /wheels/*.whl && \
-    rm -rf /wheels
-
-# Copy application code
-COPY cortex/ ./cortex/
-COPY config/ ./config/
-
-# Create non-root user
-RUN useradd -m -u 1000 cortex && \
-    chown -R cortex:cortex /app
+# Run as an ordinary user, in the mounted project
+RUN useradd -m -u 1000 cortex && mkdir /work && chown cortex:cortex /work
 USER cortex
+WORKDIR /work
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# Default command
-ENTRYPOINT ["python", "-m", "cortex"]
+ENTRYPOINT ["cortex"]
 CMD ["--help"]
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import cortex; print('OK')" || exit 1
-
-# Labels
-LABEL org.opencontainers.image.title="Cortex Terminal Agent"
-LABEL org.opencontainers.image.description="AI-powered terminal coding assistant"
-LABEL org.opencontainers.image.source="https://github.com/yourusername/cortex"
-LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.title="Cortex" \
+      org.opencontainers.image.description="A terminal coding agent" \
+      org.opencontainers.image.source="https://github.com/sebastian420-hub/cortex" \
+      org.opencontainers.image.licenses="MIT"
