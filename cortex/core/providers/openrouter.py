@@ -5,6 +5,7 @@ import re
 import logging
 from typing import Dict, Any, List, Iterator, Optional
 
+from .usage import normalize_usage
 from .base import ModelProvider, ProviderError
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,9 @@ class OpenRouterProvider(ModelProvider):
             # Convert OpenAI format to Cortex internal format
             message = response.choices[0].message
             result = {"message": {"role": message.role, "content": message.content or ""}}
+            usage = normalize_usage(getattr(response, "usage", None))
+            if usage:
+                result["usage"] = usage
 
             if hasattr(message, "tool_calls") and message.tool_calls:
                 from cortex.utils.tool_call_validation import validate_tool_call_data

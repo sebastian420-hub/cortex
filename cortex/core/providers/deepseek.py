@@ -3,6 +3,7 @@
 import os
 from typing import Dict, Any, List, Iterator, Optional
 
+from .usage import normalize_usage
 from .base import ModelProvider, ProviderError
 
 
@@ -51,6 +52,9 @@ class DeepSeekProvider(ModelProvider):
             message = response.choices[0].message
 
             result = {"message": {"role": message.role, "content": message.content}}
+            usage = normalize_usage(getattr(response, "usage", None))
+            if usage:
+                result["usage"] = usage
 
             # Handle reasoning_content (required for DeepSeek thinking mode)
             if hasattr(message, "reasoning_content") and message.reasoning_content:

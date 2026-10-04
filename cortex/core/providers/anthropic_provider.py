@@ -4,6 +4,7 @@ import os
 import json
 from typing import Dict, Any, List, Iterator, Optional
 
+from .usage import normalize_usage
 from .base import ModelProvider, ProviderError
 
 
@@ -102,6 +103,9 @@ class AnthropicProvider(ModelProvider):
 
             # Convert Anthropic format to Ollama-compatible format
             result = {"message": {"role": "assistant", "content": ""}}
+            usage = normalize_usage(getattr(response, "usage", None))
+            if usage:
+                result["usage"] = usage
 
             # Handle content (can be list of text blocks or tool use blocks)
             content_parts = []
