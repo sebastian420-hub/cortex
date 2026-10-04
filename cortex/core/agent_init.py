@@ -120,6 +120,7 @@ class AgentInitializer:
         self.file_cache = self._init_file_cache()
         self.router = self._init_routing()
         self.tool_registry = get_registry()
+        self._load_tool_plugins()
         self.formatter = create_formatter(output_format, console=console)
 
         # Initialize planning engine
@@ -135,6 +136,16 @@ class AgentInitializer:
 
         # Timeout configuration
         self.timeout_config = self.config.get_timeout_config()
+
+    def _load_tool_plugins(self) -> None:
+        """Load the plugin modules named in ``tools.plugins``. A plugin that cannot be loaded is
+        reported, and does not stop Cortex from starting."""
+        plugins = getattr(self.config, "tools_plugins", None)
+        if not isinstance(plugins, (list, tuple)):
+            return
+        for plugin in plugins:
+            if isinstance(plugin, str) and not self.tool_registry.load_plugin(plugin):
+                logger.warning(f"Could not load the tool plugin '{plugin}' (see the log above)")
 
     def _init_memory_bank(self) -> MemoryBank:
         """Initialize memory bank for tracking decisions and facts"""

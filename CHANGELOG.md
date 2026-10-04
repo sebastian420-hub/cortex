@@ -76,6 +76,12 @@ each claim was either made true, with a test, or removed. Nothing here has a ver
 - Documentation rewritten so every claim is true or labelled; Python 3.9 or newer (older docs said 3.8).
 
 ### Fixed
+- `tools.disabled` and `tools.plugins` in the configuration did nothing: they were read and then
+  never applied, so a "disabled" tool was still offered to the model and still ran, and a
+  configured plugin was never loaded. A disabled tool is now hidden from the model (and no longer
+  counted against its context window) and refused if it is called anyway, for that agent only;
+  configured plugins load at startup, and a plugin tool can be called by the name the model is
+  shown (it was registered under a namespaced name that nothing looked up).
 - Local models served by Ollama were never told their context window, so Ollama's small default
   silently dropped the start of the conversation, system prompt first, since Cortex sends about
   7,000 tokens before the user's first word. Cortex now requests 32,768 tokens (configurable with

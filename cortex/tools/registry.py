@@ -82,6 +82,15 @@ class ToolRegistry:
         logger.debug(f"Unregistered tool: {name}")
         return True
 
+    def _lookup(self, name: str) -> Optional[Dict[str, Any]]:
+        """A tool's entry by its full name (``plugin:echo``), or by the short name the model is
+        shown (``echo``) when exactly one registered tool has that short name."""
+        tool_info = self._tools.get(name)
+        if tool_info is not None:
+            return tool_info
+        matches = [info for info in self._tools.values() if info["short_name"] == name]
+        return matches[0] if len(matches) == 1 else None
+
     def get_tool_class(self, name: str) -> Optional[Type[Tool]]:
         """
         Get tool class by name.
@@ -92,7 +101,7 @@ class ToolRegistry:
         Returns:
             Tool class if found and enabled, None otherwise
         """
-        tool_info = self._tools.get(name)
+        tool_info = self._lookup(name)
         if tool_info and tool_info["enabled"]:
             return tool_info["class"]
         return None
@@ -107,7 +116,7 @@ class ToolRegistry:
         Returns:
             Tool schema if found and enabled, None otherwise
         """
-        tool_info = self._tools.get(name)
+        tool_info = self._lookup(name)
         if tool_info and tool_info["enabled"]:
             return tool_info["schema"]
         return None
@@ -167,7 +176,7 @@ class ToolRegistry:
 
     def is_enabled(self, name: str) -> bool:
         """Check if a tool is enabled."""
-        tool_info = self._tools.get(name)
+        tool_info = self._lookup(name)
         return tool_info["enabled"] if tool_info else False
 
     def list_tools(

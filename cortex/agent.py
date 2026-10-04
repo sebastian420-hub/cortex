@@ -9,7 +9,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from rich.markdown import Markdown
 
@@ -568,8 +568,20 @@ class Cortex:
         """Public method to load project context for backward compatibility."""
         return self._load_project_context()
 
+    def _disabled_tool_names(self) -> Set[str]:
+        """Tools switched off in this agent's configuration (``tools.disabled``).
+
+        Kept per agent: the tool registry is shared by the whole process, and one agent's
+        settings must not change what another is offered.
+        """
+        configured = getattr(self.config, "tools_disabled", None)
+        if not isinstance(configured, (list, tuple, set)):
+            return set()
+        return {name for name in configured if isinstance(name, str)}
+
     def _enabled_tool_schemas(self) -> List[Dict[str, Any]]:
-        """The tool definitions offered to the model (planning tools only with --planning)."""
+        """The tool definitions offered to the model (planning tools only with --planning, and
+        never the ones the configuration disables)."""
         exclude: List[str] = []
         if not self.enable_planning:
             exclude = [
@@ -578,6 +590,7 @@ class Cortex:
                 "create_and_execute_plan",
                 "metacognitive_reflect",
             ]
+        exclude += sorted(self._disabled_tool_names())
         return get_registry().get_all_schemas(exclude_names=exclude)
 
     def _apply_provider_limits(self) -> None:
@@ -898,6 +911,14 @@ class Cortex:
         elif pre_result.action == HookAction.MODIFY and pre_result.modified_data:
             tool_name = pre_result.modified_data.get("tool_name", tool_name)
             arguments = pre_result.modified_data.get("arguments", arguments)
+
+        # A tool the configuration disables is refused even if the model asks for it anyway
+        if tool_name in self._disabled_tool_names():
+            return create_error_response(
+                f"The tool '{tool_name}' is disabled in this configuration (tools.disabled).",
+                ErrorType.PERMISSION,
+                {"tool_name": tool_name, "blocked_by": "config"},
+            )
 
         # Permission check
         if not self.permission_manager.check(tool_name, arguments):
