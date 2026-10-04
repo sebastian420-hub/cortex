@@ -341,19 +341,20 @@ def test_the_configuration_you_gave_is_not_modified(task_repo):
 
 
 @posix_only
-def test_a_termination_signal_stops_the_run_cleanly(task_repo):
+@pytest.mark.parametrize("sig", [signal.SIGTERM, signal.SIGINT])
+def test_a_termination_signal_or_ctrl_c_stops_the_run_cleanly(task_repo, sig):
     class Terminated(ScriptedProvider):
         def chat(self, model, messages, tools=None):
-            os.kill(os.getpid(), signal.SIGTERM)  # e.g. the scheduler's timeout fires
+            os.kill(os.getpid(), sig)  # e.g. the scheduler's time-out fires, or Ctrl-C
             return super().chat(model, messages, tools)
 
-    before_handler = signal.getsignal(signal.SIGTERM)
+    before_handlers = (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGINT))
     before = branches(task_repo)
 
     result, _ = execute(task_repo, provider=Terminated(endless_reads()))
 
     assert result.status == "interrupted" and result.exit_code == 1
-    assert signal.getsignal(signal.SIGTERM) == before_handler  # put back
+    assert (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGINT)) == before_handlers
     assert_left_nothing(task_repo, before)
 
 
@@ -554,3 +555,55 @@ def test_a_failure_while_collecting_a_good_result_is_a_crash_not_a_pass(task_rep
     assert result.status == "crashed" and result.exit_code == 1
     assert "index is locked" in result.reason
     assert_left_nothing(task_repo, before)
+
+
+# ---- tests must see the task's code, not the checkout the project was installed from -------
+
+
+@pytest.fixture
+def installed_package(task_repo, tmp_path):
+    """A src-layout package that is "installed" the way an editable install is: a .pth file in
+    site-packages points at the ORIGINAL checkout, not at the task's worktree."""
+    package = task_repo / "src" / "mypkg"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("VALUE = 1\n")
+    git(task_repo, "add", ".")
+    git(task_repo, "commit", "-qm", "add package")
+
+    site = tmp_path / "site"
+    site.mkdir()
+    (site / "mypkg-editable.pth").write_text(str(task_repo / "src"))
+    code = (
+        f"import site, sys; site.addsitedir({str(site)!r}); import mypkg; "
+        "sys.exit(0 if mypkg.VALUE == {expected} else 1)"
+    )
+    return (
+        lambda expected: f"{shlex.quote(sys.executable)} -c {shlex.quote(code.format(expected=expected))}"
+    )
+
+
+def test_a_correct_fix_is_seen_by_tests_despite_an_editable_install(task_repo, installed_package):
+    script = [write("src/mypkg/__init__.py", "VALUE = 2\n"), final("fixed")]
+
+    result, _ = execute(task_repo, script, verify=installed_package(expected=2))
+
+    assert result.status == "passed", result.reason  # it used to fail: the tests saw VALUE = 1
+
+
+def test_a_regression_is_not_hidden_by_an_editable_install(task_repo, installed_package):
+    # The agent breaks the package. Tests that still imported the original checkout would pass.
+    script = [write("src/mypkg/__init__.py", "VALUE = 99\n"), final("changed")]
+
+    result, _ = execute(task_repo, script, verify=installed_package(expected=1))
+
+    assert result.status == "failed", "the regression must not pass"
+
+
+def test_the_import_path_is_put_back_after_the_run(task_repo, monkeypatch):
+    monkeypatch.setenv("PYTHONPATH", "/some/where")
+    execute(task_repo, GOOD)
+    assert os.environ["PYTHONPATH"] == "/some/where"
+
+    monkeypatch.delenv("PYTHONPATH")
+    execute(task_repo, GOOD)
+    assert "PYTHONPATH" not in os.environ

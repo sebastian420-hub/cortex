@@ -19,6 +19,7 @@ account of its work counts for nothing.
 import contextlib
 import copy
 import fnmatch
+import os
 import secrets
 import signal
 import threading
@@ -172,6 +173,28 @@ def commit_message(
 # ---- the run ------------------------------------------------------------------------------
 
 
+@contextlib.contextmanager
+def _prefer_worktree_imports(path: Path) -> Iterator[None]:
+    """Make Python code run during the task import the worktree's code.
+
+    A project installed in editable mode points at your own checkout, so tests run in the worktree
+    would import the code that was there before the task: a correct fix would fail, and worse, a
+    regression the agent introduced would pass. Putting the worktree (and its ``src`` directory,
+    for that layout) first on ``PYTHONPATH`` makes it win. It applies to the agent's own commands
+    and to the verify command alike, and is undone afterwards.
+    """
+    entries = [str(path)] + ([str(path / "src")] if (path / "src").is_dir() else [])
+    previous = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = os.pathsep.join(entries + ([previous] if previous else []))
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("PYTHONPATH", None)
+        else:
+            os.environ["PYTHONPATH"] = previous
+
+
 def _new_run_id() -> str:
     return time.strftime("%Y%m%d-%H%M%S", time.gmtime()) + "-" + secrets.token_hex(3)
 
@@ -273,19 +296,30 @@ class _Run:
             self.agent.request_shutdown()
 
     @contextlib.contextmanager
-    def _stop_on_sigterm(self) -> Iterator[None]:
-        """A termination signal (a scheduler's timeout, say) stops the run at the next step, so
-        the worktree is still cleaned up. Only possible from the main thread."""
-        if threading.current_thread() is not threading.main_thread() or not hasattr(
-            signal, "SIGTERM"
-        ):
+    def _stop_on_signal(self) -> Iterator[None]:
+        """A termination signal (a scheduler's time-out) or Ctrl-C stops the run at the next step,
+        so the worktree is still cleaned up and a result is still written. A second signal does
+        what it normally would, in case the run is stuck. Only possible from the main thread."""
+        names = [n for n in ("SIGTERM", "SIGINT") if hasattr(signal, n)]
+        if threading.current_thread() is not threading.main_thread() or not names:
             yield
             return
-        previous = signal.signal(signal.SIGTERM, lambda signum, frame: self._request_stop())
+        previous = {n: signal.getsignal(getattr(signal, n)) for n in names}
+
+        def restore() -> None:
+            for name, handler in previous.items():
+                signal.signal(getattr(signal, name), handler)
+
+        def on_signal(signum: int, frame: Any) -> None:
+            self._request_stop()
+            restore()
+
+        for name in names:
+            signal.signal(getattr(signal, name), on_signal)
         try:
             yield
         finally:
-            signal.signal(signal.SIGTERM, previous)
+            restore()
 
     def _budget_reason(self, which: str) -> str:
         meter, config = self.meter, self.config
@@ -484,7 +518,7 @@ class _Run:
 
         keep = False
         try:
-            with self._stop_on_sigterm():
+            with self._stop_on_signal(), _prefer_worktree_imports(workspace.path):
                 try:
                     status, reason = self._drive()
                 except Exception as e:  # one broken run must not take the scheduler down

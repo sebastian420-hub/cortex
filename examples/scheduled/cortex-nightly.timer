@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Cortex task every night
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# If the machine was off at 02:30, run once when it comes back
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

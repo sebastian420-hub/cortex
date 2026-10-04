@@ -1,0 +1,17 @@
+# Cortex on a schedule with cron. Install with `crontab -e`.
+#
+# cron runs commands with a tiny environment, so put the settings at the top of the crontab.
+# `run-task.sh` takes a lock (runs never overlap), stops a run that goes on too long, and keeps
+# the result of every run in CORTEX_RESULTS. Its output goes to cron's mail or to the log below.
+
+CORTEX_REPO=/home/me/projects/myrepo
+CORTEX_TASK_FILE=/home/me/.config/cortex/tasks/fix-failing-tests.md
+# An absolute path to the interpreter: a virtualenv inside the repo is not in the task's worktree
+CORTEX_VERIFY=/home/me/projects/myrepo/.venv/bin/python -m pytest -q
+# A local model served on this machine (vLLM, llama.cpp, LM Studio); see docs/DEPLOYMENT.md
+OPENAI_BASE_URL=http://localhost:8000/v1
+CORTEX_OPENAI_CONTEXT_WINDOW=65536
+PATH=/home/me/.local/bin:/usr/local/bin:/usr/bin:/bin
+
+# Every night at 02:30
+30 2 * * *  /home/me/cortex/examples/scheduled/run-task.sh --provider openai --model qwen3-coder --protect 'tests/*' >>/home/me/.cortex/cron.log 2>&1
