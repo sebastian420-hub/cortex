@@ -62,6 +62,14 @@ DEFAULT_TRANSACTIONS = {
     "backup_dir": None,  # Uses .cortex/backups by default
 }
 
+# Default git checkpoint settings (/undo)
+DEFAULT_CHECKPOINTS = {
+    "enabled": True,
+    "keep": 20,  # snapshots kept per stack
+    "timeout": 60.0,  # seconds git may spend on one snapshot before it is skipped
+    "stale_days": 7,  # snapshots left behind by sessions that never exited cleanly
+}
+
 # Default parallel execution settings
 DEFAULT_PARALLEL_EXECUTION = {
     "enabled": True,
@@ -218,6 +226,8 @@ class AgentConfig:
         redis_cache: Optional[Dict[str, Any]] = None,
         # Transaction settings (new)
         transactions: Optional[Dict[str, Any]] = None,
+        # Git checkpoint settings (/undo)
+        checkpoints: Optional[Dict[str, Any]] = None,
         # Parallel execution settings (new)
         parallel_execution: Optional[Dict[str, Any]] = None,
         # Rate limiting settings (new)
@@ -295,6 +305,7 @@ class AgentConfig:
 
         # Transaction settings (merge with defaults)
         self.transactions = {**DEFAULT_TRANSACTIONS, **(transactions or {})}
+        self.checkpoints = {**DEFAULT_CHECKPOINTS, **(checkpoints or {})}
 
         # Parallel execution settings (merge with defaults)
         self.parallel_execution = {**DEFAULT_PARALLEL_EXECUTION, **(parallel_execution or {})}
@@ -357,6 +368,10 @@ class AgentConfig:
     def get_transactions_config(self) -> Dict[str, Any]:
         """Get configuration for TransactionManager."""
         return self.transactions
+
+    def get_checkpoints_config(self) -> Dict[str, Any]:
+        """Get configuration for the git checkpoint store (/undo)."""
+        return self.checkpoints
 
     def get_parallel_execution_config(self) -> Dict[str, Any]:
         """Get configuration for ParallelToolExecutor."""
@@ -592,6 +607,7 @@ class AgentConfig:
             "error_recovery": self.error_recovery,
             "file_cache": self.file_cache,
             "transactions": self.transactions,
+            "checkpoints": self.checkpoints,
             "routing": self.routing,
             # Hybrid architecture
             "semantic_memory": self.semantic_memory,  # New

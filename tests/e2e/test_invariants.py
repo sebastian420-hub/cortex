@@ -382,6 +382,171 @@ def test_ending_the_session_finishes_the_open_transaction(make_agent, project):
     assert (project / "kept.txt").exists()
 
 
+def _command(agent, name):
+    from cortex.cli_commands.commands.base import CommandContext
+    from cortex.cli_commands.commands.transaction import RedoCommand, UndoCommand
+
+    command = {"undo": UndoCommand, "redo": RedoCommand}[name]()
+    ctx = CommandContext(
+        agent=agent, config=agent.config, hook_manager=agent.hook_manager, output_format="text"
+    )
+    command.execute(ctx)
+
+
+def _checkpoint_refs(project):
+    import subprocess
+
+    return subprocess.run(
+        ["git", "for-each-ref", "--format=%(refname)", "refs/cortex/"],
+        cwd=project,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+
+
+def test_undo_reverses_what_a_shell_command_did(make_agent, project):
+    (project / "sub").mkdir()
+    (project / "sub" / "x.txt").write_text("precious\n")
+    agent = make_agent(
+        [
+            tool_call("execute_command", {"command": "rm -r sub && touch made.txt"}),
+            final("cleaned up"),
+        ],
+        planning=False,
+    )
+    agent._process_message("tidy the repo")
+    assert not (project / "sub").exists() and (project / "made.txt").exists()
+
+    _command(agent, "undo")
+
+    assert (project / "sub" / "x.txt").read_text() == "precious\n"
+    assert not (project / "made.txt").exists()
+
+
+def test_redo_puts_the_undone_changes_back(make_agent, project):
+    agent = make_agent(
+        [tool_call("execute_command", {"command": "touch made.txt"}), final("done")],
+        planning=False,
+    )
+    agent._process_message("make a file")
+    _command(agent, "undo")
+    assert not (project / "made.txt").exists()
+
+    _command(agent, "redo")
+
+    assert (project / "made.txt").exists()
+
+
+def test_one_checkpoint_per_request_taken_before_its_first_change(make_agent, project):
+    agent = make_agent(
+        [
+            tool_call("read_file", {"path": "a.py"}, "c1"),
+            tool_call("write_file", {"path": "one.txt", "content": "1"}, "c2"),
+            tool_call("write_file", {"path": "two.txt", "content": "2"}, "c3"),
+            final("done"),
+        ],
+        planning=False,
+    )
+    agent._process_message("write two files")
+
+    assert len(_checkpoint_refs(project)) == 1
+    _command(agent, "undo")
+    assert not (project / "one.txt").exists() and not (project / "two.txt").exists()
+
+
+def test_a_request_that_only_reads_takes_no_checkpoint(make_agent, project):
+    agent = make_agent(
+        [tool_call("read_file", {"path": "a.py"}), final("it returns 1")], planning=False
+    )
+    agent._process_message("what does hello return?")
+
+    assert _checkpoint_refs(project) == []
+
+
+def test_undo_only_reverses_the_latest_request(make_agent, project):
+    agent = make_agent(
+        [
+            tool_call("write_file", {"path": "first.txt", "content": "1"}, "c1"),
+            final("one"),
+            tool_call("write_file", {"path": "second.txt", "content": "2"}, "c2"),
+            final("two"),
+        ],
+        planning=False,
+    )
+    agent._process_message("first")
+    agent._process_message("second")
+
+    _command(agent, "undo")
+
+    assert (project / "first.txt").exists()
+    assert not (project / "second.txt").exists()
+
+
+def test_plan_mode_takes_no_checkpoint(make_agent, project):
+    agent = make_agent(mode=PermissionMode.PLAN, planning=False)
+    agent.execute_tool("write_file", {"path": "x.txt", "content": "x"})
+
+    assert _checkpoint_refs(project) == []
+
+
+def test_undo_without_a_git_repository_explains_and_does_not_fail(make_agent, tmp_path):
+    import shutil
+
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    (plain / "a.txt").write_text("a\n")
+    from cortex.agent import Cortex
+    from cortex.config import AgentConfig
+
+    config = AgentConfig(model="llama3.2", provider="ollama", permission_mode="auto_approve")
+    agent = Cortex(
+        model="llama3.2",
+        project_dir=str(plain),
+        permission_mode=PermissionMode.AUTO_APPROVE,
+        config=config,
+        enable_planning=False,
+        enable_layered_memory=False,
+    )
+    from .scripted import ScriptedProvider
+
+    agent.provider = ScriptedProvider(
+        [tool_call("write_file", {"path": "b.txt", "content": "b"}), final("done")]
+    )
+    agent._process_message("write b")
+
+    _command(agent, "undo")  # must not raise
+
+    assert (plain / "b.txt").exists()
+    shutil.rmtree(plain)
+
+
+def test_ending_the_session_removes_its_checkpoints(make_agent, project):
+    agent = make_agent(
+        [tool_call("write_file", {"path": "x.txt", "content": "x"}), final("done")],
+        planning=False,
+    )
+    agent._process_message("write x")
+    assert len(_checkpoint_refs(project)) == 1
+
+    agent._cleanup()
+
+    assert _checkpoint_refs(project) == []
+    assert (project / "x.txt").exists()
+
+
+def test_checkpoints_can_be_turned_off(make_agent, project):
+    agent = make_agent(
+        [tool_call("write_file", {"path": "x.txt", "content": "x"}), final("done")],
+        planning=False,
+        checkpoints={"enabled": False},
+    )
+    agent._process_message("write x")
+
+    assert _checkpoint_refs(project) == []
+    _command(agent, "undo")  # explains, does not fail
+    assert (project / "x.txt").exists()
+
+
 def test_plan_mode_does_not_run_project_code(make_agent, project):
     agent = make_agent(mode=PermissionMode.PLAN, planning=False)
     agent.execute_tool("run_tests", {})

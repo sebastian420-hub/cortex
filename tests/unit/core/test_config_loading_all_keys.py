@@ -40,6 +40,7 @@ SAMPLES = {
     "error_recovery": {"enable_smart_recovery": False},
     "file_cache": {"enabled": False},
     "transactions": {"max_backups": 2},
+    "checkpoints": {"keep": 3},
     "routing": {"enabled": True},
     "semantic_memory": {"enabled": True},
     "profiling": {"enabled": True},

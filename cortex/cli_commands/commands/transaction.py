@@ -78,3 +78,100 @@ Rolled Back: {stats['rolled_back']}
 Backup Dir: {stats['backup_dir']}
 """
         console.print(Panel(info, title="Transactions"))
+
+
+def _checkpoint_store(ctx: CommandContext):
+    """The session's git checkpoint store, or None when checkpoints are off."""
+    return getattr(ctx.agent, "checkpoints", None)
+
+
+def _explain_unavailable(store) -> None:
+    if store is None:
+        console.print("[yellow]Git checkpoints are turned off (checkpoints.enabled).[/yellow]")
+    else:
+        console.print(
+            "[yellow]/undo needs the project to be in a git repository.[/yellow] "
+            "[dim]/rollback still undoes edits made with Cortex's file tools.[/dim]"
+        )
+
+
+def _report_restore(result, verb: str) -> None:
+    files = len(result.restored) + len(result.removed)
+    label = f' "{result.snapshot.label}"' if result.snapshot.label else ""
+    console.print(
+        f"[green]✓[/green] {verb}: restored {len(result.restored)} file(s), "
+        f"removed {len(result.removed)} created since{label}"
+        if files
+        else f"[green]✓[/green] {verb}: the project already matched that checkpoint"
+    )
+    for path in result.restored[:20]:
+        console.print(f"  [dim]restored {path}[/dim]")
+    for path in result.removed[:20]:
+        console.print(f"  [dim]removed  {path}[/dim]")
+    if files > 40:
+        console.print(f"  [dim]... and {files - 40} more[/dim]")
+    if result.failed:
+        console.print(f"[red]Could not restore {len(result.failed)} file(s):[/red]")
+        for path in result.failed[:20]:
+            console.print(f"  [dim]{path}[/dim]")
+    if result.head_moved and result.head_at_snapshot:
+        console.print(
+            "[yellow]A command moved the git branch since this checkpoint.[/yellow] Files were "
+            "restored; the branch was not. To move it back: "
+            f"[cyan]git reset --soft {result.head_at_snapshot[:12]}[/cyan] (see also git reflog)"
+        )
+
+
+class UndoCommand(Command):
+    """Restore the project to how it was before the last request"""
+
+    @property
+    def name(self) -> str:
+        return "undo"
+
+    @property
+    def description(self) -> str:
+        return "Restore the project to before the last request (git checkpoint)"
+
+    def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
+        store = _checkpoint_store(ctx)
+        if store is None or not store.available():
+            _explain_unavailable(store)
+            return
+        try:
+            result = store.restore()
+        except LookupError as e:
+            console.print(f"[yellow]{e}[/yellow]")
+            return
+        except Exception as e:  # git failed halfway: say so rather than crash the session
+            console.print(f"[red]Undo failed:[/red] {e}")
+            return
+        _report_restore(result, "Undone")
+        console.print("[dim]/redo brings the undone changes back.[/dim]")
+
+
+class RedoCommand(Command):
+    """Bring back what the last /undo took away"""
+
+    @property
+    def name(self) -> str:
+        return "redo"
+
+    @property
+    def description(self) -> str:
+        return "Bring back the changes the last /undo removed"
+
+    def execute(self, ctx: CommandContext, args: Optional[str] = None) -> None:
+        store = _checkpoint_store(ctx)
+        if store is None or not store.available():
+            _explain_unavailable(store)
+            return
+        try:
+            result = store.redo()
+        except LookupError as e:
+            console.print(f"[yellow]{e}[/yellow]")
+            return
+        except Exception as e:
+            console.print(f"[red]Redo failed:[/red] {e}")
+            return
+        _report_restore(result, "Redone")

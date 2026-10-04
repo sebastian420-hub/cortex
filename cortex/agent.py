@@ -6,6 +6,7 @@ import logging
 import os
 import sys
 import time
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -25,6 +26,8 @@ from .core.prompts.builder import PromptBuilder
 from .core.providers import ProviderError, ProviderFactory
 from .core.security import SecurityError
 from .core.streaming import display_streaming_response, stream_model_response
+from .core.checkpoints import GitCheckpointStore
+from .core.tool_policy import PLAN_MODE_CLASSES, classify_tool
 from .core.transaction import TransactionManager
 from .core.turn import (
     STATUS_BLOCKED,
@@ -207,6 +210,21 @@ class Cortex:
             max_backups=transactions_config.get("max_backups", 10),
             enabled=transactions_config.get("enabled", True),
         )
+        # Git checkpoints: a snapshot of the whole project before a request's first change, which
+        # /undo restores (this is what covers shell commands; transactions only see file tools)
+        checkpoints_config = self.config.get_checkpoints_config()
+        self.checkpoints: Optional[GitCheckpointStore] = None
+        if checkpoints_config.get("enabled", True):
+            self.checkpoints = GitCheckpointStore(
+                self.project_dir,
+                session_id=uuid.uuid4().hex[:8],
+                keep=checkpoints_config.get("keep", 20),
+                timeout=checkpoints_config.get("timeout", 60.0),
+                stale_days=checkpoints_config.get("stale_days", 7),
+            )
+        self._checkpoint_pending = False
+        self._turn_label = ""
+        self._turn_checkpoint = None
         self.tool_executor = ToolExecutor(self)
         self.message_processor = MessageProcessor(self)
 
@@ -846,6 +864,8 @@ class Cortex:
         ):
             self._begin_turn_transaction(f"direct call: {tool_name}")
 
+        self._checkpoint_before_first_change(tool_name, arguments)
+
         # Track tool usage
         self._tools_used.append(tool_name)
 
@@ -971,6 +991,8 @@ class Cortex:
         """Cleanup resources on shutdown."""
         try:
             self._finish_turn_transaction()
+            if self.checkpoints is not None:
+                self.checkpoints.clear()
             self._dispatch_session_end()
             if self.parallel_executor:
                 self.parallel_executor.shutdown()
@@ -991,22 +1013,40 @@ class Cortex:
         The previous turn is committed first, so /rollback always means "undo my last request".
         """
         self._finish_turn_transaction()
+        self._checkpoint_pending = True
+        self._turn_label = user_message
+        self._turn_checkpoint = None
         try:
             self.transaction_manager.begin(metadata={"request": user_message[:200]})
         except Exception as e:
             logger.warning(f"Could not start a transaction; changes will not be undoable: {e}")
 
+    def _checkpoint_before_first_change(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Snapshot the project before the first tool of this request that could change it."""
+        if not self._checkpoint_pending or self.checkpoints is None:
+            return
+        # Only tools known to be harmless skip it: an unclassified tool is treated as a change
+        if classify_tool(tool_name, arguments) in PLAN_MODE_CLASSES:
+            return
+        self._checkpoint_pending = False
+        self._turn_checkpoint = self.checkpoints.snapshot(self._turn_label)
+
     def _announce_undo(self) -> None:
         """Tell the user, once a turn ends, that its file changes can be undone."""
         if not self._is_text_output():
             return
-        transaction = self.transaction_manager.get_current_transaction()
-        count = len({str(f) for f in transaction.get_files_modified()}) if transaction else 0
-        if count:
-            plural = "s" if count != 1 else ""
+        if self._turn_checkpoint is not None:
             console.print(
-                f"[dim]{count} file{plural} changed. /rollback undoes this request.[/dim]"
+                "[dim]Checkpoint saved: /undo restores the project to before this request.[/dim]"
             )
+        else:
+            transaction = self.transaction_manager.get_current_transaction()
+            count = len({str(f) for f in transaction.get_files_modified()}) if transaction else 0
+            if count:
+                plural = "s" if count != 1 else ""
+                console.print(
+                    f"[dim]{count} file{plural} changed. /rollback undoes this request.[/dim]"
+                )
 
     def _process_message(self, user_message: str, use_streaming: bool = False) -> TurnResult:
         """Run one user message to completion and report how it ended."""
