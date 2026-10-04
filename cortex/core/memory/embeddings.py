@@ -65,7 +65,9 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
             self._dimensions = self._model.get_sentence_embedding_dimension()
             logger.info(f"Initialized LocalEmbeddingModel with {model_name}, dimensions: {self._dimensions}")
         except ImportError:
-            logger.error("sentence-transformers not installed. Please install it to use LocalEmbeddingModel.")
+            logger.error(
+                "sentence-transformers is not installed. Install it with: pip install 'cortex[memory]'"
+            )
             raise
         except Exception as e:
             logger.error(f"Failed to load SentenceTransformer model {model_name}: {e}")

@@ -185,6 +185,6 @@ class TestChromaMemoryManager:
     def test_chroma_not_installed(self, tmp_path: Path):
         """Test error when chromadb is not installed."""
         with patch("cortex.core.memory.semantic.chromadb", None):
-            with pytest.raises(ImportError, match="ChromaDB is not installed"):
+            with pytest.raises(ImportError, match=r"cortex\[memory\]"):
                 ChromaMemoryManager(persist_directory=tmp_path / "chroma_db")
 

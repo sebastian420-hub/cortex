@@ -38,7 +38,8 @@ class ChromaMemoryManager:
     ):
         if chromadb is None:
             raise ImportError(
-                "ChromaDB is not installed. Please install it with 'pip install chromadb'."
+                "Semantic memory needs ChromaDB, which is not installed. "
+                "Install it with: pip install 'cortex[memory]'"
             )
         
         self.persist_directory = persist_directory

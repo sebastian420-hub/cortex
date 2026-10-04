@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
       fail-fast: false
 
     steps:
@@ -44,6 +44,40 @@ jobs:
         with:
           name: coverage-report
           path: coverage.xml
+
+  # ============================================
+  # Smoke test - a clean base install must start every way a user starts it
+  # ============================================
+  smoke:
+    name: Smoke (${{ matrix.os }} / Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.12']
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install the package (base install, no extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+
+      - name: cortex --help
+        run: cortex --help
+
+      - name: python -m cortex --version
+        run: python -m cortex --version
+
+      - name: Package imports without the optional memory extra
+        run: python -c "import cortex, sys; assert 'chromadb' not in sys.modules; print(cortex.__version__)"
 
   # ============================================
   # Native components - Rust extension and Go services
