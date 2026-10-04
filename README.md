@@ -6,8 +6,9 @@
 
 Cortex is an AI agent you run in your terminal. You describe a software task; a language model
 reads and searches your code, edits files, runs commands and tests, and uses git, asking before it
-changes anything (unless you tell it not to). It works with a local model through Ollama, or a
-cloud model through OpenRouter, Anthropic or DeepSeek.
+changes anything (unless you tell it not to). It works with a local model through Ollama, or any
+server that speaks the OpenAI API (vLLM, llama.cpp, LM Studio), or a cloud model through
+OpenRouter, Anthropic or DeepSeek.
 
 What sets it apart is what happens when something goes wrong: every request can be undone, a
 failed step is reported as failed, and the safety features say plainly what they do and do not
@@ -37,7 +38,9 @@ cortex --provider ollama --model llama3.2
 ```
 
 Other providers: `--provider anthropic` (`ANTHROPIC_API_KEY`), `--provider deepseek`
-(`DEEPSEEK_API_KEY`). One prompt and exit: `cortex -p "fix the failing test"`.
+(`DEEPSEEK_API_KEY`), and `--provider openai` for a vLLM, llama.cpp or LM Studio server
+(`OPENAI_BASE_URL`; see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)). One prompt and exit:
+`cortex -p "fix the failing test"`.
 
 More options, containers and unattended use: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -78,8 +81,8 @@ More options, containers and unattended use: [docs/DEPLOYMENT.md](docs/DEPLOYMEN
 
 ### Not here (yet)
 
-OpenAI as a provider, an MCP server, an HTTP API or webhooks, multi-agent coordination, and a
-research framework are **not implemented**; earlier versions of this README said otherwise. The
+An MCP server, an HTTP API or webhooks, multi-agent coordination, and a research framework are
+**not implemented**; earlier versions of this README said otherwise. The
 Rust and Go components are optional and off by default; the Go services have no Python client.
 What is planned is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -92,6 +95,8 @@ What is planned is in [docs/ROADMAP.md](docs/ROADMAP.md).
 | `OPENROUTER_API_KEY` | OpenRouter (the default provider) |
 | `ANTHROPIC_API_KEY` | Anthropic |
 | `DEEPSEEK_API_KEY` | DeepSeek |
+| `OPENAI_BASE_URL`, `OPENAI_API_KEY` | an OpenAI-compatible server (`--provider openai`); a local server needs only the URL |
+| `CORTEX_OLLAMA_NUM_CTX`, `CORTEX_OPENAI_CONTEXT_WINDOW` | the context window of a local model (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)) |
 | `CORTEX_MODEL`, `CORTEX_PROVIDER`, `CORTEX_MODE` | defaults for model, provider and permission mode |
 | `CORTEX_OFFLINE=1` | never download tokenizer data (for machines without internet) |
 

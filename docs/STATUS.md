@@ -16,7 +16,7 @@ badges in the [README](../README.md)), so they cannot go stale here.
 
 | Area | Status | How it is checked, and the limits |
 |------|--------|-----------------------------------|
-| Agent loop with file, git, search, AST and web tools, hooks, and four providers (OpenRouter, Anthropic, DeepSeek, Ollama) | Works | `tests/e2e/test_invariants.py` drives the loop with a scripted model. Provider code is tested with fake clients, not live APIs |
+| Agent loop with file, git, search, AST and web tools, hooks, and five providers (OpenRouter, Anthropic, DeepSeek, Ollama, OpenAI-compatible) | Works | `tests/e2e/test_invariants.py` drives the loop with a scripted model. Provider code is tested with fake clients, not live APIs |
 | Valid conversation: every tool request is followed by its result, even after truncation or summarisation | Works | `tests/unit/utils/test_message_validation.py` and the e2e tests; strict providers reject a broken order, so a repair step exists as a safety net |
 | A turn ends with a result (`ok`, `error`, `max_iterations`, `loop_guard`, `blocked`, `interrupted`); one-shot mode exits non-zero unless it is `ok` | Works | e2e tests. The exit code says the turn finished, not that the work is right |
 | Loop guard (stops after the same error repeats) | Works | `tests/test_loop_guards.py` and e2e |
@@ -60,7 +60,8 @@ badges in the [README](../README.md)), so they cannot go stale here.
 | Docker image | Works | CI builds it and checks it starts, runs as non-root and has git and ripgrep |
 | Rust native layer (`rust/`) | Optional | Its tests run in CI. Off by default and the speed-up is unmeasured. The Python AST parser does not use the Rust parser (it returns a summary, not the tree the Python code reads); search and tokenizing have Python fallbacks |
 | Go services (`go/`) | Optional | Built and tested in CI. Cortex has no client for them and does not use them |
-| OpenAI as a provider; an MCP server; an HTTP API or webhooks; a research framework | Not implemented | Older documents said otherwise; those claims were removed |
+| OpenAI-compatible provider (OpenAI, vLLM, llama.cpp, LM Studio) | Works in tests | Tests stand in for the SDK client: connection settings, tool calls (including untidy ones from local models), usage, streaming, errors, the configured context window. Not yet run against a live server |
+| An MCP server; an HTTP API or webhooks; a research framework | Not implemented | Older documents said otherwise; those claims were removed |
 
 ## Check it yourself
 

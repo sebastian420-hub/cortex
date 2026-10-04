@@ -83,12 +83,15 @@ cortex --model claude-4-6-opus
 --provider <provider_name>
 ```
 
-Override provider auto-detection. Options: `ollama`, `deepseek`, `anthropic`.
+Override provider auto-detection. Options: `ollama`, `deepseek`, `anthropic`, `openrouter`, `openai`
+(any OpenAI-compatible server such as vLLM or llama.cpp; set `OPENAI_BASE_URL`, see
+[DEPLOYMENT.md](DEPLOYMENT.md)).
 
 **Examples:**
 ```bash
 cortex --provider deepseek --model deepseek-chat
 cortex --provider anthropic --model claude-3-haiku-20240307
+OPENAI_BASE_URL=http://gpu-box:8000/v1 cortex --provider openai --model <model>
 ```
 
 ### List Providers

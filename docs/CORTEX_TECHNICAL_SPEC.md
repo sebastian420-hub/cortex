@@ -54,9 +54,13 @@ placeholder for a missing one, drops orphans) and trims or summarises history wi
 tool exchange (`tail_start`). Before each model call the agent validates the messages; with
 `CORTEX_STRICT_MESSAGES=1` (used by the tests) a violation raises instead of being repaired.
 
-Providers (`core/providers/`): OpenRouter (default), Anthropic, DeepSeek, Ollama. Each returns
-`{"message": ..., "usage": {"input_tokens", "output_tokens"}}`; `usage` is omitted when the API
-reported none (`providers/usage.py`). There is no OpenAI provider.
+Providers (`core/providers/`): OpenRouter (default), Anthropic, DeepSeek, Ollama, and an
+OpenAI-compatible provider for OpenAI and local servers (vLLM, llama.cpp, LM Studio), chosen only
+with `--provider openai` because a model name cannot tell such a server from OpenRouter. Each
+returns `{"message": ..., "usage": {"input_tokens", "output_tokens"}}`; `usage` is omitted when the
+API reported none (`providers/usage.py`). A provider that fixes the model's context window
+exposes it as `context_window`, which the agent uses to size the history; the OpenAI-compatible
+provider knows it only when configured.
 
 Ollama is always sent an explicit context window (`options.num_ctx`: 32,768 by default,
 `ollama.num_ctx` or `CORTEX_OLLAMA_NUM_CTX` to change it), because its own default is smaller

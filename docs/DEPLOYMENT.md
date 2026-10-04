@@ -36,9 +36,10 @@ cortex --help
 | Anthropic | `ANTHROPIC_API_KEY` | `cortex --provider anthropic --model <model>` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `cortex --provider deepseek --model <model>` |
 | Ollama (local, no key) | none | `cortex --provider ollama --model llama3.2` |
+| OpenAI-compatible server: vLLM, llama.cpp, LM Studio, SGLang (local, no key) or OpenAI | `OPENAI_BASE_URL` (a local server) or `OPENAI_API_KEY` (OpenAI) | `cortex --provider openai --model <name the server knows>` |
 
-Cortex has no OpenAI provider. For a fully offline machine use Ollama and set `CORTEX_OFFLINE=1`
-so it never tries to download tokenizer data.
+For a fully offline machine use Ollama or a local OpenAI-compatible server and set
+`CORTEX_OFFLINE=1` so Cortex never tries to download tokenizer data.
 
 ### Local models: the context window
 
@@ -53,6 +54,33 @@ says (the environment wins). It also sizes its conversation history to that wind
 definitions, and warns if the window leaves too little room (below about 14,000 tokens). A larger
 window costs memory on the machine running the model; raise it for long tasks if you have the
 room.
+
+### Local models: a vLLM, llama.cpp or LM Studio server
+
+Use this when the model runs on another machine (a GPU box on your network, for example) or is too
+large for Ollama's defaults. Start the server, then point Cortex at it:
+
+```bash
+export OPENAI_BASE_URL=http://gpu-box:8000/v1      # no key needed for a local server
+export CORTEX_OPENAI_CONTEXT_WINDOW=65536          # what the server was started with
+cortex --provider openai --model <the model name the server reports>
+```
+
+The same can live in the config file (`openai.base_url`, `openai.context_window`); the
+environment wins. Things to know:
+
+- **Tool calling must be switched on in the server**, or the model can talk but not act. Typical
+  flags are `--enable-auto-tool-choice --tool-call-parser <parser>` for vLLM and `--jinja` for
+  llama.cpp's `llama-server`; the parser has to suit the model, so check the server's documentation.
+- **Cortex cannot ask the server for its context window**, so you tell it. With the window set,
+  Cortex sizes its history to fit (and warns if the window is too small for its tool definitions,
+  below about 14,000 tokens). Without it, Cortex assumes the server's window is large enough, and
+  the server may reject or truncate a long conversation.
+- The model name is passed to the server exactly as given. Names such as `Qwen/Qwen3-Coder-30B`
+  would otherwise be sent to OpenRouter, which is why `--provider openai` has to be explicit.
+- This provider is covered by tests that stand in for the SDK client. It has not yet been run
+  against a live vLLM or llama.cpp server, so expect to find server-specific quirks; the
+  [benchmark](BENCHMARK.md) is the way to find out how a given model really does.
 
 ## Configure
 

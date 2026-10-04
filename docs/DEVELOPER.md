@@ -22,7 +22,7 @@ cortex/
 │   ├── memory/               # long-term memory: contract, ranking, vector store
 │   ├── memory_layers/        # working, session and state memory
 │   ├── prompts/              # PromptBuilder
-│   ├── providers/            # OpenRouter, Anthropic, DeepSeek, Ollama; token usage
+│   ├── providers/            # OpenRouter, Anthropic, DeepSeek, Ollama, OpenAI-compatible; token usage
 │   └── gym/                  # practice sessions
 ├── tools/                    # the tools the model can call
 ├── utils/message_validation.py   # keeps tool-call messages valid for chat APIs

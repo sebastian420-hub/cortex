@@ -46,6 +46,11 @@ each claim was either made true, with a test, or removed. Nothing here has a ver
 - Turn results (`ok`, `error`, `max_iterations`, `loop_guard`, `blocked`, `interrupted`): one-shot
   mode (`cortex -p`) exits non-zero unless the turn finished.
 - Providers report token usage in one shape.
+- **OpenAI-compatible provider** (`--provider openai`): OpenAI, or a local vLLM, llama.cpp,
+  LM Studio or SGLang server through `OPENAI_BASE_URL` (no key needed locally). The server's
+  context window is set with `openai.context_window` or `CORTEX_OPENAI_CONTEXT_WINDOW` so the
+  history is sized to fit. Tested with a stand-in for the SDK client, not yet against a live
+  server.
 - A tool-policy table classifying every tool; a test fails when a tool has no class.
 - CONTRIBUTING.md; docs/SECURITY.md, docs/BENCHMARK.md.
 
@@ -76,6 +81,9 @@ each claim was either made true, with a test, or removed. Nothing here has a ver
   7,000 tokens before the user's first word. Cortex now requests 32,768 tokens (configurable with
   `ollama.num_ctx` or `CORTEX_OLLAMA_NUM_CTX`), sizes its history to the window minus the tool
   definitions, and warns when the window is too small.
+- The startup provider check and the model-switch message ignored `--provider` and guessed from the
+  model name: with `--provider ollama` and a name such as `qwen/qwen3-coder` the check that Ollama
+  is running was skipped, because the name looked like an OpenRouter model.
 - Tool-call and result messages are kept in the order chat APIs require, through truncation and
   summarisation (a strict provider rejected the old order).
 - The loop guard is fed by the agent loop, so it can stop a runaway turn.
