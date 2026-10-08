@@ -357,6 +357,12 @@ def main():
 
         sys.exit(run_main(sys.argv[2:]))
 
+    # `cortex pentest ...` scaffolds and scope-checks a pentest engagement; its own arguments too
+    if len(sys.argv) > 1 and sys.argv[1] == "pentest":
+        from .pentest.cli import main as pentest_main
+
+        sys.exit(pentest_main(sys.argv[2:]))
+
     args = build_parser().parse_args()
 
     # Handle list-providers command

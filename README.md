@@ -80,6 +80,12 @@ watching, for example from a nightly schedule: `cortex run`, below.
     branch only if the check passed. Your checkout is never touched, a run that fails leaves nothing
     behind, and budgets bound it. See [docs/HEADLESS.md](docs/HEADLESS.md) and the cron and systemd
     examples in [`examples/scheduled/`](examples/scheduled). Not yet run with a real model.
+*   **A scope gate for authorized pentest work.** `cortex pentest init <dir>` scaffolds an
+    engagement with a `scope.yaml` you fill in from your signed authorization; `cortex pentest
+    check-scope <dir>` checks scanner output or notes against it and refuses anything not
+    explicitly authorized (deny-by-default: a typo or an unlisted host never passes). It is a
+    gate and an assistant for a person doing the testing, not an attack tool: it runs nothing
+    against anything. See [docs/PENTEST.md](docs/PENTEST.md).
 *   **A benchmark.** `python -m bench` runs 20 verifiable tasks (bug fixes and refactors) and
     records pass/fail from the tasks' own tests, plus steps, tokens and cost. See
     [docs/BENCHMARK.md](docs/BENCHMARK.md).

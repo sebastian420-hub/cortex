@@ -96,6 +96,7 @@ follow_imports = "silent"
 files = [
     "cortex/core/turn.py",
     "cortex/headless",
+    "cortex/pentest",
     "cortex/core/tool_policy.py",
     "cortex/core/checkpoints.py",
     "cortex/core/command_sandbox.py",
