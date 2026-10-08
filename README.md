@@ -85,9 +85,11 @@ watching, for example from a nightly schedule: `cortex run`, below.
     check-scope <dir>` checks scanner output or notes against it and refuses anything not
     explicitly authorized (deny-by-default: a typo or an unlisted host never passes); `cortex
     pentest triage <dir> --nuclei FILE` turns nuclei's output into one deduplicated,
-    severity-ranked findings list, each item checked against scope. It is a gate and an
-    assistant for a person doing the testing, not an attack tool: it runs nothing against
-    anything. See [docs/PENTEST.md](docs/PENTEST.md).
+    severity-ranked findings list, each item checked against scope; `cortex pentest report <dir>`
+    drafts the client report from it -- a finding only appears as a validated result once a
+    human has confirmed it, never while it is still an unreviewed or out-of-scope detection. It
+    is a gate and an assistant for a person doing the testing, not an attack tool: it runs
+    nothing against anything. See [docs/PENTEST.md](docs/PENTEST.md).
 *   **A benchmark.** `python -m bench` runs 20 verifiable tasks (bug fixes and refactors) and
     records pass/fail from the tasks' own tests, plus steps, tokens and cost. See
     [docs/BENCHMARK.md](docs/BENCHMARK.md).
